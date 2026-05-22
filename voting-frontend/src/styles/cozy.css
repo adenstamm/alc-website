@@ -1,0 +1,825 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,750&family=Nunito+Sans:wght@400;600;700;800&display=swap");
+
+:root {
+  --bg: #3f2818;
+  --bg-deep: #2f1d12;
+  --surface: rgba(58, 36, 22, 0.78);
+  --ink: #ffeac4;
+  --muted: #d8bd91;
+  --accent: #d19a55;
+  --accent-strong: #86442e;
+  --wood: #5a3923;
+  --wood-dark: #3a2416;
+  --clay: #86442e;
+  --shelf: #b98254;
+  --moss: #766b4b;
+  --font-body: "Nunito Sans", "Avenir Next", "Segoe UI", sans-serif;
+  --font-display: "Fraunces", Georgia, serif;
+}
+
+body {
+  background:
+    linear-gradient(90deg, rgba(255, 225, 173, 0.07), transparent 18%, rgba(0, 0, 0, 0.05) 50%, transparent 82%),
+    repeating-linear-gradient(90deg, #4a2f1d 0 56px, #553722 56px 112px, #422918 112px 168px);
+}
+
+body:has(.cozy-home) {
+  color: #f3dfbd;
+}
+
+.page:has(.cozy-home) {
+  overflow: visible;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 203, 121, 0.28), rgba(255, 203, 121, 0.08) 32%, transparent 68%),
+    linear-gradient(90deg, rgba(255, 232, 188, 0.1), transparent 20%, rgba(0, 0, 0, 0.04) 56%, transparent 88%),
+    repeating-linear-gradient(93deg, #5a3923 0 38px, #654128 38px 78px, #4d301d 78px 116px);
+}
+
+.page-shell:has(.cozy-home) {
+  max-width: 1220px;
+  border-color: rgba(139, 99, 61, 0.45);
+  background: rgba(58, 36, 22, 0.62);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.22);
+}
+
+.page-shell:has(.cozy-home) .site-nav {
+  border-bottom-color: rgba(139, 99, 61, 0.45);
+}
+
+.page-shell:has(.cozy-home) .brand-mark {
+  border-radius: 4px;
+  background: #d19a55;
+  color: #21140c;
+  box-shadow: inset 0 -5px 0 rgba(0, 0, 0, 0.1);
+}
+
+.page-shell:has(.cozy-home) .brand-copy strong,
+.page-shell:has(.cozy-home) .nav-link,
+.page-shell:has(.cozy-home) .brand-copy span {
+  color: #d8bd91;
+}
+
+.page-shell:has(.cozy-home) .nav-link:hover,
+.page-shell:has(.cozy-home) .nav-link:focus-visible,
+.page-shell:has(.cozy-home) .nav-link.is-active {
+  background: rgba(209, 154, 85, 0.14);
+  border-color: rgba(209, 154, 85, 0.28);
+  color: #ffeac4;
+}
+
+.cozy-home {
+  display: grid;
+  gap: 22px;
+}
+
+.cozy-hero,
+.cozy-record-shelf,
+.cozy-instagram,
+.cozy-info-panel {
+  border: 1px solid rgba(139, 99, 61, 0.45);
+  border-radius: 8px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.17);
+}
+
+.cozy-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 330px);
+  gap: 28px;
+  align-items: center;
+  padding: clamp(24px, 4vw, 48px);
+  background: rgba(58, 36, 22, 0.78);
+}
+
+.cozy-title {
+  max-width: 8ch;
+  margin: 0;
+  color: #ffeac4;
+  font-family: var(--font-display);
+  font-size: clamp(3.5rem, 8vw, 6rem);
+  font-weight: 750;
+  letter-spacing: 0;
+  line-height: 0.94;
+}
+
+.cozy-title span {
+  display: block;
+}
+
+.cozy-tagline {
+  margin: 22px 0 0;
+  color: #f0c982;
+  font-size: clamp(1.18rem, 2vw, 1.45rem);
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.cozy-intro {
+  max-width: 42rem;
+  margin: 14px 0 0;
+  color: #d8bd91;
+  font-size: 1.02rem;
+  line-height: 1.75;
+}
+
+.cozy-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.cozy-button {
+  display: inline-flex;
+  min-height: 50px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+  border-radius: 4px;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease;
+}
+
+.cozy-button:hover,
+.cozy-button:focus-visible,
+.cozy-link-card:hover,
+.cozy-link-card:focus-visible {
+  transform: translateY(-2px);
+}
+
+.cozy-button-primary {
+  border: 0;
+  background: #d19a55;
+  color: #21140c;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+}
+
+.cozy-button-secondary {
+  border: 1px solid rgba(209, 154, 85, 0.55);
+  background: transparent;
+  color: #f3dfbd;
+}
+
+.cozy-current-album {
+  padding: 16px;
+  border-radius: 8px;
+  background: #2b1a10;
+  box-shadow: inset 0 0 0 1px rgba(255, 225, 173, 0.11);
+}
+
+.cozy-current-cover,
+.cozy-album-cover,
+.cozy-instagram-feed img {
+  aspect-ratio: 1;
+  width: 100%;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.cozy-current-cover {
+  box-shadow: 0 20px 34px rgba(0, 0, 0, 0.34);
+}
+
+.cozy-current-copy p,
+.cozy-section-heading p,
+.cozy-info-panel > p {
+  margin: 16px 0 0;
+  color: #d19a55;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.cozy-current-copy h2,
+.cozy-section-heading h2,
+.cozy-info-panel h2 {
+  margin: 5px 0 0;
+  color: #ffeac4;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 750;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.cozy-current-copy span,
+.cozy-section-heading span,
+.cozy-info-panel > span {
+  display: block;
+  margin-top: 8px;
+  color: #d8bd91;
+  line-height: 1.6;
+}
+
+.cozy-link-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cozy-link-card {
+  min-height: 150px;
+  padding: 18px;
+  border-radius: 8px;
+  color: inherit;
+  text-decoration: none;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.16);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.cozy-link-card span {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.76;
+}
+
+.cozy-link-card strong {
+  display: block;
+  margin-top: 8px;
+  font-family: var(--font-display);
+  font-size: 1.42rem;
+  letter-spacing: 0;
+  line-height: 1.06;
+}
+
+.cozy-link-card p {
+  margin: 10px 0 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  opacity: 0.82;
+}
+
+.cozy-link-vote {
+  background: #86442e;
+  color: #f7e2bd;
+}
+
+.cozy-link-join,
+.cozy-link-discord {
+  background: #b98254;
+  color: #21140c;
+}
+
+.cozy-link-events {
+  background: #d19a55;
+  color: #21140c;
+}
+
+.cozy-link-info {
+  background: #766b4b;
+  color: #f6e1bd;
+}
+
+.cozy-record-shelf {
+  padding: 22px;
+  background: #b98254;
+  color: #21140c;
+}
+
+.cozy-record-shelf .cozy-section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.cozy-record-shelf .cozy-section-heading p {
+  margin: 0;
+  color: #5e2e1f;
+}
+
+.cozy-record-shelf .cozy-section-heading h2 {
+  color: #21140c;
+}
+
+.cozy-record-shelf .cozy-section-heading span {
+  max-width: 16rem;
+  color: #5f3f28;
+  text-align: right;
+}
+
+.cozy-album-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.cozy-album-card {
+  position: relative;
+  overflow: hidden;
+  padding: 10px;
+  border: 0;
+  border-radius: 6px;
+  background: #3a2416;
+  box-shadow: 0 18px 32px rgba(60, 36, 20, 0.22);
+  cursor: pointer;
+}
+
+.cozy-album-overlay {
+  position: absolute;
+  inset: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: end;
+  padding: 14px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, transparent 18%, rgba(33, 20, 12, 0.86));
+  color: #ffeac4;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.cozy-album-card.is-active .cozy-album-overlay,
+.cozy-album-card:focus-visible .cozy-album-overlay {
+  opacity: 1;
+}
+
+.cozy-album-card.is-active .cozy-album-cover {
+  filter: grayscale(0.35) brightness(0.72);
+}
+
+.cozy-album-overlay strong {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  line-height: 1.1;
+}
+
+.cozy-album-overlay span {
+  margin-top: 4px;
+  color: #d8bd91;
+  font-size: 0.9rem;
+}
+
+.cozy-social-and-info {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(290px, 0.62fr);
+  gap: 18px;
+}
+
+.cozy-instagram {
+  padding: 20px;
+  background: rgba(58, 36, 22, 0.78);
+}
+
+.cozy-instagram-profile {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+}
+
+.cozy-avatar {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border-radius: 50%;
+  background: #d19a55;
+  color: #21140c;
+  font-family: var(--font-display);
+  font-weight: 750;
+}
+
+.cozy-instagram h2 {
+  margin: 0;
+  color: #ffeac4;
+  font-size: 1.08rem;
+}
+
+.cozy-instagram p {
+  margin: 2px 0 0;
+  color: #d8bd91;
+}
+
+.cozy-instagram a {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  border-radius: 4px;
+  background: #b98254;
+  color: #21140c;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.cozy-instagram-stats {
+  display: flex;
+  gap: 18px;
+  margin: 18px 0;
+  padding: 14px 0;
+  border-top: 1px solid rgba(139, 99, 61, 0.45);
+  border-bottom: 1px solid rgba(139, 99, 61, 0.45);
+  color: #d8bd91;
+  font-size: 0.9rem;
+}
+
+.cozy-instagram-stats strong {
+  color: #ffeac4;
+}
+
+.cozy-instagram-feed {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cozy-info-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.cozy-info-panel {
+  padding: 20px;
+  background: rgba(58, 36, 22, 0.78);
+}
+
+.cozy-info-panel:first-child {
+  background: #b98254;
+  color: #21140c;
+}
+
+.cozy-info-panel:first-child > p {
+  color: #5e2e1f;
+}
+
+.cozy-info-panel:first-child h2 {
+  color: #21140c;
+}
+
+.cozy-info-panel:first-child > span {
+  color: #5f3f28;
+}
+
+.cozy-event-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.cozy-event-list article {
+  padding: 14px;
+  border-radius: 6px;
+  background: #766b4b;
+  color: #f6e1bd;
+}
+
+.cozy-event-list strong,
+.cozy-event-list span {
+  display: block;
+}
+
+.cozy-event-list span {
+  margin-top: 5px;
+  opacity: 0.84;
+  line-height: 1.5;
+}
+
+@media (max-width: 1080px) {
+  .cozy-hero,
+  .cozy-social-and-info {
+    grid-template-columns: 1fr;
+  }
+
+  .cozy-link-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cozy-album-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .page:has(.cozy-home) {
+    padding: 12px;
+  }
+
+  .page-shell:has(.cozy-home) {
+    padding: 14px;
+    border-radius: 12px;
+  }
+
+  .cozy-home {
+    gap: 14px;
+  }
+
+  .cozy-hero,
+  .cozy-record-shelf,
+  .cozy-instagram,
+  .cozy-info-panel {
+    padding: 16px;
+  }
+
+  .cozy-title {
+    font-size: clamp(3rem, 17vw, 4rem);
+  }
+
+  .cozy-hero-actions,
+  .cozy-button {
+    width: 100%;
+  }
+
+  .cozy-link-grid,
+  .cozy-album-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cozy-record-shelf .cozy-section-heading {
+    display: block;
+  }
+
+  .cozy-record-shelf .cozy-section-heading span {
+    max-width: none;
+    text-align: left;
+  }
+
+  .cozy-instagram-profile {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .cozy-instagram a {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+
+  .cozy-instagram-stats {
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 0.78rem;
+  }
+
+  .cozy-instagram-feed {
+    gap: 6px;
+  }
+}
+
+/* Shared cozy theme for vote and admin pages. */
+body,
+.page {
+  color: #f3dfbd;
+}
+
+.page {
+  overflow: visible;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 203, 121, 0.2), rgba(255, 203, 121, 0.06) 34%, transparent 68%),
+    linear-gradient(90deg, rgba(255, 232, 188, 0.08), transparent 20%, rgba(0, 0, 0, 0.05) 56%, transparent 88%),
+    repeating-linear-gradient(93deg, #5a3923 0 38px, #654128 38px 78px, #4d301d 78px 116px);
+}
+
+.page-shell {
+  border-color: rgba(139, 99, 61, 0.45);
+  background: rgba(58, 36, 22, 0.68);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.22);
+}
+
+.site-nav {
+  border-bottom-color: rgba(139, 99, 61, 0.45);
+}
+
+.brand-mark {
+  border-radius: 4px;
+  background: #d19a55;
+  color: #21140c;
+  box-shadow: inset 0 -5px 0 rgba(0, 0, 0, 0.1);
+}
+
+.brand-copy strong,
+.brand-copy span,
+.nav-link {
+  color: #d8bd91;
+}
+
+.nav-link:hover,
+.nav-link:focus-visible,
+.nav-link.is-active {
+  background: rgba(209, 154, 85, 0.14);
+  border-color: rgba(209, 154, 85, 0.28);
+  color: #ffeac4;
+}
+
+.surface-card,
+.confirmation-card,
+.saved-ballot,
+.candidate-option,
+.member-row,
+.auth-mode-switch {
+  border-color: rgba(139, 99, 61, 0.45);
+  background: rgba(58, 36, 22, 0.84);
+  color: #f3dfbd;
+  box-shadow: 0 20px 54px rgba(0, 0, 0, 0.18);
+}
+
+.surface-card::before {
+  background: linear-gradient(135deg, rgba(255, 226, 173, 0.08), transparent 45%);
+}
+
+.page-title,
+.section-heading h2,
+.form-header h2,
+.confirmation-card h3,
+.feature-card h3,
+.rhythm-card h3,
+.album-card h3,
+.sidebar-title,
+.candidate-option strong,
+.member-row strong,
+.field-group label {
+  color: #ffeac4;
+}
+
+.hero-lead,
+.page-intro,
+.section-heading p,
+.feature-card p,
+.rhythm-card p,
+.album-note,
+.sidebar-copy,
+.form-header p,
+.confirmation-card p,
+.helper-note,
+.signal-card p,
+.candidate-note,
+.timestamp,
+.member-row p,
+.meta-list dd {
+  color: #d8bd91;
+}
+
+.eyebrow,
+.album-spotlight-label,
+.saved-ballot span,
+.album-period,
+.meta-list dt {
+  color: #d19a55;
+}
+
+.button-primary {
+  background: #d19a55;
+  color: #21140c;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.2);
+}
+
+.button-secondary {
+  border-color: rgba(209, 154, 85, 0.42);
+  background: rgba(185, 130, 84, 0.2);
+  color: #f3dfbd;
+}
+
+.button-primary:disabled,
+.button-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.field-group input,
+.field-group textarea {
+  border-color: rgba(139, 99, 61, 0.58);
+  background: #2b1a10;
+  color: #ffeac4;
+}
+
+.field-group input::placeholder,
+.field-group textarea::placeholder {
+  color: #a98a66;
+}
+
+.field-group input:focus,
+.field-group textarea:focus {
+  border-color: rgba(209, 154, 85, 0.62);
+  background: #342112;
+  box-shadow: 0 0 0 4px rgba(209, 154, 85, 0.16);
+}
+
+.auth-mode-switch {
+  padding: 6px;
+  background: rgba(43, 26, 16, 0.76);
+}
+
+.auth-mode-switch button {
+  color: #d8bd91;
+}
+
+.auth-mode-switch button.is-active {
+  background: #b98254;
+  color: #21140c;
+}
+
+.candidate-option {
+  background: rgba(43, 26, 16, 0.74);
+}
+
+.candidate-option:hover {
+  box-shadow: 0 24px 42px rgba(0, 0, 0, 0.18);
+}
+
+.candidate-option.is-selected {
+  border-color: rgba(209, 154, 85, 0.66);
+  background: rgba(209, 154, 85, 0.16);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.16);
+}
+
+.candidate-option input {
+  accent-color: #d19a55;
+}
+
+.phase-pill,
+.phase-nominations,
+.phase-primary,
+.phase-final {
+  background: rgba(209, 154, 85, 0.18);
+  color: #f0c982;
+}
+
+.album-spotlight,
+.signal-card {
+  border-color: rgba(139, 99, 61, 0.45);
+  background: rgba(43, 26, 16, 0.62);
+}
+
+.meta-list.compact div,
+.meta-list div {
+  border-bottom-color: rgba(139, 99, 61, 0.35);
+}
+
+.form-error {
+  border-color: rgba(219, 104, 82, 0.38);
+  background: rgba(74, 36, 29, 0.9);
+  color: #ffd1c6;
+}
+
+.form-success {
+  border-color: rgba(166, 184, 115, 0.36);
+  background: rgba(53, 64, 42, 0.9);
+  color: #edf3c6;
+}
+
+.member-badges span {
+  background: rgba(209, 154, 85, 0.18);
+  color: #f0c982;
+}
+
+.member-actions .button-secondary {
+  background: rgba(43, 26, 16, 0.44);
+}
+
+.nomination-pool-card {
+  max-height: 520px;
+}
+
+.nomination-pool-list {
+  display: grid;
+  gap: 10px;
+  max-height: 330px;
+  margin-top: 16px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.nomination-pool-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid rgba(139, 99, 61, 0.34);
+  border-radius: 12px;
+  background: rgba(43, 26, 16, 0.48);
+}
+
+.nomination-pool-item.is-advancing {
+  border-color: rgba(209, 154, 85, 0.62);
+  background: rgba(209, 154, 85, 0.13);
+}
+
+.nomination-pool-item > span {
+  color: #d19a55;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.nomination-pool-item strong {
+  display: block;
+  color: #ffeac4;
+  line-height: 1.15;
+}
+
+.nomination-pool-item p {
+  margin: 5px 0 0;
+  color: #d8bd91;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}

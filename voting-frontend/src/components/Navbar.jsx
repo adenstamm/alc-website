@@ -2,6 +2,7 @@ function Navbar({ currentPath, navigate }) {
   const links = [
     { path: "/", label: "Home" },
     { path: "/vote", label: "Vote" },
+    { path: "/admin", label: "Admin" },
   ];
 
   function handleNavigate(event, path) {

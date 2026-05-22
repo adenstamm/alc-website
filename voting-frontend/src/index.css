@@ -1,13 +1,15 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap");
+
 :root {
-  --bg: #f6f0ea;
-  --bg-deep: #efe1f4;
+  --bg: #f8f0ea;
+  --bg-deep: #e8ecf7;
   --surface: rgba(255, 255, 255, 0.72);
   --ink: #1b1324;
   --muted: #665d73;
   --accent: #6d4ecf;
   --accent-strong: #5336aa;
-  --font-body: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
-  --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  --font-body: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+  --font-display: "Syne", "Avenir Next", "Segoe UI", sans-serif;
   color: var(--ink);
   background: var(--bg);
   font-family: var(--font-body);
@@ -36,9 +38,13 @@ body,
 body {
   margin: 0;
   background:
-    radial-gradient(circle at top left, rgba(187, 154, 255, 0.26), transparent 28%),
-    radial-gradient(circle at 82% 12%, rgba(255, 255, 255, 0.7), transparent 22%),
-    linear-gradient(180deg, var(--bg) 0%, #f9f4ef 50%, var(--bg-deep) 100%);
+    linear-gradient(90deg, rgba(83, 54, 170, 0.04) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(83, 54, 170, 0.04) 1px, transparent 1px),
+    linear-gradient(180deg, var(--bg) 0%, #fbf7f2 45%, var(--bg-deep) 100%);
+  background-size:
+    32px 32px,
+    32px 32px,
+    auto;
 }
 
 body,

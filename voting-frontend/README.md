@@ -1,16 +1,24 @@
-# React + Vite
+# Album Listening Club Website
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React/Vite frontend for the Album Listening Club site and voting flow.
 
-Currently, two official plugins are available:
+## Local setup
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```sh
+npm install
+npm run dev
+```
 
-## React Compiler
+## Supabase voting setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Voting is backed by Supabase auth, approved memberships, and a database uniqueness rule.
 
-## Expanding the ESLint configuration
+1. Create a Supabase project.
+2. Copy `.env.example` to `.env.local`.
+3. Fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+4. Run `supabase/schema.sql` in the Supabase SQL editor.
+5. Create your first account through the vote page.
+6. In Supabase, manually set that row in `memberships` to `status = 'approved'` and `role = 'admin'`.
+7. Use `/admin` to approve future members.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+The database enforces one vote per approved account per poll through the `votes_one_per_user_per_poll` constraint.

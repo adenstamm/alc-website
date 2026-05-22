@@ -1,94 +1,218 @@
-import { phaseContent } from "../data/clubContent";
+import { useState } from "react";
 
-function Home({ clubPrinciples, currentPoll, navigate, recentAlbums, weeklyRhythm }) {
-  const phaseLabel = phaseContent[currentPoll.phase].label;
+import "../styles/cozy.css";
+
+const coverUrls = {
+  blonde: "https://upload.wikimedia.org/wikipedia/en/a/a0/Blonde_-_Frank_Ocean.jpeg",
+  currents: "https://upload.wikimedia.org/wikipedia/en/9/9b/Tame_Impala_-_Currents.png",
+  discovery: "https://upload.wikimedia.org/wikipedia/en/a/ae/Daft_Punk_-_Discovery.jpg",
+  ctrl: "https://upload.wikimedia.org/wikipedia/en/b/bf/SZA_-_Ctrl_cover.png",
+  vespertine: "https://upload.wikimedia.org/wikipedia/en/8/8a/BjorkVespertine.jpg",
+};
+
+const feedImages = [
+  coverUrls.currents,
+  "https://upload.wikimedia.org/wikipedia/en/6/67/Cocteau_Twins-Heaven_or_Las_Vegas.jpg",
+  coverUrls.blonde,
+  coverUrls.discovery,
+  coverUrls.ctrl,
+  coverUrls.vespertine,
+];
+
+function Home({
+  clubLinks,
+  currentPoll,
+  homeActions,
+  instagramFeed,
+  navigate,
+  recentAlbums,
+  specialEvents,
+}) {
+  const [activeAlbumId, setActiveAlbumId] = useState(null);
+  const currentAlbumCover =
+    currentPoll.albumOfWeek.coverUrl ||
+    "https://upload.wikimedia.org/wikipedia/en/6/67/Cocteau_Twins-Heaven_or_Las_Vegas.jpg";
+  const quickLinks = [
+    ...homeActions,
+    {
+      id: "info",
+      label: "Info",
+      title: "How ALC works",
+      description: "Meeting rhythm, cost, location details, and what to expect.",
+      kind: "anchor",
+      target: "#more-info",
+    },
+  ];
+
+  function handleAction(event, action) {
+    if (action.kind === "route") {
+      event.preventDefault();
+      navigate(action.target);
+    }
+  }
+
+  function getActionHref(action) {
+    if (action.kind === "route") {
+      return action.target;
+    }
+
+    if (action.kind === "external") {
+      return clubLinks[action.target] || "#";
+    }
+
+    return action.target;
+  }
 
   return (
-    <div className="home-page">
-      <section className="hero-panel">
-        <div className="hero-copy surface-card">
-          <p className="eyebrow">Your weekly dose of new music</p>
-          <h1 className="hero-title">
-            Album Listening Club
+    <div className="home-page cozy-home">
+      <section className="cozy-hero" aria-labelledby="home-title">
+        <div className="cozy-hero-copy">
+          <h1 id="home-title" className="cozy-title">
+            Album
+            <span>Listening</span>
+            Club
           </h1>
-          <p className="hero-lead">
-            ALC is a club dedicated to helping you expand your music taste while making new friends along the way. Yap about your week, favorite media, but most
-            importantly what you thought of the album this week (whether you loved it or hated it ! )
+
+          <p className="cozy-tagline">Like a book club, but for albums.</p>
+          <p className="cozy-intro">
+            A warm little home base for the record everyone is sitting with this week.
+            Vote together, listen on your own time, then show up ready to talk like
+            friends on a dorm room floor with the lights low.
           </p>
 
-          <div className="hero-actions">
-            <button className="button button-primary" onClick={() => navigate("/vote")}>
-              Vote on next week&apos;s album!
+          <div className="cozy-hero-actions" aria-label="Primary links">
+            <button className="cozy-button cozy-button-primary" onClick={() => navigate("/vote")}>
+              Go to weekly voting
             </button>
 
-            <a className="button button-secondary" href="#recent-albums">
-              Browse recent albums
+            <a className="cozy-button cozy-button-secondary" href={clubLinks.sunDevilCentral}>
+              Join the club
             </a>
           </div>
-
-          <div className="signal-grid" aria-label="Product strengths">
-            <div className="signal-card">
-              <span className="signal-value">Voting rules</span>
-              <p>Rate this weeks album, nominate a new album, and choose your favorite from the nominations :)</p>
-            </div>
-
-            <div className="signal-card">
-              <span className="signal-value">1 vote per user</span>
-              <p>We want to make sure everyone has a say! </p>
-            </div>
-
-            <div className="signal-card">
-              <span className="signal-value">3 phases</span>
-              <p>All voting phases will be accessed on the same page</p>
-            </div>
-          </div>
         </div>
 
-        <aside className="hero-aside surface-card">
-          <p className="phase-pill">{currentPoll.cycleLabel}</p>
-          <h2 className="aside-title">This week&apos;s album</h2>
+        <article className="cozy-current-album" aria-label="This week's album">
+          <img
+            src={currentAlbumCover}
+            alt={`${currentPoll.albumOfWeek.title} album cover`}
+            className="cozy-current-cover"
+          />
 
-          <div className="album-spotlight">
-            <span className="album-spotlight-label">{currentPoll.albumOfWeek.note}</span>
-            <strong>{currentPoll.albumOfWeek.title}</strong>
-            <p>{currentPoll.albumOfWeek.artist}</p>
+          <div className="cozy-current-copy">
+            <p>This week&apos;s album</p>
+            <h2>{currentPoll.albumOfWeek.title}</h2>
+            <span>{currentPoll.albumOfWeek.artist}</span>
           </div>
-
-          <dl className="meta-list">
-            <div>
-              <dt>Poll phase</dt>
-              <dd>{phaseLabel}</dd>
-            </div>
-            <div>
-              <dt>Status</dt>
-              <dd>{currentPoll.status}</dd>
-            </div>
-            <div>
-              <dt>Ballot prompt</dt>
-              <dd>{currentPoll.question}</dd>
-            </div>
-          </dl>
-
-          <button className="button button-secondary full-width" onClick={() => navigate("/vote")}>
-            Go to voting
-          </button>
-        </aside>
+        </article>
       </section>
 
-      <section className="section-block" id="recent-albums">
-        <div className="section-heading">
-          <h2>Recent Album Listening Club Albums</h2>
+      <section className="cozy-link-grid" aria-label="Club links">
+        {quickLinks.map((action) => (
+          <a
+            key={action.id}
+            className={`cozy-link-card cozy-link-${action.id}`}
+            href={getActionHref(action)}
+            onClick={(event) => handleAction(event, action)}
+          >
+            <span>{action.label}</span>
+            <strong>{action.title}</strong>
+            <p>{action.description}</p>
+          </a>
+        ))}
+      </section>
+
+      <section className="cozy-record-shelf" id="recent-albums" aria-labelledby="recent-heading">
+        <div className="cozy-section-heading">
+          <p>Recent listens</p>
+          <h2 id="recent-heading">Records on the shelf.</h2>
+          <span>Tap a cover to reveal the album and artist.</span>
         </div>
 
-        <div className="album-grid">
-          {recentAlbums.map((album) => (
-            <article key={album.id} className="album-card surface-card">
-              <span className="album-period">{album.period}</span>
-              <h3>{album.title}</h3>
-              <p className="album-artist">{album.artist}</p>
-              <p className="album-note">{album.note}</p>
-            </article>
-          ))}
+        <div className="cozy-album-grid">
+          {recentAlbums.map((album) => {
+            const isActive = activeAlbumId === album.id;
+
+            return (
+              <button
+                key={album.id}
+                type="button"
+                className={`cozy-album-card ${isActive ? "is-active" : ""}`}
+                aria-pressed={isActive}
+                onClick={() => setActiveAlbumId(isActive ? null : album.id)}
+              >
+                <img
+                  src={album.coverUrl || coverUrls[album.id]}
+                  alt={`${album.title} album cover`}
+                  className="cozy-album-cover"
+                />
+
+                <span className="cozy-album-overlay">
+                  <strong>{album.title}</strong>
+                  <span>{album.artist}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="cozy-social-and-info" aria-label="Club social and information">
+        <div className="cozy-instagram" aria-labelledby="instagram-heading">
+          <div className="cozy-instagram-profile">
+            <div className="cozy-avatar">ALC</div>
+
+            <div>
+              <h2 id="instagram-heading">@albumasu</h2>
+              <p>Album Listening Club</p>
+            </div>
+
+            <a href={clubLinks.instagram}>Follow</a>
+          </div>
+
+          <div className="cozy-instagram-stats" aria-label="Instagram profile stats">
+            <span>
+              <strong>24</strong> posts
+            </span>
+            <span>
+              <strong>48</strong> members
+            </span>
+            <span>
+              <strong>weekly</strong> club
+            </span>
+          </div>
+
+          <div className="cozy-instagram-feed" aria-label="Instagram feed preview">
+            {instagramFeed.map((post, index) => (
+              <img
+                key={post.id}
+                src={post.imageUrl || feedImages[index % feedImages.length]}
+                alt={post.label}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="cozy-info-stack">
+          <section className="cozy-info-panel" id="more-info" aria-labelledby="info-heading">
+            <p>More info</p>
+            <h2 id="info-heading">What to expect.</h2>
+            <span>
+              We meet every week in Hayden basement, room C8!! 7:15. Come to yap about your favorite albums.
+            </span>
+          </section>
+
+          <section className="cozy-info-panel" id="events" aria-labelledby="events-heading">
+            <p>Events</p>
+            <h2 id="events-heading">Outside club night.</h2>
+            <div className="cozy-event-list">
+              {specialEvents.map((event) => (
+                <article key={event.id}>
+                  <strong>{event.title}</strong>
+                  <span>{event.description}</span>
+                </article>
+              ))}
+            </div>
+          </section>
         </div>
       </section>
     </div>

@@ -3,15 +3,23 @@ import { useEffect, useState } from "react";
 import "./App.css";
 import Navbar from "./components/Navbar";
 import {
-  clubPrinciples,
+  clubLinks,
   currentPoll,
+  homeActions,
+  instagramFeed,
   recentAlbums,
-  weeklyRhythm,
+  specialEvents,
 } from "./data/clubContent";
+import { hasSupabaseConfig, supabase } from "./lib/supabaseClient";
+import Admin from "./pages/Admin";
 import Home from "./pages/Home";
 import Poll from "./pages/Poll";
 
 function normalizePath(pathname) {
+  if (pathname === "/admin" || pathname === "/admin/") {
+    return "/admin";
+  }
+
   if (pathname === "/vote" || pathname === "/vote/") {
     return "/vote";
   }
@@ -25,6 +33,29 @@ function getCurrentPath() {
 
 function App() {
   const [currentPath, setCurrentPath] = useState(getCurrentPath); //single source of truth
+  const [authReady, setAuthReady] = useState(!hasSupabaseConfig);
+  const [session, setSession] = useState(null);
+  const [membership, setMembership] = useState(null);
+
+  async function loadMembership(nextSession) {
+    if (!hasSupabaseConfig || !nextSession?.user) {
+      setMembership(null);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("memberships")
+      .select("user_id, email, display_name, status, role, created_at, updated_at")
+      .eq("user_id", nextSession.user.id)
+      .maybeSingle();
+
+    if (error) {
+      setMembership(null);
+      return;
+    }
+
+    setMembership(data);
+  }
 
   useEffect(() => { //listener for button changes, helps url and ui stay in sync
     function handlePopState() {
@@ -35,6 +66,40 @@ function App() {
 
     return () => {
       window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasSupabaseConfig) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    async function loadSession() {
+      const { data } = await supabase.auth.getSession();
+
+      if (!isMounted) {
+        return;
+      }
+
+      setSession(data.session);
+      await loadMembership(data.session);
+      setAuthReady(true);
+    }
+
+    loadSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      loadMembership(nextSession);
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
     };
   }, []);
 
@@ -55,15 +120,35 @@ function App() {
         <Navbar currentPath={currentPath} navigate={navigate} />
 
         <main className="view">
-          {currentPath === "/vote" ? (
-            <Poll navigate={navigate} poll={currentPoll} />
+          {currentPath === "/admin" ? (
+            <Admin
+              authReady={authReady}
+              hasSupabaseConfig={hasSupabaseConfig}
+              membership={membership}
+              session={session}
+              supabase={supabase}
+            />
+          ) : currentPath === "/vote" ? (
+            <Poll
+              key={`${currentPoll.id}-${currentPoll.phase}`}
+              authReady={authReady}
+              hasSupabaseConfig={hasSupabaseConfig}
+              membership={membership}
+              navigate={navigate}
+              poll={currentPoll}
+              refreshMembership={() => loadMembership(session)}
+              session={session}
+              supabase={supabase}
+            />
           ) : (
             <Home
-              clubPrinciples={clubPrinciples}
+              clubLinks={clubLinks}
               currentPoll={currentPoll}
+              homeActions={homeActions}
+              instagramFeed={instagramFeed}
               navigate={navigate}
               recentAlbums={recentAlbums}
-              weeklyRhythm={weeklyRhythm}
+              specialEvents={specialEvents}
             />
           )}
         </main>

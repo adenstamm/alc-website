@@ -4,6 +4,7 @@ export const recentAlbums = [
     title: "Blonde",
     artist: "Frank Ocean",
     period: "Recently featured",
+    coverClass: "cover-blonde",
     note: "A dense, emotional listen that turned into the longest post-club discussion of the month.",
   },
   {
@@ -11,6 +12,7 @@ export const recentAlbums = [
     title: "Currents",
     artist: "Tame Impala",
     period: "Two weeks ago",
+    coverClass: "cover-currents",
     note: "A polished psych-pop pick that gave the club a lighter, more immediate week.",
   },
   {
@@ -18,6 +20,7 @@ export const recentAlbums = [
     title: "Discovery",
     artist: "Daft Punk",
     period: "Three weeks ago",
+    coverClass: "cover-discovery",
     note: "A high-energy choice that let newer members jump in without needing much context.",
   },
   {
@@ -25,7 +28,82 @@ export const recentAlbums = [
     title: "Ctrl",
     artist: "SZA",
     period: "Last month",
+    coverClass: "cover-ctrl",
     note: "A lyrical album that pulled conversation toward songwriting and sequencing.",
+  },
+  {
+    id: "vespertine",
+    title: "Vespertine",
+    artist: "Björk",
+    period: "Archive pick",
+    coverClass: "cover-vespertine",
+    note: "An intimate album that pulled the room toward texture, production, and close listening.",
+  },
+];
+
+export const clubLinks = {
+  discord: "#",
+  instagram: "https://www.instagram.com/albumasu/",
+  sunDevilCentral:
+    "https://sundevilcentral.eoss.asu.edu/webapp/auth/login?redirect=%2FALC%2F&msg=LOGIN_REQUIRED",
+};
+
+export const homeActions = [
+  {
+    id: "vote",
+    label: "Vote",
+    title: "Weekly voting",
+    description: "Nominate, narrow it down, and help choose what everyone listens to next.",
+    kind: "route",
+    target: "/vote",
+  },
+  {
+    id: "join",
+    label: "Join",
+    title: "Sun Devil Central",
+    description: "Join the club officially and get the real meeting details in one place.",
+    kind: "external",
+    target: "sunDevilCentral",
+  },
+  {
+    id: "discord",
+    label: "Discord",
+    title: "Community chat",
+    description: "The place for reminders, side conversations, and keeping up between meetings.",
+    kind: "external",
+    target: "discord",
+  },
+  {
+    id: "events",
+    label: "Events",
+    title: "Special events",
+    description: "Live concerts, volunteering, and occasional hangs beyond the weekly meeting.",
+    kind: "anchor",
+    target: "#events",
+  },
+];
+
+export const instagramFeed = [
+  { id: "post-1", label: "Meeting recap", coverClass: "feed-meeting" },
+  { id: "post-2", label: "Album of the week", coverClass: "feed-album" },
+  { id: "post-3", label: "Group listen", coverClass: "feed-listen" },
+  { id: "post-4", label: "Event post", coverClass: "feed-event" },
+  { id: "post-5", label: "Archive pick", coverClass: "feed-archive" },
+  { id: "post-6", label: "Club moment", coverClass: "feed-club" },
+];
+
+export const specialEvents = [
+  {
+    id: "concerts",
+    label: "Live concerts",
+    title: "Group show nights",
+    description: "Concert plans for members who want the club to leave the library.",
+  },
+  {
+    id: "volunteering",
+    label: "Volunteering",
+    title: "Good hangs with a purpose",
+    description: "Volunteer events that still feel social, low-pressure, and easy to join.",
   },
 ];
 
@@ -81,6 +159,7 @@ export const currentPoll = {
     title: "Heaven or Las Vegas",
     artist: "Cocteau Twins",
     note: "Current club listen",
+    coverClass: "cover-week",
   },
   candidates: [
     {
@@ -114,9 +193,9 @@ export const phaseContent = { //given this phase what stuff should i show
   },
   primary: {
     label: "Primary Voting",
-    title: "Choose the album that should advance",
+    title: "Choose from the top five nominations",
     description:
-      "The nomination pool is set. Members now pick one option to move into the final vote.",
+      "Duplicates are grouped together. The five most-nominated unique albums move into this ballot, with newest nominations breaking ties.",
     buttonLabel: "Cast primary vote",
   },
   final: {
