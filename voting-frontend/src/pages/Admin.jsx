@@ -1,26 +1,169 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import {
+  getRecentShelfAlbums,
+  loadRecordShelfCoverOverrides,
+  RECORD_SHELF_BUCKET,
+} from "../lib/recordShelf";
 
 function isAdmin(membership) {
   return membership?.status === "approved" && membership?.role === "admin";
 }
 
-function Admin({ authReady, hasSupabaseConfig, membership, session, supabase }) {
+const MEMBERS_PER_PAGE = 10;
+
+function formatCount(count, noun) {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+function getMemberName(member) {
+  return member.display_name || "Unnamed member";
+}
+
+function createPollId(cycleLabel) {
+  const slug = cycleLabel
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+
+  return slug ? `poll-${slug}` : `poll-${new Date().toISOString().slice(0, 10)}`;
+}
+
+function Admin({ authReady, hasSupabaseConfig, membership, poll, pollError, refreshPoll, session, supabase }) {
   const [memberships, setMemberships] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [results, setResults] = useState(null);
+  const [selectedFinalistIds, setSelectedFinalistIds] = useState([]);
+  const [newPoll, setNewPoll] = useState({
+    cycleLabel: "",
+    pollId: "",
+    question: "What should the club listen to next?",
+    description: "Submit one album and artist pairing for the next club session.",
+    albumTitle: "",
+    albumArtist: "",
+  });
+  const [memberTab, setMemberTab] = useState("pending");
+  const [accountFilter, setAccountFilter] = useState("active");
+  const [memberSearch, setMemberSearch] = useState("");
+  const [memberPage, setMemberPage] = useState(1);
+  const [selectedShelfAlbumId, setSelectedShelfAlbumId] = useState("");
+  const [shelfCoverFile, setShelfCoverFile] = useState(null);
+  const [shelfCoverOverrides, setShelfCoverOverrides] = useState({});
+  const [isLoadingShelfCovers, setIsLoadingShelfCovers] = useState(false);
+  const [isSavingShelfCover, setIsSavingShelfCover] = useState(false);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+  const [isLoadingResults, setIsLoadingResults] = useState(false);
+  const [isSavingPhase, setIsSavingPhase] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
 
-  const canManageMembers = hasSupabaseConfig && isAdmin(membership);
+  const canManage = hasSupabaseConfig && isAdmin(membership);
+  const shelfAlbums = useMemo(() => getRecentShelfAlbums(), []);
+  const selectedShelfAlbum = shelfAlbums.find((album) => album.id === selectedShelfAlbumId) || shelfAlbums[0];
+  const primaryRows = results?.primaryResults || [];
+  const nominationRows = results?.nominations || [];
+  const finalRows = results?.finalists || [];
+  const irvRounds = results?.irv?.rounds || [];
+  const irvTie = results?.irv?.tie || null;
+  const irvWinnerId = results?.irv?.winnerId || null;
+  const irvWinner = finalRows.find((candidate) => candidate.id === irvWinnerId);
+  const selectedCount = selectedFinalistIds.length;
+  const canAdvanceToFinal = poll.phase === "primary" && selectedCount === 5;
+  const adminCount = memberships.filter(
+    (member) => member.status === "approved" && member.role === "admin",
+  ).length;
+  const pendingMembers = memberships.filter((member) => member.status === "pending");
+  const accountFilters = [
+    { id: "active", label: "Active members" },
+    { id: "admins", label: "Admins" },
+    { id: "pending", label: "Pending" },
+    { id: "rejected", label: "Rejected" },
+    { id: "all", label: "All" },
+  ];
+  const visibleMembers = useMemo(() => {
+    const sourceMembers =
+      memberTab === "pending"
+        ? pendingMembers
+        : memberships.filter((member) => {
+            if (accountFilter === "active") {
+              return member.status === "approved";
+            }
+
+            if (accountFilter === "admins") {
+              return member.status === "approved" && member.role === "admin";
+            }
+
+            if (accountFilter === "pending") {
+              return member.status === "pending";
+            }
+
+            if (accountFilter === "rejected") {
+              return member.status === "rejected";
+            }
+
+            return true;
+          });
+    const normalizedSearch = memberSearch.trim().toLowerCase();
+
+    if (!normalizedSearch) {
+      return sourceMembers;
+    }
+
+    return sourceMembers.filter((member) =>
+      getMemberName(member).toLowerCase().includes(normalizedSearch),
+    );
+  }, [accountFilter, memberSearch, memberTab, memberships, pendingMembers]);
+  const totalMemberPages = Math.max(1, Math.ceil(visibleMembers.length / MEMBERS_PER_PAGE));
+  const currentMemberPage = Math.min(memberPage, totalMemberPages);
+  const pagedMembers = visibleMembers.slice(
+    (currentMemberPage - 1) * MEMBERS_PER_PAGE,
+    currentMemberPage * MEMBERS_PER_PAGE,
+  );
+
+  const loadResults = useCallback(async () => {
+    if (!canManage || !poll?.id) {
+      return;
+    }
+
+    setIsLoadingResults(true);
+    setError(null);
+
+    const { data, error: loadError } = await supabase.rpc("get_admin_poll_results", {
+      target_poll_id: poll.id,
+    });
+
+    if (loadError) {
+      setError(loadError.message);
+      setResults(null);
+    } else {
+      setResults(data);
+      const finalistIds = (data?.finalists || []).map((candidate) => candidate.id);
+      setSelectedFinalistIds(finalistIds);
+    }
+
+    setIsLoadingResults(false);
+  }, [canManage, poll?.id, supabase]);
+
+  const sortedPrimaryRows = useMemo(
+    () =>
+      [...primaryRows].sort((a, b) => {
+        if ((b.primaryVotes || 0) !== (a.primaryVotes || 0)) {
+          return (b.primaryVotes || 0) - (a.primaryVotes || 0);
+        }
+
+        return a.title.localeCompare(b.title);
+      }),
+    [primaryRows],
+  );
 
   useEffect(() => {
-    if (!canManageMembers) {
+    if (!canManage) {
       return;
     }
 
     let isMounted = true;
 
     async function loadMemberships() {
-      setIsLoading(true);
+      setIsLoadingMembers(true);
       setError(null);
 
       const { data, error: loadError } = await supabase
@@ -38,7 +181,7 @@ function Admin({ authReady, hasSupabaseConfig, membership, session, supabase }) 
         setMemberships(data);
       }
 
-      setIsLoading(false);
+      setIsLoadingMembers(false);
     }
 
     loadMemberships();
@@ -46,11 +189,145 @@ function Admin({ authReady, hasSupabaseConfig, membership, session, supabase }) 
     return () => {
       isMounted = false;
     };
-  }, [canManageMembers, supabase]);
+  }, [canManage, supabase]);
+
+  useEffect(() => {
+    loadResults();
+  }, [loadResults]);
+
+  const loadShelfCovers = useCallback(async () => {
+    if (!canManage) {
+      return;
+    }
+
+    setIsLoadingShelfCovers(true);
+    const overrides = await loadRecordShelfCoverOverrides(
+      supabase,
+      hasSupabaseConfig,
+      shelfAlbums.map((album) => album.id),
+    );
+    setShelfCoverOverrides(overrides);
+    setIsLoadingShelfCovers(false);
+  }, [canManage, hasSupabaseConfig, shelfAlbums, supabase]);
+
+  useEffect(() => {
+    if (!selectedShelfAlbumId && shelfAlbums.length) {
+      setSelectedShelfAlbumId(shelfAlbums[0].id);
+    }
+  }, [selectedShelfAlbumId, shelfAlbums]);
+
+  useEffect(() => {
+    loadShelfCovers();
+  }, [loadShelfCovers]);
+
+  useEffect(() => {
+    setMemberPage(1);
+  }, [accountFilter, memberSearch, memberTab]);
+
+  function handleNewPollChange(event) {
+    const { name, value } = event.target;
+
+    setNewPoll((currentPoll) => {
+      const nextPoll = {
+        ...currentPoll,
+        [name]: value,
+      };
+
+      if (name === "cycleLabel" && (!currentPoll.pollId || currentPoll.pollId === createPollId(currentPoll.cycleLabel))) {
+        nextPoll.pollId = createPollId(value);
+      }
+
+      return nextPoll;
+    });
+  }
+
+  async function handleCreatePoll(event) {
+    event.preventDefault();
+    setError(null);
+    setMessage(null);
+
+    if (!newPoll.pollId || !newPoll.cycleLabel || !newPoll.albumTitle || !newPoll.albumArtist) {
+      setError("Add a poll id, cycle label, album title, and artist before creating a poll.");
+      return;
+    }
+
+    setIsSavingPhase(true);
+
+    const { error: createError } = await supabase.rpc("create_poll", {
+      new_poll_id: newPoll.pollId,
+      new_cycle_label: newPoll.cycleLabel,
+      new_question: newPoll.question,
+      new_description: newPoll.description,
+      album_title: newPoll.albumTitle,
+      album_artist: newPoll.albumArtist,
+    });
+
+    setIsSavingPhase(false);
+
+    if (createError) {
+      setError(createError.message);
+      return;
+    }
+
+    setMessage("New poll created and set active.");
+    setNewPoll({
+      cycleLabel: "",
+      pollId: "",
+      question: "What should the club listen to next?",
+      description: "Submit one album and artist pairing for the next club session.",
+      albumTitle: "",
+      albumArtist: "",
+    });
+    setResults(null);
+    setSelectedFinalistIds([]);
+    await refreshPoll();
+    await loadResults();
+  }
+
+  function handleMemberTabChange(nextTab) {
+    setMemberTab(nextTab);
+
+    if (nextTab === "all" && memberTab !== "all") {
+      setAccountFilter("active");
+    }
+  }
+
+  function getMembershipActionLabel(updates) {
+    if (updates.status === "approved") {
+      return "Account approved.";
+    }
+
+    if (updates.status === "rejected") {
+      return "Account rejected.";
+    }
+
+    if (updates.status === "pending") {
+      return "Account moved back to pending.";
+    }
+
+    if (updates.role === "admin") {
+      return "Admin role added.";
+    }
+
+    if (updates.role === "member") {
+      return "Admin role removed.";
+    }
+
+    return "Membership updated.";
+  }
 
   async function updateMembership(userId, updates) {
     setError(null);
     setMessage(null);
+
+    if (updates.role === "member") {
+      const targetMember = memberships.find((member) => member.user_id === userId);
+
+      if (targetMember?.role === "admin" && adminCount <= 1) {
+        setError("You cannot remove the last admin.");
+        return;
+      }
+    }
 
     const { data, error: updateError } = await supabase
       .from("memberships")
@@ -69,10 +346,585 @@ function Admin({ authReady, hasSupabaseConfig, membership, session, supabase }) 
         currentMembership.user_id === userId ? data : currentMembership,
       ),
     );
-    setMessage("Membership updated.");
+    setMessage(getMembershipActionLabel(updates));
   }
 
-  function renderBody() {
+  function toggleFinalist(candidateId) {
+    setSelectedFinalistIds((currentIds) => {
+      if (currentIds.includes(candidateId)) {
+        return currentIds.filter((id) => id !== candidateId);
+      }
+
+      if (currentIds.length >= 5) {
+        return currentIds;
+      }
+
+      return [...currentIds, candidateId];
+    });
+  }
+
+  async function runAdminAction(action, successMessage, params = {}) {
+    setError(null);
+    setMessage(null);
+    setIsSavingPhase(true);
+
+    const { error: actionError } = await supabase.rpc(action, {
+      target_poll_id: poll.id,
+      ...params,
+    });
+
+    setIsSavingPhase(false);
+
+    if (actionError) {
+      setError(actionError.message);
+      return;
+    }
+
+    setMessage(successMessage);
+    await refreshPoll();
+    await loadResults();
+  }
+
+  function renderCreatePoll() {
+    if (!canManage) {
+      return null;
+    }
+
+    return (
+      <article className="surface-card vote-form-card admin-create-poll">
+        <div className="form-header">
+          <div>
+            <span className="phase-pill phase-nominations">New poll</span>
+            <h2>Create the next weekly poll</h2>
+          </div>
+          <p>This archives the current active poll and opens a fresh nominations phase.</p>
+        </div>
+
+        <form className="vote-form" onSubmit={handleCreatePoll}>
+          <div className="admin-create-grid">
+            <div className="field-group">
+              <label htmlFor="cycleLabel">Cycle label</label>
+              <input
+                id="cycleLabel"
+                name="cycleLabel"
+                type="text"
+                placeholder="Week 17"
+                value={newPoll.cycleLabel}
+                onChange={handleNewPollChange}
+              />
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="pollId">Poll id</label>
+              <input
+                id="pollId"
+                name="pollId"
+                type="text"
+                placeholder="poll-week-17"
+                value={newPoll.pollId}
+                onChange={handleNewPollChange}
+              />
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="albumTitle">Current album title</label>
+              <input
+                id="albumTitle"
+                name="albumTitle"
+                type="text"
+                placeholder="Heaven or Las Vegas"
+                value={newPoll.albumTitle}
+                onChange={handleNewPollChange}
+              />
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="albumArtist">Current album artist</label>
+              <input
+                id="albumArtist"
+                name="albumArtist"
+                type="text"
+                placeholder="Cocteau Twins"
+                value={newPoll.albumArtist}
+                onChange={handleNewPollChange}
+              />
+            </div>
+          </div>
+
+          <div className="field-group">
+            <label htmlFor="question">Voting question</label>
+            <input
+              id="question"
+              name="question"
+              type="text"
+              value={newPoll.question}
+              onChange={handleNewPollChange}
+            />
+          </div>
+
+          <div className="field-group">
+            <label htmlFor="description">Nomination description</label>
+            <textarea
+              id="description"
+              name="description"
+              rows="3"
+              value={newPoll.description}
+              onChange={handleNewPollChange}
+            />
+          </div>
+
+          <button className="button button-primary" type="submit" disabled={isSavingPhase}>
+            {isSavingPhase ? "Creating..." : "Create active poll"}
+          </button>
+        </form>
+      </article>
+    );
+  }
+
+  function renderCurrentResults() {
+    if (!canManage) {
+      return null;
+    }
+
+    return (
+      <article className="surface-card vote-form-card admin-results-panel">
+        <div className="form-header">
+          <div>
+            <span className={`phase-pill phase-${poll.phase}`}>{poll.phase}</span>
+            <h2>Current poll results</h2>
+          </div>
+          <p>{poll.status}</p>
+        </div>
+
+        {pollError ? <p className="form-error">{pollError}</p> : null}
+        {isLoadingResults ? <p className="helper-note">Loading live results...</p> : null}
+
+        {poll.phase === "nominations" ? (
+          <>
+            <div className="admin-result-list">
+              {nominationRows.length ? nominationRows.map((candidate) => (
+                <article className="admin-result-row" key={candidate.id}>
+                  <div>
+                    <strong>{candidate.title}</strong>
+                    <p>{candidate.artist}</p>
+                  </div>
+                  <span>{formatCount(candidate.nominationCount || 0, "nomination")}</span>
+                </article>
+              )) : <p className="helper-note">No nominations have been submitted yet.</p>}
+            </div>
+            <button
+              className="button button-primary"
+              type="button"
+              disabled={isSavingPhase || nominationRows.length === 0}
+              onClick={() => runAdminAction("advance_to_primary", "Poll moved to primary.")}
+            >
+              Move to primary
+            </button>
+          </>
+        ) : null}
+
+        {poll.phase === "primary" ? (
+          <>
+            <p className="helper-note">Select exactly five albums for final voting. Selected {selectedCount}/5.</p>
+            <div className="admin-result-list">
+              {sortedPrimaryRows.map((candidate) => {
+                const isSelected = selectedFinalistIds.includes(candidate.id);
+
+                return (
+                  <label
+                    className={`admin-result-row candidate-option ${isSelected ? "is-selected" : ""}`}
+                    key={candidate.id}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      disabled={!isSelected && selectedCount >= 5}
+                      onChange={() => toggleFinalist(candidate.id)}
+                    />
+                    <div>
+                      <strong>{candidate.title}</strong>
+                      <p>{candidate.artist}</p>
+                    </div>
+                    <span>{formatCount(candidate.primaryVotes || 0, "vote")}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="admin-action-row">
+              <button
+                className="button button-secondary"
+                type="button"
+                disabled={isSavingPhase || selectedCount !== 5}
+                onClick={() =>
+                  runAdminAction("save_finalists", "Finalists saved.", {
+                    candidate_ids: selectedFinalistIds,
+                  })
+                }
+              >
+                Save five finalists
+              </button>
+              <button
+                className="button button-primary"
+                type="button"
+                disabled={isSavingPhase || !canAdvanceToFinal}
+                onClick={() =>
+                  runAdminAction("advance_to_final", "Poll moved to final voting.", {
+                    candidate_ids: selectedFinalistIds,
+                  })
+                }
+              >
+                Move to final
+              </button>
+            </div>
+          </>
+        ) : null}
+
+        {poll.phase === "final" ? (
+          <>
+            {irvWinner ? (
+              <div className="confirmation-card">
+                <p className="eyebrow">IRV winner</p>
+                <h3>{irvWinner.title}</h3>
+                <p>{irvWinner.artist}</p>
+              </div>
+            ) : null}
+            {irvTie ? (
+              <p className="form-error">
+                Manual decision needed in round {irvTie.round}: {irvTie.candidateIds.length} candidates tied for elimination.
+              </p>
+            ) : null}
+            <div className="admin-result-list">
+              {irvRounds.map((round) => (
+                <article className="admin-irv-round" key={round.round}>
+                  <strong>Round {round.round}</strong>
+                  {round.tallies.map((tally) => {
+                    const candidate = finalRows.find((row) => row.id === tally.candidateId);
+                    return (
+                      <p key={tally.candidateId}>
+                        {candidate?.title || tally.candidateId}: {formatCount(tally.votes, "vote")}
+                      </p>
+                    );
+                  })}
+                  {round.eliminatedCandidateId ? (
+                    <span>Eliminated: {finalRows.find((row) => row.id === round.eliminatedCandidateId)?.title}</span>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          </>
+        ) : null}
+      </article>
+    );
+  }
+
+  function handleShelfCoverFileChange(event) {
+    setShelfCoverFile(event.target.files?.[0] || null);
+  }
+
+  async function handleShelfCoverUpload(event) {
+    event.preventDefault();
+    setError(null);
+    setMessage(null);
+
+    if (!selectedShelfAlbum || !shelfCoverFile) {
+      setError("Choose an album and an image before uploading.");
+      return;
+    }
+
+    if (!shelfCoverFile.type.startsWith("image/")) {
+      setError("Upload an image file for the shelf cover.");
+      return;
+    }
+
+    setIsSavingShelfCover(true);
+
+    const extension = shelfCoverFile.name.split(".").pop()?.toLowerCase() || "jpg";
+    const storagePath = `${selectedShelfAlbum.id}/${Date.now()}.${extension}`;
+    const { error: uploadError } = await supabase.storage
+      .from(RECORD_SHELF_BUCKET)
+      .upload(storagePath, shelfCoverFile, {
+        cacheControl: "3600",
+        contentType: shelfCoverFile.type,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      setIsSavingShelfCover(false);
+      setError(uploadError.message);
+      return;
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from(RECORD_SHELF_BUCKET)
+      .getPublicUrl(storagePath);
+
+    const nextCover = {
+      album_id: selectedShelfAlbum.id,
+      album_title: selectedShelfAlbum.title,
+      cover_url: publicUrlData.publicUrl,
+      storage_path: storagePath,
+      updated_by: session?.user?.id || null,
+    };
+    const { error: saveError } = await supabase
+      .from("record_shelf_covers")
+      .upsert(nextCover, { onConflict: "album_id" });
+
+    setIsSavingShelfCover(false);
+
+    if (saveError) {
+      setError(saveError.message);
+      return;
+    }
+
+    setShelfCoverFile(null);
+    setShelfCoverOverrides((currentOverrides) => ({
+      ...currentOverrides,
+      [selectedShelfAlbum.id]: nextCover,
+    }));
+    setMessage(`${selectedShelfAlbum.title} shelf cover updated.`);
+  }
+
+  async function handleShelfCoverClear(album) {
+    setError(null);
+    setMessage(null);
+    setIsSavingShelfCover(true);
+
+    const currentOverride = shelfCoverOverrides[album.id];
+
+    const { error: deleteError } = await supabase
+      .from("record_shelf_covers")
+      .delete()
+      .eq("album_id", album.id);
+
+    if (!deleteError && currentOverride?.storage_path) {
+      await supabase.storage.from(RECORD_SHELF_BUCKET).remove([currentOverride.storage_path]);
+    }
+
+    setIsSavingShelfCover(false);
+
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+
+    setShelfCoverOverrides((currentOverrides) => {
+      const nextOverrides = { ...currentOverrides };
+      delete nextOverrides[album.id];
+      return nextOverrides;
+    });
+    setMessage(`${album.title} will use the automatic cover again.`);
+  }
+
+  function renderShelfCoverManager() {
+    if (!canManage) {
+      return null;
+    }
+
+    return (
+      <article className="surface-card vote-form-card admin-shelf-panel">
+        <div className="form-header">
+          <div>
+            <span className="phase-pill phase-final">Shelf</span>
+            <h2>Manage record shelf covers</h2>
+          </div>
+          <p>Upload a custom image to replace one of the five current shelf album covers.</p>
+        </div>
+
+        {error ? <p className="form-error">{error}</p> : null}
+        {message ? <p className="form-success">{message}</p> : null}
+
+        <div className="admin-shelf-grid">
+          {shelfAlbums.map((album) => {
+            const override = shelfCoverOverrides[album.id];
+
+            return (
+              <article className="admin-shelf-card" key={album.id}>
+                {override?.cover_url ? (
+                  <img src={override.cover_url} alt={`${album.title} custom cover`} />
+                ) : (
+                  <span className="cozy-album-cover cozy-generated-cover" aria-hidden="true">
+                    <span>{album.title.slice(0, 2)}</span>
+                  </span>
+                )}
+                <div>
+                  <strong>{album.title}</strong>
+                  <p>{override ? "Custom cover active" : "Using automatic cover"}</p>
+                </div>
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  disabled={!override || isSavingShelfCover}
+                  onClick={() => handleShelfCoverClear(album)}
+                >
+                  Clear
+                </button>
+              </article>
+            );
+          })}
+        </div>
+
+        <form className="vote-form admin-shelf-upload" onSubmit={handleShelfCoverUpload}>
+          <div className="field-group">
+            <label htmlFor="shelfAlbum">Album to replace</label>
+            <select
+              id="shelfAlbum"
+              value={selectedShelfAlbumId}
+              onChange={(event) => setSelectedShelfAlbumId(event.target.value)}
+            >
+              {shelfAlbums.map((album) => (
+                <option key={album.id} value={album.id}>
+                  {album.title}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="field-group">
+            <label htmlFor="shelfCover">Replacement image</label>
+            <input
+              id="shelfCover"
+              type="file"
+              accept="image/*"
+              onChange={handleShelfCoverFileChange}
+            />
+          </div>
+
+          <button className="button button-primary" type="submit" disabled={isSavingShelfCover}>
+            {isSavingShelfCover ? "Uploading..." : "Upload shelf cover"}
+          </button>
+        </form>
+
+        {isLoadingShelfCovers ? <p className="helper-note">Loading custom shelf covers...</p> : null}
+        <p className="helper-note">
+          If this says the bucket or table is missing, run the latest Supabase SQL migration.
+        </p>
+      </article>
+    );
+  }
+
+  function renderMemberActions(member) {
+    const canRemoveAdmin =
+      member.status === "approved" && member.role === "admin" && adminCount > 1;
+
+    return (
+      <div className="member-actions">
+        {member.status !== "approved" ? (
+          <button
+            className="button button-secondary"
+            type="button"
+            onClick={() => updateMembership(member.user_id, { status: "approved" })}
+          >
+            Approve
+          </button>
+        ) : null}
+
+        {member.status !== "rejected" ? (
+          <button
+            className="button button-secondary"
+            type="button"
+            onClick={() => updateMembership(member.user_id, { status: "rejected" })}
+          >
+            Reject
+          </button>
+        ) : null}
+
+        {member.status === "rejected" ? (
+          <button
+            className="button button-secondary"
+            type="button"
+            onClick={() => updateMembership(member.user_id, { status: "pending" })}
+          >
+            Restore pending
+          </button>
+        ) : null}
+
+        {member.status === "approved" && member.role !== "admin" ? (
+          <button
+            className="button button-secondary"
+            type="button"
+            onClick={() => updateMembership(member.user_id, { role: "admin" })}
+          >
+            Make admin
+          </button>
+        ) : null}
+
+        {member.status === "approved" && member.role === "admin" ? (
+          <button
+            className="button button-secondary"
+            type="button"
+            disabled={!canRemoveAdmin}
+            onClick={() => updateMembership(member.user_id, { role: "member" })}
+          >
+            Remove admin
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+
+  function renderMemberList() {
+    if (isLoadingMembers) {
+      return <p className="helper-note">Loading members...</p>;
+    }
+
+    if (!visibleMembers.length) {
+      return (
+        <p className="helper-note">
+          {memberTab === "pending"
+            ? "No pending approvals match this search."
+            : "No accounts match this view."}
+        </p>
+      );
+    }
+
+    return (
+      <>
+        <div className="member-list">
+          {pagedMembers.map((member) => (
+            <article className="member-row" key={member.user_id}>
+              <div>
+                <strong>{getMemberName(member)}</strong>
+                <p>{member.email}</p>
+              </div>
+
+              <div className="member-badges">
+                <span>{member.status}</span>
+                <span>{member.role}</span>
+              </div>
+
+              {renderMemberActions(member)}
+            </article>
+          ))}
+        </div>
+
+        <div className="member-pagination">
+          <span>
+            Page {currentMemberPage} of {totalMemberPages} · {formatCount(visibleMembers.length, "account")}
+          </span>
+          <div>
+            <button
+              className="button button-secondary"
+              type="button"
+              disabled={currentMemberPage === 1}
+              onClick={() => setMemberPage((page) => Math.max(1, page - 1))}
+            >
+              Previous
+            </button>
+            <button
+              className="button button-secondary"
+              type="button"
+              disabled={currentMemberPage === totalMemberPages}
+              onClick={() => setMemberPage((page) => Math.min(totalMemberPages, page + 1))}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  function renderMemberBody() {
     if (!hasSupabaseConfig) {
       return (
         <article className="surface-card vote-form-card">
@@ -104,7 +956,7 @@ function Admin({ authReady, hasSupabaseConfig, membership, session, supabase }) 
       );
     }
 
-    if (!canManageMembers) {
+    if (!canManage) {
       return (
         <article className="surface-card vote-form-card">
           <p className="eyebrow">Admin only</p>
@@ -117,61 +969,64 @@ function Admin({ authReady, hasSupabaseConfig, membership, session, supabase }) 
     }
 
     return (
-      <article className="surface-card vote-form-card">
+      <article className="surface-card vote-form-card admin-members-panel">
         <div className="form-header">
           <div>
-            <span className="phase-pill phase-primary">Member approval</span>
-            <h2>Approve voting access</h2>
+            <span className="phase-pill phase-primary">Accounts</span>
+            <h2>Manage member access</h2>
           </div>
-          <p>Approved members get one database-enforced submission per poll.</p>
+          <p>Pending approvals stay separate from the full account directory.</p>
         </div>
 
         {error ? <p className="form-error">{error}</p> : null}
         {message ? <p className="form-success">{message}</p> : null}
 
-        {isLoading ? (
-          <p className="helper-note">Loading members...</p>
-        ) : (
-          <div className="member-list">
-            {memberships.map((member) => (
-              <article className="member-row" key={member.user_id}>
-                <div>
-                  <strong>{member.display_name || member.email}</strong>
-                  <p>{member.email}</p>
-                </div>
+        <div className="member-tabs" role="tablist" aria-label="Membership views">
+          <button
+            className={memberTab === "pending" ? "is-active" : ""}
+            type="button"
+            onClick={() => handleMemberTabChange("pending")}
+          >
+            Pending approvals ({pendingMembers.length})
+          </button>
+          <button
+            className={memberTab === "all" ? "is-active" : ""}
+            type="button"
+            onClick={() => handleMemberTabChange("all")}
+          >
+            All accounts
+          </button>
+        </div>
 
-                <div className="member-badges">
-                  <span>{member.status}</span>
-                  <span>{member.role}</span>
-                </div>
-
-                <div className="member-actions">
-                  <button
-                    className="button button-secondary"
-                    type="button"
-                    onClick={() => updateMembership(member.user_id, { status: "approved" })}
-                  >
-                    Approve
-                  </button>
-                  <button
-                    className="button button-secondary"
-                    type="button"
-                    onClick={() => updateMembership(member.user_id, { status: "rejected" })}
-                  >
-                    Reject
-                  </button>
-                  <button
-                    className="button button-secondary"
-                    type="button"
-                    onClick={() => updateMembership(member.user_id, { role: "admin" })}
-                  >
-                    Make admin
-                  </button>
-                </div>
-              </article>
-            ))}
+        <div className="member-toolbar">
+          <div className="field-group">
+            <label htmlFor="memberSearch">Search by display name</label>
+            <input
+              id="memberSearch"
+              type="search"
+              placeholder="Member name"
+              value={memberSearch}
+              onChange={(event) => setMemberSearch(event.target.value)}
+            />
           </div>
-        )}
+
+          {memberTab === "all" ? (
+            <div className="member-filter-group" aria-label="Account filters">
+              {accountFilters.map((filter) => (
+                <button
+                  className={accountFilter === filter.id ? "is-active" : ""}
+                  key={filter.id}
+                  type="button"
+                  onClick={() => setAccountFilter(filter.id)}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        {renderMemberList()}
       </article>
     );
   }
@@ -181,14 +1036,17 @@ function Admin({ authReady, hasSupabaseConfig, membership, session, supabase }) 
       <section className="page-header surface-card">
         <div>
           <p className="eyebrow">Admin</p>
-          <h1 className="page-title">Membership approvals.</h1>
+          <h1 className="page-title">Voting control room.</h1>
           <p className="page-intro">
-            This is where account creation turns into real voting access.
+            Manage member access, watch live results, and move the active poll through each phase.
           </p>
         </div>
       </section>
 
-      {renderBody()}
+      {renderCreatePoll()}
+      {renderCurrentResults()}
+      {renderShelfCoverManager()}
+      {renderMemberBody()}
     </div>
   );
 }

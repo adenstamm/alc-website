@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import "./App.css";
 import Navbar from "./components/Navbar";
@@ -12,8 +12,11 @@ import {
 } from "./data/clubContent";
 import { hasSupabaseConfig, supabase } from "./lib/supabaseClient";
 import Admin from "./pages/Admin";
+import About from "./pages/About";
 import Home from "./pages/Home";
 import Poll from "./pages/Poll";
+import ResetPassword from "./pages/ResetPassword";
+import Events from "./pages/Events";
 
 function normalizePath(pathname) {
   if (pathname === "/admin" || pathname === "/admin/") {
@@ -24,6 +27,18 @@ function normalizePath(pathname) {
     return "/vote";
   }
 
+  if (pathname === "/events" || pathname === "/events/") {
+    return "/events";
+  }
+
+  if (pathname === "/about" || pathname === "/about/") {
+    return "/about";
+  }
+
+  if (pathname === "/reset-password" || pathname === "/reset-password/") {
+    return "/reset-password";
+  }
+
   return "/";
 }
 
@@ -31,11 +46,48 @@ function getCurrentPath() {
   return normalizePath(window.location.pathname);
 }
 
+function normalizeLivePoll(data) {
+  if (!data) {
+    return currentPoll;
+  }
+
+  return {
+    ...currentPoll,
+    ...data,
+    cycleLabel: data.cycle_label || data.cycleLabel || currentPoll.cycleLabel,
+    albumOfWeek: data.album_of_week || data.albumOfWeek || currentPoll.albumOfWeek,
+    candidates: data.candidates || [],
+    finalists: data.finalists || [],
+  };
+}
+
 function App() {
-  const [currentPath, setCurrentPath] = useState(getCurrentPath); //single source of truth
+  const [currentPath, setCurrentPath] = useState(getCurrentPath);
   const [authReady, setAuthReady] = useState(!hasSupabaseConfig);
   const [session, setSession] = useState(null);
   const [membership, setMembership] = useState(null);
+  const [livePoll, setLivePoll] = useState(currentPoll);
+  const [pollError, setPollError] = useState(null);
+
+  const refreshPoll = useCallback(async () => {
+    if (!hasSupabaseConfig) {
+      setLivePoll(currentPoll);
+      return currentPoll;
+    }
+
+    const { data, error } = await supabase.rpc("get_current_poll");
+
+    if (error) {
+      setPollError(error.message);
+      setLivePoll(currentPoll);
+      return currentPoll;
+    }
+
+    const nextPoll = normalizeLivePoll(data);
+    setPollError(null);
+    setLivePoll(nextPoll);
+    return nextPoll;
+  }, []);
 
   async function loadMembership(nextSession) {
     if (!hasSupabaseConfig || !nextSession?.user) {
@@ -57,7 +109,7 @@ function App() {
     setMembership(data);
   }
 
-  useEffect(() => { //listener for button changes, helps url and ui stay in sync
+  useEffect(() => {
     function handlePopState() {
       setCurrentPath(getCurrentPath());
     }
@@ -68,6 +120,10 @@ function App() {
       window.removeEventListener("popstate", handlePopState);
     };
   }, []);
+
+  useEffect(() => {
+    refreshPoll();
+  }, [refreshPoll]);
 
   useEffect(() => {
     if (!hasSupabaseConfig) {
@@ -95,15 +151,16 @@ function App() {
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
       loadMembership(nextSession);
+      refreshPoll();
     });
 
     return () => {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [refreshPoll]);
 
-  function navigate(nextPath) { // uses pushstate to not do full page reload
+  function navigate(nextPath) {
     const normalizedPath = normalizePath(nextPath);
 
     if (normalizedPath !== currentPath) {
@@ -117,7 +174,11 @@ function App() {
   return (
     <div className="page">
       <div className="page-shell">
-        <Navbar currentPath={currentPath} navigate={navigate} />
+        <Navbar
+          currentPath={currentPath}
+          navigate={navigate}
+          showAdminLink={membership?.status === "approved" && membership?.role === "admin"}
+        />
 
         <main className="view">
           {currentPath === "/admin" ? (
@@ -125,30 +186,53 @@ function App() {
               authReady={authReady}
               hasSupabaseConfig={hasSupabaseConfig}
               membership={membership}
+              poll={livePoll}
+              pollError={pollError}
+              refreshPoll={refreshPoll}
               session={session}
               supabase={supabase}
             />
           ) : currentPath === "/vote" ? (
             <Poll
-              key={`${currentPoll.id}-${currentPoll.phase}`}
+              key={`${livePoll.id}-${livePoll.phase}`}
               authReady={authReady}
               hasSupabaseConfig={hasSupabaseConfig}
               membership={membership}
               navigate={navigate}
-              poll={currentPoll}
+              poll={livePoll}
+              pollError={pollError}
               refreshMembership={() => loadMembership(session)}
+              refreshPoll={refreshPoll}
               session={session}
+              supabase={supabase}
+            />
+          ) : currentPath === "/events" ? (
+            <Events
+              specialEvents={specialEvents}
+              navigate={navigate}
+            />
+          ) : currentPath === "/about" ? (
+            <About
+              clubLinks={clubLinks}
+              navigate={navigate}
+            />
+          ) : currentPath === "/reset-password" ? (
+            <ResetPassword
+              hasSupabaseConfig={hasSupabaseConfig}
+              navigate={navigate}
               supabase={supabase}
             />
           ) : (
             <Home
               clubLinks={clubLinks}
-              currentPoll={currentPoll}
+              currentPoll={livePoll}
+              hasSupabaseConfig={hasSupabaseConfig}
               homeActions={homeActions}
               instagramFeed={instagramFeed}
               navigate={navigate}
               recentAlbums={recentAlbums}
               specialEvents={specialEvents}
+              supabase={supabase}
             />
           )}
         </main>

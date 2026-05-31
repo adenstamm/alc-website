@@ -78,8 +78,8 @@ export const homeActions = [
     label: "Events",
     title: "Special events",
     description: "Live concerts, volunteering, and occasional hangs beyond the weekly meeting.",
-    kind: "anchor",
-    target: "#events",
+    kind: "route",
+    target: "/events",
   },
 ];
 
@@ -94,20 +94,44 @@ export const instagramFeed = [
 
 export const specialEvents = [
   {
-    id: "concerts",
-    label: "Live concerts",
-    title: "Group show nights",
-    description: "Concert plans for members who want the club to leave the library.",
+    id: "record-store-run",
+    title: "Record store run",
+    date: "2026-06-06",
+    displayDate: "June 6, 2026",
+    time: "2:00 PM",
+    location: "Zia Records Tempe",
+    status: "upcoming",
+    tag: "Hangout",
+    description:
+      "A low-pressure crate-digging trip for anyone who wants to browse, recommend finds, and grab coffee after.",
   },
   {
-    id: "volunteering",
-    label: "Volunteering",
-    title: "Good hangs with a purpose",
-    description: "Volunteer events that still feel social, low-pressure, and easy to join.",
+    id: "summer-listening-night",
+    title: "Summer listening night",
+    date: "2026-06-18",
+    displayDate: "June 18, 2026",
+    time: "7:15 PM",
+    location: "Hayden Library C8",
+    status: "upcoming",
+    tag: "Club night",
+    description:
+      "A relaxed group listen with snacks, favorite summer tracks, and a quick vote on the next theme.",
+  },
+  {
+    id: "spring-wrap-party",
+    title: "Spring wrap party",
+    date: "2026-05-01",
+    displayDate: "May 1, 2026",
+    time: "7:00 PM",
+    location: "Hayden Library C8",
+    status: "recent",
+    tag: "Recent",
+    description:
+      "Members brought favorite tracks from the semester and traded recommendations before finals week.",
   },
 ];
 
-export const weeklyRhythm = [ //how club works section
+export const weeklyRhythm = [
   {
     step: "01",
     title: "Listen with intention",
@@ -135,24 +159,23 @@ export const clubPrinciples = [
       "The site is built to feel curated. Every section exists to reinforce the club rhythm instead of filling space.",
   },
   {
-    title: "One ballot per poll",
+    title: "One ballot per phase",
     description:
-      "Votes persist through refreshes in the browser, which makes the experience feel dependable even before a backend exists.",
+      "Votes are enforced in the database so each approved member gets one submission per phase.",
   },
   {
-    title: "Phase-ready structure",
+    title: "Admin-run phases",
     description:
-      "The same vote page can handle nominations, primaries, or a final round by changing the poll configuration.",
+      "Admins move the poll from nominations to primary to final without redeploying the site.",
   },
 ];
 
-// need to update this object when a new weekly poll goes live.
 export const currentPoll = {
-  id: "2026-week-16-nominations",
+  id: "2026-week-16",
   phase: "nominations",
   cycleLabel: "Week 16",
   status: "Open until nominations at Wednesday's club",
-  question: "What did you think of this album? What should the club listen to next?",
+  question: "What should the club listen to next?",
   description:
     "Nomination week is open. Submit one album and artist pairing for the next club session.",
   albumOfWeek: {
@@ -161,48 +184,30 @@ export const currentPoll = {
     note: "Current club listen",
     coverClass: "cover-week",
   },
-  candidates: [
-    {
-      id: "in-rainbows",
-      title: "In Rainbows",
-      artist: "Radiohead",
-      note: "A warm, detailed record with a lot to unpack on repeat listens.",
-    },
-    {
-      id: "vespertine",
-      title: "Vespertine",
-      artist: "Björk",
-      note: "An intimate album that would push the club toward production-focused discussion.",
-    },
-    {
-      id: "miseducation",
-      title: "The Miseducation of Lauryn Hill",
-      artist: "Lauryn Hill",
-      note: "A bigger, high-consensus option that still leaves plenty of room for analysis.",
-    },
-  ],
+  candidates: [],
+  finalists: [],
 };
 
-export const phaseContent = { //given this phase what stuff should i show
+export const phaseContent = {
   nominations: {
-    label: "Nominations and Ratings",
+    label: "Nominations",
     title: "Submit one album for the next round",
     description:
-      "This phase collects fresh options. Each member gets one submission for the current poll id.",
+      "This phase collects fresh album and artist nominations. Banned albums and artists are rejected before they enter the pool.",
     buttonLabel: "Lock in nomination",
   },
   primary: {
     label: "Primary Voting",
-    title: "Choose from the top five nominations",
+    title: "Pick one or more albums",
     description:
-      "Duplicates are grouped together. The five most-nominated unique albums move into this ballot, with newest nominations breaking ties.",
-    buttonLabel: "Cast primary vote",
+      "Every unique sanitized nomination is on this ballot. Choose any number from one to five; you do not need to fill all five slots.",
+    buttonLabel: "Cast primary ballot",
   },
   final: {
-    label: "Final Voting",
-    title: "Choose next week's album",
+    label: "Final IRV Voting",
+    title: "Rank all five finalists",
     description:
-      "Final voting is live. One selection from the shortlist decides the next club listen.",
-    buttonLabel: "Submit final vote",
+      "Order the five finalists from favorite to least favorite. The admin page will show instant-runoff rounds.",
+    buttonLabel: "Submit final ranking",
   },
 };

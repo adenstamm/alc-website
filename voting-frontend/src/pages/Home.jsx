@@ -1,5 +1,10 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import {
+  fetchAlbumCover,
+  getRecentShelfAlbums,
+  loadRecordShelfCoverOverrides,
+} from "../lib/recordShelf";
 import "../styles/cozy.css";
 
 const coverUrls = {
@@ -7,9 +12,8 @@ const coverUrls = {
   currents: "https://upload.wikimedia.org/wikipedia/en/9/9b/Tame_Impala_-_Currents.png",
   discovery: "https://upload.wikimedia.org/wikipedia/en/a/ae/Daft_Punk_-_Discovery.jpg",
   ctrl: "https://upload.wikimedia.org/wikipedia/en/b/bf/SZA_-_Ctrl_cover.png",
-  vespertine: "https://upload.wikimedia.org/wikipedia/en/8/8a/BjorkVespertine.jpg",
+  vespertine: "https://upload.wikimedia.org/wikipedia/en/8/8a/Bjork-vespertine.jpg",
 };
-
 const feedImages = [
   coverUrls.currents,
   "https://upload.wikimedia.org/wikipedia/en/6/67/Cocteau_Twins-Heaven_or_Las_Vegas.jpg",
@@ -19,16 +23,27 @@ const feedImages = [
   coverUrls.vespertine,
 ];
 
+function getEventPreview(specialEvents) {
+  const upcoming = specialEvents.find((event) => event.status === "upcoming");
+  const recent = specialEvents.find((event) => event.status === "recent");
+
+  return [upcoming, recent].filter(Boolean);
+}
+
 function Home({
   clubLinks,
   currentPoll,
+  hasSupabaseConfig,
   homeActions,
   instagramFeed,
   navigate,
-  recentAlbums,
   specialEvents,
+  supabase,
 }) {
   const [activeAlbumId, setActiveAlbumId] = useState(null);
+  const [albumCoverUrls, setAlbumCoverUrls] = useState({});
+  const eventPreview = getEventPreview(specialEvents);
+  const shelfAlbums = useMemo(() => getRecentShelfAlbums(), []);
   const currentAlbumCover =
     currentPoll.albumOfWeek.coverUrl ||
     "https://upload.wikimedia.org/wikipedia/en/6/67/Cocteau_Twins-Heaven_or_Las_Vegas.jpg";
@@ -39,10 +54,47 @@ function Home({
       label: "Info",
       title: "How ALC works",
       description: "Meeting rhythm, cost, location details, and what to expect.",
-      kind: "anchor",
-      target: "#more-info",
+      kind: "route",
+      target: "/about",
     },
   ];
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadAlbumCovers() {
+      const albumIds = shelfAlbums.map((album) => album.id);
+      const [coverEntries, coverOverrides] = await Promise.all([
+        Promise.all(
+          shelfAlbums.map(async (album) => {
+            try {
+              const coverUrl = await fetchAlbumCover(album.title, controller.signal);
+              return [album.id, coverUrl];
+            } catch (error) {
+              if (error.name !== "AbortError") {
+                return [album.id, null];
+              }
+
+              return null;
+            }
+          }),
+        ),
+        loadRecordShelfCoverOverrides(supabase, hasSupabaseConfig, albumIds),
+      ]);
+
+      if (!controller.signal.aborted) {
+        const fetchedCovers = Object.fromEntries(coverEntries.filter(Boolean));
+        const uploadedCovers = Object.fromEntries(
+          Object.entries(coverOverrides).map(([albumId, row]) => [albumId, row.cover_url]),
+        );
+        setAlbumCoverUrls({ ...fetchedCovers, ...uploadedCovers });
+      }
+    }
+
+    loadAlbumCovers();
+
+    return () => controller.abort();
+  }, [hasSupabaseConfig, shelfAlbums, supabase]);
 
   function handleAction(event, action) {
     if (action.kind === "route") {
@@ -125,12 +177,13 @@ function Home({
         <div className="cozy-section-heading">
           <p>Recent listens</p>
           <h2 id="recent-heading">Records on the shelf.</h2>
-          <span>Tap a cover to reveal the album and artist.</span>
+          <span>Built from the five newest entries in the club archive.</span>
         </div>
 
         <div className="cozy-album-grid">
-          {recentAlbums.map((album) => {
+          {shelfAlbums.map((album) => {
             const isActive = activeAlbumId === album.id;
+            const albumCoverUrl = albumCoverUrls[album.id];
 
             return (
               <button
@@ -140,11 +193,18 @@ function Home({
                 aria-pressed={isActive}
                 onClick={() => setActiveAlbumId(isActive ? null : album.id)}
               >
-                <img
-                  src={album.coverUrl || coverUrls[album.id]}
-                  alt={`${album.title} album cover`}
-                  className="cozy-album-cover"
-                />
+                {albumCoverUrl ? (
+                  <img
+                    src={albumCoverUrl}
+                    alt={`${album.title} album cover`}
+                    className="cozy-album-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <span className="cozy-album-cover cozy-generated-cover" aria-hidden="true">
+                    <span>{album.title.slice(0, 2)}</span>
+                  </span>
+                )}
 
                 <span className="cozy-album-overlay">
                   <strong>{album.title}</strong>
@@ -197,21 +257,41 @@ function Home({
             <p>More info</p>
             <h2 id="info-heading">What to expect.</h2>
             <span>
-              We meet every week in Hayden basement, room C8!! 7:15. Come to yap about your favorite albums.
+              We meet every week in Hayden basement, room C8 at 7:15. Come to yap about your favorite albums.
             </span>
+            <button
+              className="cozy-button cozy-button-secondary cozy-events-button"
+              type="button"
+              onClick={() => navigate("/about")}
+            >
+              More info
+            </button>
           </section>
 
           <section className="cozy-info-panel" id="events" aria-labelledby="events-heading">
             <p>Events</p>
-            <h2 id="events-heading">Outside club night.</h2>
-            <div className="cozy-event-list">
-              {specialEvents.map((event) => (
-                <article key={event.id}>
-                  <strong>{event.title}</strong>
-                  <span>{event.description}</span>
-                </article>
-              ))}
-            </div>
+            <h2 id="events-heading">Recent and upcoming.</h2>
+            {eventPreview.length > 0 ? (
+              <div className="cozy-event-list">
+                {eventPreview.map((event) => (
+                  <article key={event.id}>
+                    <span>{event.status === "upcoming" ? "Upcoming" : "Recent"}</span>
+                    <strong>{event.title}</strong>
+                    <small>{event.displayDate} at {event.time}</small>
+                    <em>{event.location}</em>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <span>No events posted yet. Check back after the next club update.</span>
+            )}
+            <button
+              className="cozy-button cozy-button-secondary cozy-events-button"
+              type="button"
+              onClick={() => navigate("/events")}
+            >
+              See all events
+            </button>
           </section>
         </div>
       </section>

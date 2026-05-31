@@ -10,6 +10,13 @@ function AuthPanel({ supabase }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isSignUp = mode === "sign-up";
+  const isReset = mode === "reset";
+
+  function handleModeChange(nextMode) {
+    setMode(nextMode);
+    setStatus(null);
+    setError(null);
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -20,6 +27,19 @@ function AuthPanel({ supabase }) {
     const cleanEmail = email.trim();
 
     try {
+      if (isReset) {
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+          redirectTo: `${window.location.origin}/reset-password`,
+        });
+
+        if (resetError) {
+          throw resetError;
+        }
+
+        setStatus("Check your email for a password reset link.");
+        return;
+      }
+
       const response = isSignUp
         ? await supabase.auth.signUp({
             email: cleanEmail,
@@ -57,14 +77,14 @@ function AuthPanel({ supabase }) {
         <button
           className={mode === "sign-in" ? "is-active" : ""}
           type="button"
-          onClick={() => setMode("sign-in")}
+          onClick={() => handleModeChange("sign-in")}
         >
           Sign in
         </button>
         <button
           className={mode === "sign-up" ? "is-active" : ""}
           type="button"
-          onClick={() => setMode("sign-up")}
+          onClick={() => handleModeChange("sign-up")}
         >
           Create account
         </button>
@@ -98,26 +118,44 @@ function AuthPanel({ supabase }) {
           />
         </div>
 
-        <div className="field-group">
-          <label htmlFor="accountPassword">Password</label>
-          <input
-            id="accountPassword"
-            name="password"
-            type="password"
-            autoComplete={isSignUp ? "new-password" : "current-password"}
-            minLength={8}
-            required
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-        </div>
+        {!isReset ? (
+          <div className="field-group">
+            <label htmlFor="accountPassword">Password</label>
+            <input
+              id="accountPassword"
+              name="password"
+              type="password"
+              autoComplete={isSignUp ? "new-password" : "current-password"}
+              minLength={8}
+              required
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </div>
+        ) : null}
 
         {error ? <p className="form-error">{error}</p> : null}
         {status ? <p className="form-success">{status}</p> : null}
 
         <button className="button button-primary" type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Working..." : isSignUp ? "Create account" : "Sign in"}
+          {isSubmitting
+            ? "Working..."
+            : isReset
+              ? "Send reset link"
+              : isSignUp
+                ? "Create account"
+                : "Sign in"}
         </button>
+
+        {!isSignUp ? (
+          <button
+            className="auth-link-button"
+            type="button"
+            onClick={() => handleModeChange(isReset ? "sign-in" : "reset")}
+          >
+            {isReset ? "Back to sign in" : "Forgot password?"}
+          </button>
+        ) : null}
       </form>
     </div>
   );

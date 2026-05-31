@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import AuthPanel from "../components/AuthPanel";
 import { phaseContent } from "../data/clubContent";
@@ -6,6 +6,11 @@ import {
   getNominationSubmissionError,
   validateNominationInput,
 } from "../lib/nominationValidation";
+import {
+  moveRankedCandidate,
+  validateFinalRanking,
+  validatePrimarySelection,
+} from "../lib/votingLogic";
 
 function getStorageKey(pollId, phase) {
   return `alc-ballot-${pollId}-${phase}`;
@@ -25,11 +30,16 @@ function createDefaultFormState(poll) {
     return {
       albumTitle: "",
       artistName: "",
+      selectedCandidateIds: [],
+      rankedCandidateIds: [],
     };
   }
 
   return {
-    candidateId: poll.candidates[0]?.id ?? "",
+    albumTitle: "",
+    artistName: "",
+    selectedCandidateIds: [],
+    rankedCandidateIds: (poll.finalists || []).map((candidate) => candidate.id),
   };
 }
 
@@ -51,11 +61,13 @@ function normalizeVoteRecord(vote) {
     return null;
   }
 
+  const choices = (vote.choices || []).sort((a, b) => a.rank - b.rank);
+
   return {
     pollId: vote.poll_id,
     phase: vote.phase,
     submittedAt: vote.created_at,
-    candidateId: vote.candidate_id,
+    candidateIds: choices.map((choice) => choice.candidate_id),
     nomination:
       vote.album_title && vote.artist_name
         ? {
@@ -68,23 +80,6 @@ function normalizeVoteRecord(vote) {
 
 function formatNominationCount(count) {
   return `${count} nomination${count === 1 ? "" : "s"}`;
-}
-
-function mapPrimaryCandidate(candidate) {
-  const nominationCount = Number(candidate.nomination_count);
-
-  return {
-    id: candidate.candidate_id,
-    title: candidate.album_title,
-    artist: candidate.artist_name,
-    note: `${formatNominationCount(nominationCount)}. Tie-breaker: most recently nominated ${formatTimestamp(
-      candidate.last_nominated_at,
-    )}.`,
-    nominationCount,
-    lastNominatedAt: candidate.last_nominated_at,
-    rank: candidate.candidate_rank,
-    advancesToPrimary: candidate.advances_to_primary,
-  };
 }
 
 function getAccountStatus(session, membership) {
@@ -113,33 +108,30 @@ function Poll({
   membership,
   navigate,
   poll,
+  pollError,
   refreshMembership,
+  refreshPoll,
   session,
   supabase,
 }) {
   const [formState, setFormState] = useState(() => createDefaultFormState(poll));
   const [storedBallot, setStoredBallot] = useState(() => readStoredBallot(poll.id, poll.phase));
   const [isLoadingVote, setIsLoadingVote] = useState(false);
-  const [isLoadingPrimaryCandidates, setIsLoadingPrimaryCandidates] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
-  const [candidateLoadError, setCandidateLoadError] = useState(null);
-  const [primaryNominationPool, setPrimaryNominationPool] = useState([]);
 
-  const phaseDetails = phaseContent[poll.phase];
+  const phaseDetails = phaseContent[poll.phase] || phaseContent.nominations;
   const hasSubmitted = storedBallot?.pollId === poll.id && storedBallot?.phase === poll.phase;
   const accountStatus = getAccountStatus(session, membership);
   const canVote = hasSupabaseConfig && accountStatus === "approved";
-  const primaryCandidates = primaryNominationPool.filter(
-    (candidate) => candidate.advancesToPrimary,
+  const candidateOptions = poll.phase === "final" ? poll.finalists || [] : poll.candidates || [];
+  const rankedCandidates = useMemo(
+    () =>
+      formState.rankedCandidateIds
+        .map((candidateId) => candidateOptions.find((candidate) => candidate.id === candidateId))
+        .filter(Boolean),
+    [candidateOptions, formState.rankedCandidateIds],
   );
-  const candidateOptions = poll.phase === "primary" ? primaryCandidates : poll.candidates;
-  const selectedCandidate = candidateOptions.find(
-    (candidate) => candidate.id === storedBallot?.candidateId,
-  );
-  const isPrimaryUnavailable =
-    poll.phase === "primary" &&
-    (isLoadingPrimaryCandidates || candidateLoadError || candidateOptions.length === 0);
 
   async function handleSignOut() {
     if (!supabase) {
@@ -151,56 +143,10 @@ function Poll({
   }
 
   useEffect(() => {
-    if (poll.phase !== "primary" || !supabase || !canVote) {
-      return;
-    }
-
-    let isMounted = true;
-
-    async function loadPrimaryCandidates() {
-      setIsLoadingPrimaryCandidates(true);
-      setCandidateLoadError(null);
-
-      const { data, error } = await supabase.rpc("get_primary_candidates", {
-        target_poll_id: poll.id,
-        candidate_limit: 5,
-      });
-
-      if (!isMounted) {
-        return;
-      }
-
-      if (error) {
-        setCandidateLoadError(error.message);
-        setPrimaryNominationPool([]);
-      } else {
-        const candidates = (data ?? []).map(mapPrimaryCandidate);
-        const advancingCandidates = candidates.filter((candidate) => candidate.advancesToPrimary);
-
-        setPrimaryNominationPool(candidates);
-        setFormState((currentState) => {
-          if (
-            currentState.candidateId &&
-            advancingCandidates.some((candidate) => candidate.id === currentState.candidateId)
-          ) {
-            return currentState;
-          }
-
-          return {
-            candidateId: advancingCandidates[0]?.id ?? "",
-          };
-        });
-      }
-
-      setIsLoadingPrimaryCandidates(false);
-    }
-
-    loadPrimaryCandidates();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [canVote, poll.id, poll.phase, supabase]);
+    setFormState(createDefaultFormState(poll));
+    setStoredBallot(readStoredBallot(poll.id, poll.phase));
+    setFormError(null);
+  }, [poll.id, poll.phase]);
 
   useEffect(() => {
     if (!supabase || !session?.user || accountStatus !== "approved") {
@@ -214,7 +160,7 @@ function Poll({
 
       const { data, error } = await supabase
         .from("votes")
-        .select("poll_id, phase, candidate_id, album_title, artist_name, created_at")
+        .select("poll_id, phase, album_title, artist_name, created_at, vote_choices(candidate_id, rank)")
         .eq("poll_id", poll.id)
         .eq("phase", poll.phase)
         .eq("user_id", session.user.id)
@@ -225,7 +171,10 @@ function Poll({
       }
 
       if (!error && data) {
-        const normalizedVote = normalizeVoteRecord(data);
+        const normalizedVote = normalizeVoteRecord({
+          ...data,
+          choices: data.vote_choices || [],
+        });
         window.localStorage.setItem(getStorageKey(poll.id, poll.phase), JSON.stringify(normalizedVote));
         setStoredBallot(normalizedVote);
       }
@@ -249,6 +198,31 @@ function Poll({
     }));
   }
 
+  function handlePrimaryToggle(candidateId) {
+    setFormState((currentState) => {
+      const isSelected = currentState.selectedCandidateIds.includes(candidateId);
+      const selectedCandidateIds = isSelected
+        ? currentState.selectedCandidateIds.filter((id) => id !== candidateId)
+        : [...currentState.selectedCandidateIds, candidateId];
+
+      return {
+        ...currentState,
+        selectedCandidateIds: selectedCandidateIds.slice(0, 5),
+      };
+    });
+  }
+
+  function handleRankMove(candidateId, direction) {
+    setFormState((currentState) => ({
+      ...currentState,
+      rankedCandidateIds: moveRankedCandidate(
+        currentState.rankedCandidateIds,
+        candidateId,
+        direction,
+      ),
+    }));
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setFormError(null);
@@ -262,81 +236,89 @@ function Poll({
       return;
     }
 
-    let nextBallot;
-    let voteRecord;
+    setIsSubmitting(true);
 
     if (poll.phase === "nominations") {
       const nominationValidation = validateNominationInput(formState);
 
       if (!nominationValidation.isValid) {
         setFormError(nominationValidation.message);
+        setIsSubmitting(false);
         return;
       }
 
-      const { albumTitle, artistName } = nominationValidation;
+      const { data, error } = await supabase.rpc("submit_nomination", {
+        target_poll_id: poll.id,
+        album_title_input: nominationValidation.albumTitle,
+        artist_name_input: nominationValidation.artistName,
+      });
 
-      nextBallot = {
-        pollId: poll.id,
-        phase: poll.phase,
-        submittedAt: new Date().toISOString(),
-        nomination: {
-          albumTitle,
-          artistName,
-        },
-      };
-      voteRecord = {
-        poll_id: poll.id,
-        phase: poll.phase,
-        user_id: session.user.id,
-        album_title: albumTitle,
-        artist_name: artistName,
-      };
-    } else {
-      const candidateExists = candidateOptions.some(
-        (candidate) => candidate.id === formState.candidateId,
-      );
+      setIsSubmitting(false);
 
-      if (!formState.candidateId || !candidateExists) {
-        setFormError("Choose an album before submitting.");
+      if (error) {
+        setFormError(getNominationSubmissionError(error));
         return;
       }
 
-      nextBallot = {
-        pollId: poll.id,
-        phase: poll.phase,
-        submittedAt: new Date().toISOString(),
-        candidateId: formState.candidateId,
-      };
-      voteRecord = {
-        poll_id: poll.id,
-        phase: poll.phase,
-        user_id: session.user.id,
-        candidate_id: formState.candidateId,
-      };
+      const savedBallot = normalizeVoteRecord(data);
+      window.localStorage.setItem(getStorageKey(poll.id, poll.phase), JSON.stringify(savedBallot));
+      setStoredBallot(savedBallot);
+      await refreshPoll();
+      return;
     }
 
-    setIsSubmitting(true);
+    if (poll.phase === "primary") {
+      const primaryValidation = validatePrimarySelection(formState.selectedCandidateIds);
 
-    const { data, error } = await supabase
-      .from("votes")
-      .insert(voteRecord)
-      .select("poll_id, phase, candidate_id, album_title, artist_name, created_at")
-      .single();
+      if (!primaryValidation.isValid) {
+        setFormError(primaryValidation.message);
+        setIsSubmitting(false);
+        return;
+      }
+
+      const { data, error } = await supabase.rpc("submit_primary_ballot", {
+        target_poll_id: poll.id,
+        candidate_ids: formState.selectedCandidateIds,
+      });
+
+      setIsSubmitting(false);
+
+      if (error) {
+        setFormError(error.code === "23505" ? "Your account already submitted this phase." : error.message);
+        return;
+      }
+
+      const savedBallot = normalizeVoteRecord(data);
+      window.localStorage.setItem(getStorageKey(poll.id, poll.phase), JSON.stringify(savedBallot));
+      setStoredBallot(savedBallot);
+      await refreshPoll();
+      return;
+    }
+
+    const finalValidation = validateFinalRanking(formState.rankedCandidateIds);
+
+    if (!finalValidation.isValid) {
+      setFormError(finalValidation.message);
+      setIsSubmitting(false);
+      return;
+    }
+
+    const { data, error } = await supabase.rpc("submit_final_ballot", {
+      target_poll_id: poll.id,
+      ranked_candidate_ids: formState.rankedCandidateIds,
+    });
 
     setIsSubmitting(false);
 
     if (error) {
-      setFormError(
-        error.code === "23505"
-          ? "Your account already has a saved submission for this poll."
-          : getNominationSubmissionError(error),
-      );
+      setFormError(error.code === "23505" ? "Your account already submitted this phase." : error.message);
       return;
     }
 
-    const savedBallot = normalizeVoteRecord(data) || nextBallot;
+    const savedBallot = normalizeVoteRecord(data);
     window.localStorage.setItem(getStorageKey(poll.id, poll.phase), JSON.stringify(savedBallot));
     setStoredBallot(savedBallot);
+    await refreshPoll();
   }
 
   function renderAccountGate() {
@@ -349,6 +331,16 @@ function Poll({
             Add <strong>VITE_SUPABASE_URL</strong> and <strong>VITE_SUPABASE_ANON_KEY</strong>
             to your environment, then run the Supabase schema in this repo.
           </p>
+        </div>
+      );
+    }
+
+    if (pollError) {
+      return (
+        <div className="confirmation-card">
+          <p className="eyebrow">Database setup needed</p>
+          <h3>The live poll could not be loaded.</h3>
+          <p>{pollError}</p>
         </div>
       );
     }
@@ -445,111 +437,78 @@ function Poll({
       );
     }
 
-    if (poll.phase === "primary") {
-      if (isLoadingPrimaryCandidates) {
-        return (
-          <div className="confirmation-card">
-            <p className="eyebrow">Building ballot</p>
-            <h3>Finding the top nominated albums.</h3>
-            <p>Duplicates are being grouped before the primary vote opens.</p>
-          </div>
-        );
-      }
-
-      if (candidateLoadError) {
-        return (
-          <div className="confirmation-card">
-            <p className="eyebrow">Primary unavailable</p>
-            <h3>Could not load the nomination pool.</h3>
-            <p>{candidateLoadError}</p>
-          </div>
-        );
-      }
-
-      if (candidateOptions.length === 0) {
-        return (
-          <div className="confirmation-card">
-            <p className="eyebrow">No nominations yet</p>
-            <h3>The primary ballot needs nominations first.</h3>
-            <p>Once members submit albums, the top five unique nominations will appear here.</p>
-          </div>
-        );
-      }
-    }
-
-    return (
-      <div className="candidate-list" role="radiogroup" aria-label="Album choices">
-        {candidateOptions.map((candidate) => (
-          <label
-            key={candidate.id}
-            className={`candidate-option ${
-              formState.candidateId === candidate.id ? "is-selected" : ""
-            }`}
-          >
-            <input
-              type="radio"
-              name="candidateId"
-              value={candidate.id}
-              checked={formState.candidateId === candidate.id}
-              onChange={handleFieldChange}
-            />
-
-            <div>
-              <strong>{candidate.title}</strong>
-              <p className="candidate-artist">{candidate.artist}</p>
-              <p className="candidate-note">{candidate.note}</p>
-            </div>
-          </label>
-        ))}
-      </div>
-    );
-  }
-
-  function renderPrimaryNominationPool() {
-    if (poll.phase !== "primary") {
-      return null;
-    }
-
-    if (isLoadingPrimaryCandidates) {
+    if (candidateOptions.length === 0) {
       return (
-        <article className="surface-card sidebar-card nomination-pool-card">
-          <p className="eyebrow">Nomination pool</p>
-          <h2 className="sidebar-title">Grouping duplicates...</h2>
-        </article>
+        <div className="confirmation-card">
+          <p className="eyebrow">Ballot unavailable</p>
+          <h3>This phase needs candidates first.</h3>
+          <p>Ask an admin to advance the poll when the previous phase is ready.</p>
+        </div>
       );
     }
 
-    if (!primaryNominationPool.length) {
-      return null;
+    if (poll.phase === "primary") {
+      return (
+        <div className="candidate-list" role="group" aria-label="Primary album choices">
+          {candidateOptions.map((candidate) => {
+            const isSelected = formState.selectedCandidateIds.includes(candidate.id);
+
+            return (
+              <label
+                key={candidate.id}
+                className={`candidate-option ${isSelected ? "is-selected" : ""}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  disabled={!isSelected && formState.selectedCandidateIds.length >= 5}
+                  onChange={() => handlePrimaryToggle(candidate.id)}
+                />
+
+                <div>
+                  <strong>{candidate.title}</strong>
+                  <p className="candidate-artist">{candidate.artist}</p>
+                  <p className="candidate-note">
+                    {formatNominationCount(candidate.nominationCount || 0)}
+                  </p>
+                </div>
+              </label>
+            );
+          })}
+        </div>
+      );
     }
 
     return (
-      <article className="surface-card sidebar-card nomination-pool-card">
-        <p className="eyebrow">Nomination pool</p>
-        <h2 className="sidebar-title">Every unique album nominated</h2>
-        <p className="sidebar-copy">
-          Top five move to this ballot. Ties go to the most recent nomination.
-        </p>
-
-        <div className="nomination-pool-list">
-          {primaryNominationPool.map((candidate) => (
-            <div
-              className={`nomination-pool-item ${
-                candidate.advancesToPrimary ? "is-advancing" : ""
-              }`}
-              key={candidate.id}
-            >
-              <span>#{candidate.rank}</span>
-              <div>
-                <strong>{candidate.title}</strong>
-                <p>
-                  {candidate.artist} · {formatNominationCount(candidate.nominationCount)}
-                </p>
-              </div>
+      <div className="ranked-ballot" aria-label="Final IRV ranking">
+        {rankedCandidates.map((candidate, index) => (
+          <article className="ranked-choice" key={candidate.id}>
+            <span>#{index + 1}</span>
+            <div>
+              <strong>{candidate.title}</strong>
+              <p>{candidate.artist}</p>
             </div>
-          ))}
-        </div>
-      </article>
+            <div className="ranked-actions">
+              <button
+                className="button button-secondary"
+                type="button"
+                disabled={index === 0}
+                onClick={() => handleRankMove(candidate.id, -1)}
+              >
+                Up
+              </button>
+              <button
+                className="button button-secondary"
+                type="button"
+                disabled={index === rankedCandidates.length - 1}
+                onClick={() => handleRankMove(candidate.id, 1)}
+              >
+                Down
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
     );
   }
 
@@ -561,7 +520,7 @@ function Poll({
     return (
       <div className="confirmation-card">
         <p className="eyebrow">Submission saved</p>
-        <h3>Your ballot is locked for this poll.</h3>
+        <h3>Your ballot is locked for this phase.</h3>
         <p>
           This browser already has a saved submission for <strong>{poll.id}</strong>.
           Refreshing the page won&apos;t remove it.
@@ -576,9 +535,17 @@ function Poll({
             </>
           ) : (
             <>
-              <span>Selected option</span>
-              <strong>{selectedCandidate?.title}</strong>
-              <p>{selectedCandidate?.artist}</p>
+              <span>{poll.phase === "final" ? "Ranked ballot" : "Selected albums"}</span>
+              {storedBallot.candidateIds.map((candidateId, index) => {
+                const candidate = candidateOptions.find((option) => option.id === candidateId);
+
+                return candidate ? (
+                  <p key={candidateId}>
+                    {poll.phase === "final" ? `${index + 1}. ` : ""}
+                    {candidate.title} - {candidate.artist}
+                  </p>
+                ) : null;
+              })}
             </>
           )}
         </div>
@@ -625,21 +592,23 @@ function Poll({
               {renderFormBody()}
 
               <p className="helper-note">
-                One verified, approved account gets one submission per poll.
+                One verified, approved account gets one submission per phase.
               </p>
+
+              {poll.phase === "primary" ? (
+                <p className="helper-note">
+                  Selected {formState.selectedCandidateIds.length}. You can submit any number from 1 to 5.
+                </p>
+              ) : null}
 
               {formError ? <p className="form-error">{formError}</p> : null}
 
               <button
                 className="button button-primary"
                 type="submit"
-                disabled={isSubmitting || isPrimaryUnavailable}
+                disabled={isSubmitting || (poll.phase !== "nominations" && candidateOptions.length === 0)}
               >
-                {isSubmitting
-                  ? "Saving..."
-                  : isPrimaryUnavailable
-                    ? "Primary not ready"
-                    : phaseDetails.buttonLabel}
+                {isSubmitting ? "Saving..." : phaseDetails.buttonLabel}
               </button>
             </form>
           ))}
@@ -660,14 +629,6 @@ function Poll({
               </button>
             </article>
           ) : null}
-
-          <article className="surface-card sidebar-card">
-            <p className="eyebrow">Current listen</p>
-            <h2 className="sidebar-title">{poll.albumOfWeek.title}</h2>
-            <p className="sidebar-copy">{poll.albumOfWeek.artist}</p>
-          </article>
-
-          {renderPrimaryNominationPool()}
 
           <article className="surface-card sidebar-card">
             <p className="eyebrow">Poll details</p>

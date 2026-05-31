@@ -1,8 +1,9 @@
-function Navbar({ currentPath, navigate }) {
+function Navbar({ currentPath, navigate, showAdminLink }) {
   const links = [
     { path: "/", label: "Home" },
     { path: "/vote", label: "Vote" },
-    { path: "/admin", label: "Admin" },
+    { path: "/events", label: "Events" },
+    ...(showAdminLink ? [{ path: "/admin", label: "Admin" }] : []),
   ];
 
   function handleNavigate(event, path) {
