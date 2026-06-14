@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import AuthPanel from "../components/AuthPanel";
+import SideBNav from "../components/SideBNav";
 import { phaseContent } from "../data/clubContent";
 import {
   getNominationSubmissionError,
@@ -11,18 +12,39 @@ import {
   validateFinalRanking,
   validatePrimarySelection,
 } from "../lib/votingLogic";
+import "../styles/sideb-mock.css";
 
-function getStorageKey(pollId, phase) {
-  return `alc-ballot-${pollId}-${phase}`;
+function getStorageKey(userId, pollId, phase) {
+  return `alc-ballot-${userId}-${pollId}-${phase}`;
 }
 
-function readStoredBallot(pollId, phase) {
+function readStoredBallot(userId, pollId, phase) {
+  if (!userId) {
+    return null;
+  }
+
   try {
-    const storedBallot = window.localStorage.getItem(getStorageKey(pollId, phase));
+    const storedBallot = window.localStorage.getItem(getStorageKey(userId, pollId, phase));
     return storedBallot ? JSON.parse(storedBallot) : null;
   } catch {
     return null;
   }
+}
+
+function writeStoredBallot(userId, pollId, phase, ballot) {
+  if (!userId || !ballot) {
+    return;
+  }
+
+  window.localStorage.setItem(getStorageKey(userId, pollId, phase), JSON.stringify(ballot));
+}
+
+function clearStoredBallot(userId, pollId, phase) {
+  if (!userId) {
+    return;
+  }
+
+  window.localStorage.removeItem(getStorageKey(userId, pollId, phase));
 }
 
 function createDefaultFormState(poll) {
@@ -61,7 +83,7 @@ function normalizeVoteRecord(vote) {
     return null;
   }
 
-  const choices = (vote.choices || []).sort((a, b) => a.rank - b.rank);
+  const choices = [...(vote.choices || [])].sort((a, b) => a.rank - b.rank);
 
   return {
     pollId: vote.poll_id,
@@ -76,6 +98,11 @@ function normalizeVoteRecord(vote) {
           }
         : null,
   };
+}
+
+function attachUserToVote(vote, userId) {
+  const normalizedVote = normalizeVoteRecord(vote);
+  return normalizedVote ? { ...normalizedVote, userId } : null;
 }
 
 function formatNominationCount(count) {
@@ -112,19 +139,27 @@ function Poll({
   refreshMembership,
   refreshPoll,
   session,
+  showAdminLink,
   supabase,
 }) {
   const [formState, setFormState] = useState(() => createDefaultFormState(poll));
-  const [storedBallot, setStoredBallot] = useState(() => readStoredBallot(poll.id, poll.phase));
+  const [storedBallot, setStoredBallot] = useState(null);
   const [isLoadingVote, setIsLoadingVote] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
 
   const phaseDetails = phaseContent[poll.phase] || phaseContent.nominations;
-  const hasSubmitted = storedBallot?.pollId === poll.id && storedBallot?.phase === poll.phase;
+  const userId = session?.user?.id;
+  const hasSubmitted =
+    storedBallot?.pollId === poll.id &&
+    storedBallot?.phase === poll.phase &&
+    storedBallot?.userId === userId;
   const accountStatus = getAccountStatus(session, membership);
   const canVote = hasSupabaseConfig && accountStatus === "approved";
-  const candidateOptions = poll.phase === "final" ? poll.finalists || [] : poll.candidates || [];
+  const candidateOptions = useMemo(
+    () => (poll.phase === "final" ? poll.finalists || [] : poll.candidates || []),
+    [poll.candidates, poll.finalists, poll.phase],
+  );
   const rankedCandidates = useMemo(
     () =>
       formState.rankedCandidateIds
@@ -139,17 +174,19 @@ function Poll({
     }
 
     await supabase.auth.signOut();
-    setStoredBallot(readStoredBallot(poll.id, poll.phase));
+    setStoredBallot(null);
   }
 
   useEffect(() => {
     setFormState(createDefaultFormState(poll));
-    setStoredBallot(readStoredBallot(poll.id, poll.phase));
+    setStoredBallot(null);
     setFormError(null);
-  }, [poll.id, poll.phase]);
+  }, [poll]);
 
   useEffect(() => {
-    if (!supabase || !session?.user || accountStatus !== "approved") {
+    if (!supabase || !userId || accountStatus !== "approved") {
+      setStoredBallot(null);
+      setIsLoadingVote(false);
       return;
     }
 
@@ -157,13 +194,14 @@ function Poll({
 
     async function loadStoredVote() {
       setIsLoadingVote(true);
+      setStoredBallot(readStoredBallot(userId, poll.id, poll.phase));
 
       const { data, error } = await supabase
         .from("votes")
         .select("poll_id, phase, album_title, artist_name, created_at, vote_choices(candidate_id, rank)")
         .eq("poll_id", poll.id)
         .eq("phase", poll.phase)
-        .eq("user_id", session.user.id)
+        .eq("user_id", userId)
         .maybeSingle();
 
       if (!isMounted) {
@@ -171,12 +209,19 @@ function Poll({
       }
 
       if (!error && data) {
-        const normalizedVote = normalizeVoteRecord({
+        const userScopedVote = attachUserToVote({
           ...data,
           choices: data.vote_choices || [],
-        });
-        window.localStorage.setItem(getStorageKey(poll.id, poll.phase), JSON.stringify(normalizedVote));
-        setStoredBallot(normalizedVote);
+        }, userId);
+        writeStoredBallot(userId, poll.id, poll.phase, userScopedVote);
+        setStoredBallot(userScopedVote);
+      } else {
+        clearStoredBallot(userId, poll.id, poll.phase);
+        setStoredBallot(null);
+
+        if (error) {
+          setFormError(error.message);
+        }
       }
 
       setIsLoadingVote(false);
@@ -187,7 +232,7 @@ function Poll({
     return () => {
       isMounted = false;
     };
-  }, [accountStatus, poll.id, poll.phase, session?.user, supabase]);
+  }, [accountStatus, poll.id, poll.phase, supabase, userId]);
 
   function handleFieldChange(event) {
     const { name, value } = event.target;
@@ -260,8 +305,14 @@ function Poll({
         return;
       }
 
-      const savedBallot = normalizeVoteRecord(data);
-      window.localStorage.setItem(getStorageKey(poll.id, poll.phase), JSON.stringify(savedBallot));
+      const savedBallot = attachUserToVote(data, userId);
+      if (!savedBallot) {
+        setFormError("Your nomination was saved, but the confirmation could not be loaded.");
+        await refreshPoll();
+        return;
+      }
+
+      writeStoredBallot(userId, poll.id, poll.phase, savedBallot);
       setStoredBallot(savedBallot);
       await refreshPoll();
       return;
@@ -288,8 +339,14 @@ function Poll({
         return;
       }
 
-      const savedBallot = normalizeVoteRecord(data);
-      window.localStorage.setItem(getStorageKey(poll.id, poll.phase), JSON.stringify(savedBallot));
+      const savedBallot = attachUserToVote(data, userId);
+      if (!savedBallot) {
+        setFormError("Your ballot was saved, but the confirmation could not be loaded.");
+        await refreshPoll();
+        return;
+      }
+
+      writeStoredBallot(userId, poll.id, poll.phase, savedBallot);
       setStoredBallot(savedBallot);
       await refreshPoll();
       return;
@@ -315,8 +372,14 @@ function Poll({
       return;
     }
 
-    const savedBallot = normalizeVoteRecord(data);
-    window.localStorage.setItem(getStorageKey(poll.id, poll.phase), JSON.stringify(savedBallot));
+    const savedBallot = attachUserToVote(data, userId);
+    if (!savedBallot) {
+      setFormError("Your ranking was saved, but the confirmation could not be loaded.");
+      await refreshPoll();
+      return;
+    }
+
+    writeStoredBallot(userId, poll.id, poll.phase, savedBallot);
     setStoredBallot(savedBallot);
     await refreshPoll();
   }
@@ -522,8 +585,7 @@ function Poll({
         <p className="eyebrow">Submission saved</p>
         <h3>Your ballot is locked for this phase.</h3>
         <p>
-          This browser already has a saved submission for <strong>{poll.id}</strong>.
-          Refreshing the page won&apos;t remove it.
+          The server has a saved submission for your account in this voting phase.
         </p>
 
         <div className="saved-ballot">
@@ -556,99 +618,99 @@ function Poll({
   }
 
   return (
-    <div className="poll-page">
-      <section className="page-header surface-card">
-        <div>
-          <p className="eyebrow">Voting page</p>
-          <h1 className="page-title">{poll.question}</h1>
-          <p className="page-intro">{poll.description}</p>
-        </div>
+    <div className="sideb-page sideb-subpage sideb-vote-page">
+      <SideBNav activePath="/vote" navigate={navigate} showAdminLink={showAdminLink} />
 
-        <button className="button button-secondary" onClick={() => navigate("/")}>
-          Back to home
-        </button>
-      </section>
-
-      <section className="vote-layout">
-        <article className="vote-form-card surface-card">
-          <div className="form-header">
-            <div>
-              <span className={`phase-pill phase-${poll.phase}`}>{phaseDetails.label}</span>
-              <h2>{phaseDetails.title}</h2>
-            </div>
-            <p>{phaseDetails.description}</p>
+      <main className="sideb-subpage-main">
+        <section className="sideb-page-hero sideb-page-hero-split sideb-vote-hero">
+          <div>
+            <p className="eyebrow">Voting page</p>
+            <h1 className="page-title">{poll.question}</h1>
+            <p className="page-intro">{poll.description}</p>
           </div>
 
-          {renderAccountGate() ||
-          (isLoadingVote ? (
-            <div className="confirmation-card">
-              <p className="eyebrow">Loading ballot</p>
-              <h3>Checking for an existing submission.</h3>
+          <button className="sideb-button sideb-button-ghost" type="button" onClick={() => navigate("/")}>
+            Back to home
+          </button>
+        </section>
+
+        <section className="vote-layout">
+          <article className="vote-form-card surface-card">
+            <div className="form-header">
+              <div>
+                <span className={`phase-pill phase-${poll.phase}`}>{phaseDetails.label}</span>
+                <h2>{phaseDetails.title}</h2>
+              </div>
+              <p>{phaseDetails.description}</p>
             </div>
-          ) : hasSubmitted ? (
-            renderConfirmation()
-          ) : (
-            <form className="vote-form" onSubmit={handleSubmit}>
-              {renderFormBody()}
 
-              <p className="helper-note">
-                One verified, approved account gets one submission per phase.
-              </p>
+            {renderAccountGate() ||
+            (isLoadingVote ? (
+              <div className="confirmation-card">
+                <p className="eyebrow">Loading ballot</p>
+                <h3>Checking for an existing submission.</h3>
+              </div>
+            ) : hasSubmitted ? (
+              renderConfirmation()
+            ) : (
+              <form className="vote-form" onSubmit={handleSubmit}>
+                {renderFormBody()}
 
-              {poll.phase === "primary" ? (
                 <p className="helper-note">
-                  Selected {formState.selectedCandidateIds.length}. You can submit any number from 1 to 5.
+                  One verified, approved account gets one submission per phase.
                 </p>
-              ) : null}
 
-              {formError ? <p className="form-error">{formError}</p> : null}
+                {poll.phase === "primary" ? (
+                  <p className="helper-note">
+                    Selected {formState.selectedCandidateIds.length}. You can submit any number from 1 to 5.
+                  </p>
+                ) : null}
 
-              <button
-                className="button button-primary"
-                type="submit"
-                disabled={isSubmitting || (poll.phase !== "nominations" && candidateOptions.length === 0)}
-              >
-                {isSubmitting ? "Saving..." : phaseDetails.buttonLabel}
-              </button>
-            </form>
-          ))}
-        </article>
+                {formError ? <p className="form-error">{formError}</p> : null}
 
-        <aside className="poll-sidebar">
-          {session ? (
-            <article className="surface-card sidebar-card">
-              <p className="eyebrow">Account</p>
-              <h2 className="sidebar-title">{membership?.display_name || "Signed in"}</h2>
-              <p className="sidebar-copy">{session.user.email}</p>
-              <div className="member-badges compact-badges">
-                <span>{accountStatus}</span>
-                <span>{membership?.role || "member"}</span>
-              </div>
-              <button className="button button-secondary full-width" type="button" onClick={handleSignOut}>
-                Sign out
-              </button>
-            </article>
-          ) : null}
-
-          <article className="surface-card sidebar-card">
-            <p className="eyebrow">Poll details</p>
-            <dl className="meta-list compact">
-              <div>
-                <dt>Phase</dt>
-                <dd>{formatPhaseLabel(poll.phase)}</dd>
-              </div>
-              <div>
-                <dt>Status</dt>
-                <dd>{poll.status}</dd>
-              </div>
-              <div>
-                <dt>Current poll id</dt>
-                <dd>{poll.id}</dd>
-              </div>
-            </dl>
+                <button
+                  className="button button-primary"
+                  type="submit"
+                  disabled={isSubmitting || (poll.phase !== "nominations" && candidateOptions.length === 0)}
+                >
+                  {isSubmitting ? "Saving..." : phaseDetails.buttonLabel}
+                </button>
+              </form>
+            ))}
           </article>
-        </aside>
-      </section>
+
+          <aside className="poll-sidebar">
+            {session ? (
+              <article className="surface-card sidebar-card">
+                <p className="eyebrow">Account</p>
+                <h2 className="sidebar-title">{membership?.display_name || "Signed in"}</h2>
+                <p className="sidebar-copy">{session.user.email}</p>
+                <div className="member-badges compact-badges">
+                  <span>{accountStatus}</span>
+                  <span>{membership?.role || "member"}</span>
+                </div>
+                <button className="button button-secondary full-width" type="button" onClick={handleSignOut}>
+                  Sign out
+                </button>
+              </article>
+            ) : null}
+
+            <article className="surface-card sidebar-card">
+              <p className="eyebrow">Poll details</p>
+              <dl className="meta-list compact">
+                <div>
+                  <dt>Phase</dt>
+                  <dd>{formatPhaseLabel(poll.phase)}</dd>
+                </div>
+                <div>
+                  <dt>Status</dt>
+                  <dd>{poll.status}</dd>
+                </div>
+              </dl>
+            </article>
+          </aside>
+        </section>
+      </main>
     </div>
   );
 }

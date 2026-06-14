@@ -2,7 +2,9 @@ function Navbar({ currentPath, navigate, showAdminLink }) {
   const links = [
     { path: "/", label: "Home" },
     { path: "/vote", label: "Vote" },
+    { path: "/results", label: "Results" },
     { path: "/events", label: "Events" },
+    { path: "/about", label: "About" },
     ...(showAdminLink ? [{ path: "/admin", label: "Admin" }] : []),
   ];
 
@@ -11,7 +13,6 @@ function Navbar({ currentPath, navigate, showAdminLink }) {
     navigate(path);
   }
 
-  //handle nav helps with no full reload
   return (
     <header className="site-nav">
       <a href="/" className="brand" onClick={(event) => handleNavigate(event, "/")}> 

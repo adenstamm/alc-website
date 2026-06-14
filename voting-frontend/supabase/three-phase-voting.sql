@@ -839,11 +839,19 @@ on conflict (id) do nothing;
 create table if not exists public.record_shelf_covers (
   album_id text primary key,
   album_title text not null,
-  cover_url text not null,
-  storage_path text not null,
+  artist_override text,
+  cover_url text,
+  storage_path text,
   updated_by uuid references auth.users(id) on delete set null,
   updated_at timestamptz not null default now()
 );
+
+alter table public.record_shelf_covers
+  add column if not exists artist_override text;
+
+alter table public.record_shelf_covers
+  alter column cover_url drop not null,
+  alter column storage_path drop not null;
 
 alter table public.record_shelf_covers enable row level security;
 

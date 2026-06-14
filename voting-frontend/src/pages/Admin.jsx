@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import SideBNav from "../components/SideBNav";
 import {
   getRecentShelfAlbums,
   loadRecordShelfCoverOverrides,
   RECORD_SHELF_BUCKET,
 } from "../lib/recordShelf";
+import {
+  createEventId,
+  emptyEventForm,
+  eventToUpsertPayload,
+  validateEventForm,
+} from "../lib/siteContent";
+import "../styles/sideb-mock.css";
 
 function isAdmin(membership) {
   return membership?.status === "approved" && membership?.role === "admin";
@@ -14,6 +22,10 @@ const MEMBERS_PER_PAGE = 10;
 
 function formatCount(count, noun) {
   return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+function formatPhaseLabel(phase) {
+  return phase.charAt(0).toUpperCase() + phase.slice(1);
 }
 
 function getMemberName(member) {
@@ -29,10 +41,31 @@ function createPollId(cycleLabel) {
   return slug ? `poll-${slug}` : `poll-${new Date().toISOString().slice(0, 10)}`;
 }
 
-function Admin({ authReady, hasSupabaseConfig, membership, poll, pollError, refreshPoll, session, supabase }) {
+function Admin({
+  authReady,
+  hasSupabaseConfig,
+  membership,
+  navigate,
+  poll,
+  pollError,
+  refreshEvents,
+  refreshPoll,
+  session,
+  showAdminLink,
+  siteEvents,
+  supabase,
+}) {
   const [memberships, setMemberships] = useState([]);
   const [results, setResults] = useState(null);
   const [selectedFinalistIds, setSelectedFinalistIds] = useState([]);
+  const [currentAlbumForm, setCurrentAlbumForm] = useState({
+    title: poll.albumOfWeek.title || "",
+    artist: poll.albumOfWeek.artist || "",
+    note: poll.albumOfWeek.note || "Current club listen",
+    coverUrl: poll.albumOfWeek.coverUrl || "",
+  });
+  const [eventForm, setEventForm] = useState(emptyEventForm);
+  const [editingEventId, setEditingEventId] = useState(null);
   const [newPoll, setNewPoll] = useState({
     cycleLabel: "",
     pollId: "",
@@ -46,6 +79,7 @@ function Admin({ authReady, hasSupabaseConfig, membership, poll, pollError, refr
   const [memberSearch, setMemberSearch] = useState("");
   const [memberPage, setMemberPage] = useState(1);
   const [selectedShelfAlbumId, setSelectedShelfAlbumId] = useState("");
+  const [shelfArtistDrafts, setShelfArtistDrafts] = useState({});
   const [shelfCoverFile, setShelfCoverFile] = useState(null);
   const [shelfCoverOverrides, setShelfCoverOverrides] = useState({});
   const [isLoadingShelfCovers, setIsLoadingShelfCovers] = useState(false);
@@ -53,13 +87,15 @@ function Admin({ authReady, hasSupabaseConfig, membership, poll, pollError, refr
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [isLoadingResults, setIsLoadingResults] = useState(false);
   const [isSavingPhase, setIsSavingPhase] = useState(false);
+  const [isSavingContent, setIsSavingContent] = useState(false);
   const [message, setMessage] = useState(null);
+  const [memberMessage, setMemberMessage] = useState(null);
   const [error, setError] = useState(null);
 
   const canManage = hasSupabaseConfig && isAdmin(membership);
   const shelfAlbums = useMemo(() => getRecentShelfAlbums(), []);
   const selectedShelfAlbum = shelfAlbums.find((album) => album.id === selectedShelfAlbumId) || shelfAlbums[0];
-  const primaryRows = results?.primaryResults || [];
+  const primaryRows = useMemo(() => results?.primaryResults || [], [results?.primaryResults]);
   const nominationRows = results?.nominations || [];
   const finalRows = results?.finalists || [];
   const irvRounds = results?.irv?.rounds || [];
@@ -68,6 +104,17 @@ function Admin({ authReady, hasSupabaseConfig, membership, poll, pollError, refr
   const irvWinner = finalRows.find((candidate) => candidate.id === irvWinnerId);
   const selectedCount = selectedFinalistIds.length;
   const canAdvanceToFinal = poll.phase === "primary" && selectedCount === 5;
+  const sortedSiteEvents = useMemo(
+    () =>
+      [...siteEvents].sort((a, b) => {
+        if (a.status !== b.status) {
+          return a.status === "upcoming" ? -1 : 1;
+        }
+
+        return a.date.localeCompare(b.date);
+      }),
+    [siteEvents],
+  );
   const adminCount = memberships.filter(
     (member) => member.status === "approved" && member.role === "admin",
   ).length;
@@ -207,6 +254,11 @@ function Admin({ authReady, hasSupabaseConfig, membership, poll, pollError, refr
       shelfAlbums.map((album) => album.id),
     );
     setShelfCoverOverrides(overrides);
+    setShelfArtistDrafts(
+      Object.fromEntries(
+        shelfAlbums.map((album) => [album.id, overrides[album.id]?.artist_override || ""]),
+      ),
+    );
     setIsLoadingShelfCovers(false);
   }, [canManage, hasSupabaseConfig, shelfAlbums, supabase]);
 
@@ -223,6 +275,15 @@ function Admin({ authReady, hasSupabaseConfig, membership, poll, pollError, refr
   useEffect(() => {
     setMemberPage(1);
   }, [accountFilter, memberSearch, memberTab]);
+
+  useEffect(() => {
+    setCurrentAlbumForm({
+      title: poll.albumOfWeek.title || "",
+      artist: poll.albumOfWeek.artist || "",
+      note: poll.albumOfWeek.note || "Current club listen",
+      coverUrl: poll.albumOfWeek.coverUrl || "",
+    });
+  }, [poll.albumOfWeek]);
 
   function handleNewPollChange(event) {
     const { name, value } = event.target;
@@ -319,6 +380,7 @@ function Admin({ authReady, hasSupabaseConfig, membership, poll, pollError, refr
   async function updateMembership(userId, updates) {
     setError(null);
     setMessage(null);
+    setMemberMessage(null);
 
     if (updates.role === "member") {
       const targetMember = memberships.find((member) => member.user_id === userId);
@@ -346,7 +408,7 @@ function Admin({ authReady, hasSupabaseConfig, membership, poll, pollError, refr
         currentMembership.user_id === userId ? data : currentMembership,
       ),
     );
-    setMessage(getMembershipActionLabel(updates));
+    setMemberMessage(getMembershipActionLabel(updates));
   }
 
   function toggleFinalist(candidateId) {
@@ -383,6 +445,137 @@ function Admin({ authReady, hasSupabaseConfig, membership, poll, pollError, refr
     setMessage(successMessage);
     await refreshPoll();
     await loadResults();
+  }
+
+  function handleCurrentAlbumChange(event) {
+    const { name, value } = event.target;
+
+    setCurrentAlbumForm((currentForm) => ({
+      ...currentForm,
+      [name]: value,
+    }));
+  }
+
+  async function handleCurrentAlbumSave(event) {
+    event.preventDefault();
+    setError(null);
+    setMessage(null);
+
+    if (!currentAlbumForm.title.trim() || !currentAlbumForm.artist.trim()) {
+      setError("Add a current album title and artist before saving.");
+      return;
+    }
+
+    setIsSavingContent(true);
+
+    const { error: updateError } = await supabase.rpc("update_current_album", {
+      album_title: currentAlbumForm.title.trim(),
+      album_artist: currentAlbumForm.artist.trim(),
+      album_note: currentAlbumForm.note.trim() || "Current club listen",
+      cover_url: currentAlbumForm.coverUrl.trim() || null,
+    });
+
+    setIsSavingContent(false);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    setMessage("Current album updated.");
+    await refreshPoll();
+  }
+
+  function handleEventChange(event) {
+    const { name, value } = event.target;
+
+    setEventForm((currentForm) => {
+      const nextForm = {
+        ...currentForm,
+        [name]: value,
+      };
+
+      if ((name === "title" || name === "date") && (!currentForm.id || currentForm.id === createEventId(currentForm.title, currentForm.date))) {
+        nextForm.id = createEventId(name === "title" ? value : currentForm.title, name === "date" ? value : currentForm.date);
+      }
+
+      return nextForm;
+    });
+  }
+
+  function handleEventEdit(eventItem) {
+    setEditingEventId(eventItem.id);
+    setEventForm({
+      id: eventItem.id,
+      title: eventItem.title,
+      date: eventItem.date,
+      displayDate: eventItem.displayDate,
+      time: eventItem.time,
+      location: eventItem.location,
+      status: eventItem.status,
+      tag: eventItem.tag,
+      description: eventItem.description,
+    });
+  }
+
+  function resetEventForm() {
+    setEditingEventId(null);
+    setEventForm(emptyEventForm);
+  }
+
+  async function handleEventSave(event) {
+    event.preventDefault();
+    setError(null);
+    setMessage(null);
+
+    const validation = validateEventForm(eventForm);
+
+    if (!validation.isValid) {
+      setError(validation.message);
+      return;
+    }
+
+    setIsSavingContent(true);
+
+    const { error: saveError } = await supabase
+      .from("site_events")
+      .upsert(eventToUpsertPayload(eventForm), { onConflict: "id" });
+
+    setIsSavingContent(false);
+
+    if (saveError) {
+      setError(saveError.message);
+      return;
+    }
+
+    setMessage(editingEventId ? "Event updated." : "Event added.");
+    resetEventForm();
+    await refreshEvents();
+  }
+
+  async function handleEventDelete(eventId) {
+    setError(null);
+    setMessage(null);
+    setIsSavingContent(true);
+
+    const { error: deleteError } = await supabase
+      .from("site_events")
+      .delete()
+      .eq("id", eventId);
+
+    setIsSavingContent(false);
+
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+
+    if (editingEventId === eventId) {
+      resetEventForm();
+    }
+
+    setMessage("Event deleted.");
+    await refreshEvents();
   }
 
   function renderCreatePoll() {
@@ -477,6 +670,223 @@ function Admin({ authReady, hasSupabaseConfig, membership, poll, pollError, refr
             {isSavingPhase ? "Creating..." : "Create active poll"}
           </button>
         </form>
+      </article>
+    );
+  }
+
+  function renderCurrentAlbumManager() {
+    if (!canManage) {
+      return null;
+    }
+
+    return (
+      <article className="surface-card vote-form-card admin-content-panel">
+        <div className="form-header">
+          <div>
+            <span className="phase-pill phase-primary">Home</span>
+            <h2>Update current album</h2>
+          </div>
+          <p>This controls the album card on the home page without creating a new voting cycle.</p>
+        </div>
+
+        <form className="vote-form" onSubmit={handleCurrentAlbumSave}>
+          <div className="admin-create-grid">
+            <div className="field-group">
+              <label htmlFor="currentAlbumTitle">Album title</label>
+              <input
+                id="currentAlbumTitle"
+                name="title"
+                type="text"
+                value={currentAlbumForm.title}
+                onChange={handleCurrentAlbumChange}
+              />
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="currentAlbumArtist">Artist</label>
+              <input
+                id="currentAlbumArtist"
+                name="artist"
+                type="text"
+                value={currentAlbumForm.artist}
+                onChange={handleCurrentAlbumChange}
+              />
+            </div>
+          </div>
+
+          <div className="field-group">
+            <label htmlFor="currentAlbumCoverUrl">Cover image URL</label>
+            <input
+              id="currentAlbumCoverUrl"
+              name="coverUrl"
+              type="url"
+              placeholder="Optional. Leave blank to use automatic cover lookup."
+              value={currentAlbumForm.coverUrl}
+              onChange={handleCurrentAlbumChange}
+            />
+          </div>
+
+          <div className="field-group">
+            <label htmlFor="currentAlbumNote">Short label</label>
+            <input
+              id="currentAlbumNote"
+              name="note"
+              type="text"
+              value={currentAlbumForm.note}
+              onChange={handleCurrentAlbumChange}
+            />
+          </div>
+
+          <button className="button button-primary" type="submit" disabled={isSavingContent}>
+            {isSavingContent ? "Saving..." : "Save current album"}
+          </button>
+        </form>
+      </article>
+    );
+  }
+
+  function renderEventsManager() {
+    if (!canManage) {
+      return null;
+    }
+
+    return (
+      <article className="surface-card vote-form-card admin-content-panel">
+        <div className="form-header">
+          <div>
+            <span className="phase-pill phase-final">Events</span>
+            <h2>Manage events</h2>
+          </div>
+          <p>Events saved here appear on the home preview and the events page.</p>
+        </div>
+
+        <div className="admin-events-layout">
+          <div className="admin-event-list">
+            {sortedSiteEvents.map((eventItem) => (
+              <article className="admin-event-row" key={eventItem.id}>
+                <div>
+                  <span>{eventItem.status}</span>
+                  <strong>{eventItem.title}</strong>
+                  <p>{eventItem.displayDate} at {eventItem.time} - {eventItem.location}</p>
+                </div>
+
+                <div className="admin-action-row">
+                  <button
+                    className="button button-secondary"
+                    type="button"
+                    onClick={() => handleEventEdit(eventItem)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="button button-secondary"
+                    type="button"
+                    disabled={isSavingContent}
+                    onClick={() => handleEventDelete(eventItem.id)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <form className="vote-form admin-event-form" onSubmit={handleEventSave}>
+            <div className="field-group">
+              <label htmlFor="eventTitle">Title</label>
+              <input
+                id="eventTitle"
+                name="title"
+                type="text"
+                value={eventForm.title}
+                onChange={handleEventChange}
+              />
+            </div>
+
+            <div className="admin-create-grid">
+              <div className="field-group">
+                <label htmlFor="eventDate">Date</label>
+                <input
+                  id="eventDate"
+                  name="date"
+                  type="date"
+                  value={eventForm.date}
+                  onChange={handleEventChange}
+                />
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="eventTime">Time</label>
+                <input
+                  id="eventTime"
+                  name="time"
+                  type="text"
+                  placeholder="7:15 PM"
+                  value={eventForm.time}
+                  onChange={handleEventChange}
+                />
+              </div>
+            </div>
+
+            <div className="admin-create-grid">
+              <div className="field-group">
+                <label htmlFor="eventStatus">Status</label>
+                <select
+                  id="eventStatus"
+                  name="status"
+                  value={eventForm.status}
+                  onChange={handleEventChange}
+                >
+                  <option value="upcoming">Upcoming</option>
+                  <option value="recent">Recent</option>
+                </select>
+              </div>
+
+              <div className="field-group">
+                <label htmlFor="eventTag">Tag</label>
+                <input
+                  id="eventTag"
+                  name="tag"
+                  type="text"
+                  placeholder="Club night"
+                  value={eventForm.tag}
+                  onChange={handleEventChange}
+                />
+              </div>
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="eventLocation">Location</label>
+              <input
+                id="eventLocation"
+                name="location"
+                type="text"
+                value={eventForm.location}
+                onChange={handleEventChange}
+              />
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="eventDescription">Description</label>
+              <textarea
+                id="eventDescription"
+                name="description"
+                rows="4"
+                value={eventForm.description}
+                onChange={handleEventChange}
+              />
+            </div>
+
+            <div className="admin-action-row">
+              <button className="button button-primary" type="submit" disabled={isSavingContent}>
+                {isSavingContent ? "Saving..." : editingEventId ? "Update event" : "Add event"}
+              </button>
+              <button className="button button-secondary" type="button" onClick={resetEventForm}>
+                Clear form
+              </button>
+            </div>
+          </form>
+        </div>
       </article>
     );
   }
@@ -621,6 +1031,47 @@ function Admin({ authReady, hasSupabaseConfig, membership, poll, pollError, refr
     setShelfCoverFile(event.target.files?.[0] || null);
   }
 
+  function handleShelfArtistChange(albumId, artistName) {
+    setShelfArtistDrafts((currentDrafts) => ({
+      ...currentDrafts,
+      [albumId]: artistName,
+    }));
+  }
+
+  async function handleShelfArtistSave(album) {
+    setError(null);
+    setMessage(null);
+    setIsSavingShelfCover(true);
+
+    const currentOverride = shelfCoverOverrides[album.id];
+    const artistOverride = (shelfArtistDrafts[album.id] || "").trim();
+    const nextOverride = {
+      album_id: album.id,
+      album_title: album.title,
+      artist_override: artistOverride || null,
+      cover_url: currentOverride?.cover_url || null,
+      storage_path: currentOverride?.storage_path || null,
+      updated_by: session?.user?.id || null,
+    };
+
+    const { error: saveError } = await supabase
+      .from("record_shelf_covers")
+      .upsert(nextOverride, { onConflict: "album_id" });
+
+    setIsSavingShelfCover(false);
+
+    if (saveError) {
+      setError(saveError.message);
+      return;
+    }
+
+    setShelfCoverOverrides((currentOverrides) => ({
+      ...currentOverrides,
+      [album.id]: nextOverride,
+    }));
+    setMessage(`${album.title} artist updated.`);
+  }
+
   async function handleShelfCoverUpload(event) {
     event.preventDefault();
     setError(null);
@@ -661,6 +1112,7 @@ function Admin({ authReady, hasSupabaseConfig, membership, poll, pollError, refr
     const nextCover = {
       album_id: selectedShelfAlbum.id,
       album_title: selectedShelfAlbum.title,
+      artist_override: shelfArtistDrafts[selectedShelfAlbum.id]?.trim() || null,
       cover_url: publicUrlData.publicUrl,
       storage_path: storagePath,
       updated_by: session?.user?.id || null,
@@ -748,15 +1200,34 @@ function Admin({ authReady, hasSupabaseConfig, membership, poll, pollError, refr
                 )}
                 <div>
                   <strong>{album.title}</strong>
-                  <p>{override ? "Custom cover active" : "Using automatic cover"}</p>
+                  <p>{override?.artist_override || "Artist uses automatic lookup"}</p>
+                  <p>{override?.cover_url ? "Custom cover active" : "Using automatic cover"}</p>
                 </div>
+                <div className="field-group admin-shelf-artist-field">
+                  <label htmlFor={`shelfArtist-${album.id}`}>Artist</label>
+                  <input
+                    id={`shelfArtist-${album.id}`}
+                    type="text"
+                    placeholder="Manual artist name"
+                    value={shelfArtistDrafts[album.id] || ""}
+                    onChange={(event) => handleShelfArtistChange(album.id, event.target.value)}
+                  />
+                </div>
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  disabled={isSavingShelfCover}
+                  onClick={() => handleShelfArtistSave(album)}
+                >
+                  Save artist
+                </button>
                 <button
                   className="button button-secondary"
                   type="button"
                   disabled={!override || isSavingShelfCover}
                   onClick={() => handleShelfCoverClear(album)}
                 >
-                  Clear
+                  Clear overrides
                 </button>
               </article>
             );
@@ -899,7 +1370,7 @@ function Admin({ authReady, hasSupabaseConfig, membership, poll, pollError, refr
 
         <div className="member-pagination">
           <span>
-            Page {currentMemberPage} of {totalMemberPages} · {formatCount(visibleMembers.length, "account")}
+            Page {currentMemberPage} of {totalMemberPages} - {formatCount(visibleMembers.length, "account")}
           </span>
           <div>
             <button
@@ -979,7 +1450,7 @@ function Admin({ authReady, hasSupabaseConfig, membership, poll, pollError, refr
         </div>
 
         {error ? <p className="form-error">{error}</p> : null}
-        {message ? <p className="form-success">{message}</p> : null}
+        {memberMessage ? <p className="form-success">{memberMessage}</p> : null}
 
         <div className="member-tabs" role="tablist" aria-label="Membership views">
           <button
@@ -1032,21 +1503,35 @@ function Admin({ authReady, hasSupabaseConfig, membership, poll, pollError, refr
   }
 
   return (
-    <div className="admin-page">
-      <section className="page-header surface-card">
-        <div>
-          <p className="eyebrow">Admin</p>
-          <h1 className="page-title">Voting control room.</h1>
-          <p className="page-intro">
-            Manage member access, watch live results, and move the active poll through each phase.
-          </p>
-        </div>
-      </section>
+    <div className="sideb-page sideb-subpage sideb-admin-page">
+      <SideBNav activePath="/admin" navigate={navigate} showAdminLink={showAdminLink} />
 
-      {renderCreatePoll()}
-      {renderCurrentResults()}
-      {renderShelfCoverManager()}
-      {renderMemberBody()}
+      <main className="sideb-subpage-main">
+        <section className="sideb-page-hero sideb-page-hero-split sideb-admin-hero">
+          <div>
+            <p className="sideb-kicker">Admin</p>
+            <h1>Voting control room.</h1>
+            <p>
+              Manage member access, watch live results, and move the active poll
+              through each phase.
+            </p>
+          </div>
+
+          <aside className="sideb-next-card" aria-label="Current poll">
+            <span>Current Phase</span>
+            <strong>{formatPhaseLabel(poll.phase)}</strong>
+            <p>{poll.status}</p>
+            <small>{poll.id}</small>
+          </aside>
+        </section>
+
+        {renderCreatePoll()}
+        {renderCurrentAlbumManager()}
+        {renderEventsManager()}
+        {renderCurrentResults()}
+        {renderShelfCoverManager()}
+        {renderMemberBody()}
+      </main>
     </div>
   );
 }

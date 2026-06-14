@@ -1,48 +1,4 @@
-export const recentAlbums = [
-  {
-    id: "blonde",
-    title: "Blonde",
-    artist: "Frank Ocean",
-    period: "Recently featured",
-    coverClass: "cover-blonde",
-    note: "A dense, emotional listen that turned into the longest post-club discussion of the month.",
-  },
-  {
-    id: "currents",
-    title: "Currents",
-    artist: "Tame Impala",
-    period: "Two weeks ago",
-    coverClass: "cover-currents",
-    note: "A polished psych-pop pick that gave the club a lighter, more immediate week.",
-  },
-  {
-    id: "discovery",
-    title: "Discovery",
-    artist: "Daft Punk",
-    period: "Three weeks ago",
-    coverClass: "cover-discovery",
-    note: "A high-energy choice that let newer members jump in without needing much context.",
-  },
-  {
-    id: "ctrl",
-    title: "Ctrl",
-    artist: "SZA",
-    period: "Last month",
-    coverClass: "cover-ctrl",
-    note: "A lyrical album that pulled conversation toward songwriting and sequencing.",
-  },
-  {
-    id: "vespertine",
-    title: "Vespertine",
-    artist: "Björk",
-    period: "Archive pick",
-    coverClass: "cover-vespertine",
-    note: "An intimate album that pulled the room toward texture, production, and close listening.",
-  },
-];
-
 export const clubLinks = {
-  discord: "#",
   instagram: "https://www.instagram.com/albumasu/",
   sunDevilCentral:
     "https://sundevilcentral.eoss.asu.edu/webapp/auth/login?redirect=%2FALC%2F&msg=LOGIN_REQUIRED",
@@ -66,14 +22,6 @@ export const homeActions = [
     target: "sunDevilCentral",
   },
   {
-    id: "discord",
-    label: "Discord",
-    title: "Community chat",
-    description: "The place for reminders, side conversations, and keeping up between meetings.",
-    kind: "external",
-    target: "discord",
-  },
-  {
     id: "events",
     label: "Events",
     title: "Special events",
@@ -81,15 +29,6 @@ export const homeActions = [
     kind: "route",
     target: "/events",
   },
-];
-
-export const instagramFeed = [
-  { id: "post-1", label: "Meeting recap", coverClass: "feed-meeting" },
-  { id: "post-2", label: "Album of the week", coverClass: "feed-album" },
-  { id: "post-3", label: "Group listen", coverClass: "feed-listen" },
-  { id: "post-4", label: "Event post", coverClass: "feed-event" },
-  { id: "post-5", label: "Archive pick", coverClass: "feed-archive" },
-  { id: "post-6", label: "Club moment", coverClass: "feed-club" },
 ];
 
 export const specialEvents = [
@@ -128,45 +67,6 @@ export const specialEvents = [
     tag: "Recent",
     description:
       "Members brought favorite tracks from the semester and traded recommendations before finals week.",
-  },
-];
-
-export const weeklyRhythm = [
-  {
-    step: "01",
-    title: "Listen with intention",
-    description:
-      "The home page keeps the current album visible so members always know what the club is sitting with this week.",
-  },
-  {
-    step: "02",
-    title: "Open one clear ballot",
-    description:
-      "Voting lives on a dedicated page, which keeps the primary action obvious instead of hiding it inside a noisy feed.",
-  },
-  {
-    step: "03",
-    title: "Reset the cycle cleanly",
-    description:
-      "A new poll id creates a fresh ballot, so every week starts from a clean state without touching old results.",
-  },
-];
-
-export const clubPrinciples = [
-  {
-    title: "Editorial, not chaotic",
-    description:
-      "The site is built to feel curated. Every section exists to reinforce the club rhythm instead of filling space.",
-  },
-  {
-    title: "One ballot per phase",
-    description:
-      "Votes are enforced in the database so each approved member gets one submission per phase.",
-  },
-  {
-    title: "Admin-run phases",
-    description:
-      "Admins move the poll from nominations to primary to final without redeploying the site.",
   },
 ];
 

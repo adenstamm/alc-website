@@ -1,16 +1,68 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-function ResetPassword({ hasSupabaseConfig, navigate, supabase }) {
+import SideBNav from "../components/SideBNav";
+import "../styles/sideb-mock.css";
+
+function hasRecoveryParams() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  return urlParams.get("type") === "recovery" || hashParams.get("type") === "recovery";
+}
+
+function ResetPassword({ hasSupabaseConfig, navigate, showAdminLink, supabase }) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [status, setStatus] = useState(null);
   const [error, setError] = useState(null);
+  const [isRecoverySession, setIsRecoverySession] = useState(false);
+  const [isCheckingRecovery, setIsCheckingRecovery] = useState(Boolean(hasSupabaseConfig));
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!hasSupabaseConfig || !supabase) {
+      setIsCheckingRecovery(false);
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    async function checkRecoverySession() {
+      const { data } = await supabase.auth.getSession();
+
+      if (!isMounted) {
+        return;
+      }
+
+      setIsRecoverySession(Boolean(data.session?.user) && hasRecoveryParams());
+      setIsCheckingRecovery(false);
+    }
+
+    checkRecoverySession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setIsRecoverySession(Boolean(nextSession?.user));
+        setError(null);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [hasSupabaseConfig, supabase]);
 
   async function handleSubmit(event) {
     event.preventDefault();
     setStatus(null);
     setError(null);
+
+    if (!isRecoverySession) {
+      setError("Open the password reset link from your email before setting a new password.");
+      return;
+    }
 
     if (password.length < 8) {
       setError("Password must be at least 8 characters.");
@@ -41,64 +93,84 @@ function ResetPassword({ hasSupabaseConfig, navigate, supabase }) {
   }
 
   return (
-    <div className="reset-page">
-      <section className="page-header surface-card">
-        <div>
-          <p className="eyebrow">Account</p>
-          <h1 className="page-title">Reset your password.</h1>
-          <p className="page-intro">
+    <div className="sideb-page sideb-subpage sideb-vote-page sideb-reset-page">
+      <SideBNav activePath="/reset-password" navigate={navigate} showAdminLink={showAdminLink} />
+
+      <main className="sideb-subpage-main">
+        <section className="sideb-page-hero sideb-page-hero-split">
+          <div>
+            <p className="sideb-kicker">Account</p>
+            <h1>Reset your password.</h1>
+            <p>
             Enter a new password after opening the reset link from your email.
-          </p>
-        </div>
-
-        <button className="button button-secondary" type="button" onClick={() => navigate("/vote")}>
-          Back to voting
-        </button>
-      </section>
-
-      <article className="surface-card vote-form-card reset-card">
-        {!hasSupabaseConfig ? (
-          <div className="confirmation-card">
-            <p className="eyebrow">Setup needed</p>
-            <h3>Connect Supabase before password reset works.</h3>
+            </p>
           </div>
-        ) : (
-          <form className="vote-form" onSubmit={handleSubmit}>
-            <div className="field-group">
-              <label htmlFor="newPassword">New password</label>
-              <input
-                id="newPassword"
-                type="password"
-                autoComplete="new-password"
-                minLength={8}
-                required
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              />
+
+          <button className="sideb-button sideb-button-ghost" type="button" onClick={() => navigate("/vote")}>
+            Back to voting
+          </button>
+        </section>
+
+        <article className="surface-card vote-form-card reset-card">
+          {!hasSupabaseConfig ? (
+            <div className="confirmation-card">
+              <p className="eyebrow">Setup needed</p>
+              <h3>Connect Supabase before password reset works.</h3>
             </div>
-
-            <div className="field-group">
-              <label htmlFor="confirmPassword">Confirm password</label>
-              <input
-                id="confirmPassword"
-                type="password"
-                autoComplete="new-password"
-                minLength={8}
-                required
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-              />
+          ) : isCheckingRecovery ? (
+            <div className="confirmation-card">
+              <p className="eyebrow">Checking reset link</p>
+              <h3>Verifying your password recovery session.</h3>
             </div>
+          ) : !isRecoverySession ? (
+            <div className="confirmation-card">
+              <p className="eyebrow">Reset link needed</p>
+              <h3>Open the password reset link from your email.</h3>
+              <p>
+                Supabase only allows password changes after the recovery link creates a temporary session.
+              </p>
+              <button className="button button-secondary" type="button" onClick={() => navigate("/vote")}>
+                Back to sign in
+              </button>
+            </div>
+          ) : (
+            <form className="vote-form" onSubmit={handleSubmit}>
+              <div className="field-group">
+                <label htmlFor="newPassword">New password</label>
+                <input
+                  id="newPassword"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+              </div>
 
-            {error ? <p className="form-error">{error}</p> : null}
-            {status ? <p className="form-success">{status}</p> : null}
+              <div className="field-group">
+                <label htmlFor="confirmPassword">Confirm password</label>
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                />
+              </div>
 
-            <button className="button button-primary" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Updating..." : "Update password"}
-            </button>
-          </form>
-        )}
-      </article>
+              {error ? <p className="form-error">{error}</p> : null}
+              {status ? <p className="form-success">{status}</p> : null}
+
+              <button className="button button-primary" type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Updating..." : "Update password"}
+              </button>
+            </form>
+          )}
+        </article>
+      </main>
     </div>
   );
 }

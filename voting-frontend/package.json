@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "node src/lib/votingLogic.test.js"
+    "test": "node src/lib/votingLogic.test.js && node src/lib/siteContent.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.1",

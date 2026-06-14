@@ -1,84 +1,102 @@
-function Events({ specialEvents, navigate }) {
+import SideBNav from "../components/SideBNav";
+import "../styles/sideb-mock.css";
+
+function EventCard({ event }) {
+  return (
+    <article className="sideb-event-card">
+      <div className="sideb-event-copy">
+        <span>{event.tag || event.status}</span>
+        <h3>{event.title}</h3>
+        <p>{event.description}</p>
+      </div>
+
+      <dl className="sideb-event-meta">
+        <div>
+          <dt>Date</dt>
+          <dd>{event.displayDate}</dd>
+        </div>
+        <div>
+          <dt>Time</dt>
+          <dd>{event.time}</dd>
+        </div>
+        <div>
+          <dt>Location</dt>
+          <dd>{event.location}</dd>
+        </div>
+      </dl>
+    </article>
+  );
+}
+
+function EventSection({ emptyMessage, events, eyebrow, title }) {
+  return (
+    <section className="sideb-panel" aria-labelledby={`${eyebrow.toLowerCase()}-events-heading`}>
+      <div className="sideb-section-heading">
+        <div>
+          <p>{eyebrow}</p>
+          <h2 id={`${eyebrow.toLowerCase()}-events-heading`}>{title}</h2>
+        </div>
+      </div>
+
+      {events.length > 0 ? (
+        <div className="sideb-event-grid">
+          {events.map((event) => (
+            <EventCard event={event} key={event.id} />
+          ))}
+        </div>
+      ) : (
+        <p className="sideb-empty">{emptyMessage}</p>
+      )}
+    </section>
+  );
+}
+
+function Events({ specialEvents, navigate, showAdminLink }) {
   const upcomingEvents = specialEvents.filter((event) => event.status === "upcoming");
   const recentEvents = specialEvents.filter((event) => event.status === "recent");
-
-  function renderEventCard(event) {
-    return (
-      <article className="event-detail-card" key={event.id}>
-        <div>
-          <span className="event-tag">{event.tag || event.status}</span>
-          <h3>{event.title}</h3>
-          <p>{event.description}</p>
-        </div>
-
-        <dl className="event-meta">
-          <div>
-            <dt>Date</dt>
-            <dd>{event.displayDate}</dd>
-          </div>
-          <div>
-            <dt>Time</dt>
-            <dd>{event.time}</dd>
-          </div>
-          <div>
-            <dt>Location</dt>
-            <dd>{event.location}</dd>
-          </div>
-        </dl>
-      </article>
-    );
-  }
+  const nextEvent = upcomingEvents[0];
 
   return (
-    <div className="events-page cozy-events-page">
-      <section className="events-hero surface-card">
-        <div>
-          <p className="eyebrow">Events</p>
-          <h1 className="page-title">Club plans beyond the weekly vote.</h1>
-          <p className="page-intro">
-            Keep up with listening nights, record store runs, concerts, and the occasional
-            low-key hang outside the regular meeting rhythm.
-          </p>
-        </div>
+    <div className="sideb-page sideb-subpage">
+      <SideBNav activePath="/events" navigate={navigate} showAdminLink={showAdminLink} />
 
-        <button
-          className="button button-secondary"
-          type="button"
-          onClick={() => navigate("/")}
-        >
-          Back home
-        </button>
-      </section>
-
-      <section className="events-section-block" aria-labelledby="upcoming-events-heading">
-        <div className="section-heading">
-          <span className="eyebrow">Upcoming</span>
-          <h2 id="upcoming-events-heading">What is next.</h2>
-        </div>
-
-        {upcomingEvents.length > 0 ? (
-          <div className="event-detail-grid">
-            {upcomingEvents.map(renderEventCard)}
+      <main className="sideb-subpage-main">
+        <section className="sideb-page-hero sideb-page-hero-split" aria-labelledby="events-title">
+          <div>
+            <p className="sideb-kicker">Events</p>
+            <h1 id="events-title">Club plans beyond the weekly vote.</h1>
+            <p>
+              Keep up with listening nights, record store runs, concerts, and the
+              occasional low-key hang outside the regular meeting rhythm.
+            </p>
           </div>
-        ) : (
-          <p className="events-empty">No upcoming events are posted yet.</p>
-        )}
-      </section>
 
-      <section className="events-section-block" aria-labelledby="recent-events-heading">
-        <div className="section-heading">
-          <span className="eyebrow">Recent</span>
-          <h2 id="recent-events-heading">What we just did.</h2>
-        </div>
+          <aside className="sideb-next-card" aria-label="Next session">
+            <span>Next Session</span>
+            <strong>{nextEvent?.title || "Nothing posted yet"}</strong>
+            <p>
+              {nextEvent
+                ? `${nextEvent.displayDate} at ${nextEvent.time}`
+                : "Check back after the next club update."}
+            </p>
+            <small>{nextEvent?.location || "Album Listening Club"}</small>
+          </aside>
+        </section>
 
-        {recentEvents.length > 0 ? (
-          <div className="event-detail-grid">
-            {recentEvents.map(renderEventCard)}
-          </div>
-        ) : (
-          <p className="events-empty">No recent events are posted yet.</p>
-        )}
-      </section>
+        <EventSection
+          emptyMessage="No upcoming events are posted yet."
+          events={upcomingEvents}
+          eyebrow="Upcoming"
+          title="What is next."
+        />
+
+        <EventSection
+          emptyMessage="No recent events are posted yet."
+          events={recentEvents}
+          eyebrow="Recent"
+          title="What we just did."
+        />
+      </main>
     </div>
   );
 }

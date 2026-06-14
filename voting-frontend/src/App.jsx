@@ -6,8 +6,6 @@ import {
   clubLinks,
   currentPoll,
   homeActions,
-  instagramFeed,
-  recentAlbums,
   specialEvents,
 } from "./data/clubContent";
 import { hasSupabaseConfig, supabase } from "./lib/supabaseClient";
@@ -17,29 +15,14 @@ import Home from "./pages/Home";
 import Poll from "./pages/Poll";
 import ResetPassword from "./pages/ResetPassword";
 import Events from "./pages/Events";
+import Results from "./pages/Results";
+import { normalizeSiteEvent } from "./lib/siteContent";
+
+const ROUTES = new Set(["/", "/admin", "/vote", "/results", "/events", "/about", "/reset-password"]);
 
 function normalizePath(pathname) {
-  if (pathname === "/admin" || pathname === "/admin/") {
-    return "/admin";
-  }
-
-  if (pathname === "/vote" || pathname === "/vote/") {
-    return "/vote";
-  }
-
-  if (pathname === "/events" || pathname === "/events/") {
-    return "/events";
-  }
-
-  if (pathname === "/about" || pathname === "/about/") {
-    return "/about";
-  }
-
-  if (pathname === "/reset-password" || pathname === "/reset-password/") {
-    return "/reset-password";
-  }
-
-  return "/";
+  const normalizedPath = pathname.replace(/\/+$/, "") || "/";
+  return ROUTES.has(normalizedPath) ? normalizedPath : "/";
 }
 
 function getCurrentPath() {
@@ -67,6 +50,7 @@ function App() {
   const [session, setSession] = useState(null);
   const [membership, setMembership] = useState(null);
   const [livePoll, setLivePoll] = useState(currentPoll);
+  const [liveEvents, setLiveEvents] = useState(specialEvents);
   const [pollError, setPollError] = useState(null);
 
   const refreshPoll = useCallback(async () => {
@@ -89,7 +73,28 @@ function App() {
     return nextPoll;
   }, []);
 
-  async function loadMembership(nextSession) {
+  const refreshEvents = useCallback(async () => {
+    if (!hasSupabaseConfig) {
+      setLiveEvents(specialEvents);
+      return specialEvents;
+    }
+
+    const { data, error } = await supabase
+      .from("site_events")
+      .select("id, title, date, display_date, time, location, status, tag, description")
+      .order("date", { ascending: true });
+
+    if (error) {
+      setLiveEvents(specialEvents);
+      return specialEvents;
+    }
+
+    const nextEvents = data.map(normalizeSiteEvent);
+    setLiveEvents(nextEvents.length ? nextEvents : specialEvents);
+    return nextEvents;
+  }, []);
+
+  const loadMembership = useCallback(async (nextSession) => {
     if (!hasSupabaseConfig || !nextSession?.user) {
       setMembership(null);
       return;
@@ -107,7 +112,7 @@ function App() {
     }
 
     setMembership(data);
-  }
+  }, []);
 
   useEffect(() => {
     function handlePopState() {
@@ -123,7 +128,8 @@ function App() {
 
   useEffect(() => {
     refreshPoll();
-  }, [refreshPoll]);
+    refreshEvents();
+  }, [refreshEvents, refreshPoll]);
 
   useEffect(() => {
     if (!hasSupabaseConfig) {
@@ -158,9 +164,9 @@ function App() {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [refreshPoll]);
+  }, [loadMembership, refreshPoll]);
 
-  function navigate(nextPath) {
+  const navigate = useCallback((nextPath) => {
     const normalizedPath = normalizePath(nextPath);
 
     if (normalizedPath !== currentPath) {
@@ -169,7 +175,10 @@ function App() {
     }
 
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }
+  }, [currentPath]);
+
+  const refreshCurrentMembership = useCallback(() => loadMembership(session), [loadMembership, session]);
+  const showAdminLink = membership?.status === "approved" && membership?.role === "admin";
 
   return (
     <div className="page">
@@ -177,7 +186,7 @@ function App() {
         <Navbar
           currentPath={currentPath}
           navigate={navigate}
-          showAdminLink={membership?.status === "approved" && membership?.role === "admin"}
+          showAdminLink={showAdminLink}
         />
 
         <main className="view">
@@ -186,10 +195,14 @@ function App() {
               authReady={authReady}
               hasSupabaseConfig={hasSupabaseConfig}
               membership={membership}
+              navigate={navigate}
               poll={livePoll}
               pollError={pollError}
+              refreshEvents={refreshEvents}
               refreshPoll={refreshPoll}
               session={session}
+              showAdminLink={showAdminLink}
+              siteEvents={liveEvents}
               supabase={supabase}
             />
           ) : currentPath === "/vote" ? (
@@ -201,25 +214,40 @@ function App() {
               navigate={navigate}
               poll={livePoll}
               pollError={pollError}
-              refreshMembership={() => loadMembership(session)}
+              refreshMembership={refreshCurrentMembership}
               refreshPoll={refreshPoll}
               session={session}
+              showAdminLink={showAdminLink}
+              supabase={supabase}
+            />
+          ) : currentPath === "/results" ? (
+            <Results
+              hasSupabaseConfig={hasSupabaseConfig}
+              membership={membership}
+              navigate={navigate}
+              poll={livePoll}
+              pollError={pollError}
+              session={session}
+              showAdminLink={showAdminLink}
               supabase={supabase}
             />
           ) : currentPath === "/events" ? (
             <Events
-              specialEvents={specialEvents}
+              specialEvents={liveEvents}
               navigate={navigate}
+              showAdminLink={showAdminLink}
             />
           ) : currentPath === "/about" ? (
             <About
               clubLinks={clubLinks}
               navigate={navigate}
+              showAdminLink={showAdminLink}
             />
           ) : currentPath === "/reset-password" ? (
             <ResetPassword
               hasSupabaseConfig={hasSupabaseConfig}
               navigate={navigate}
+              showAdminLink={showAdminLink}
               supabase={supabase}
             />
           ) : (
@@ -228,10 +256,9 @@ function App() {
               currentPoll={livePoll}
               hasSupabaseConfig={hasSupabaseConfig}
               homeActions={homeActions}
-              instagramFeed={instagramFeed}
               navigate={navigate}
-              recentAlbums={recentAlbums}
-              specialEvents={specialEvents}
+              showAdminLink={showAdminLink}
+              specialEvents={liveEvents}
               supabase={supabase}
             />
           )}
