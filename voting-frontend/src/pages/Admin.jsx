@@ -44,6 +44,7 @@ function createPollId(cycleLabel) {
 function Admin({
   authReady,
   hasSupabaseConfig,
+  hasSiteEventsConfig,
   membership,
   navigate,
   poll,
@@ -746,7 +747,7 @@ function Admin({
   }
 
   function renderEventsManager() {
-    if (!canManage) {
+    if (!canManage || !hasSiteEventsConfig) {
       return null;
     }
 

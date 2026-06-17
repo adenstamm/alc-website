@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 
-import heroImage from "../assets/sideb-turntable-hero.jpg";
 import SideBNav from "../components/SideBNav";
 import {
   fetchAlbumMetadata,
@@ -130,7 +129,7 @@ function Home({
 
       <section
         className="sideb-hero"
-        style={{ "--hero-image": `url(${heroImage})` }}
+        style={{ "--hero-image": "url(/sideb-turntable-hero.jpg)" }}
         aria-labelledby="home-title"
       >
         <div className="sideb-hero-copy">

@@ -8,7 +8,7 @@ import {
   homeActions,
   specialEvents,
 } from "./data/clubContent";
-import { hasSupabaseConfig, supabase } from "./lib/supabaseClient";
+import { hasSiteEventsConfig, hasSupabaseConfig, supabase } from "./lib/supabaseClient";
 import Admin from "./pages/Admin";
 import About from "./pages/About";
 import Home from "./pages/Home";
@@ -74,7 +74,7 @@ function App() {
   }, []);
 
   const refreshEvents = useCallback(async () => {
-    if (!hasSupabaseConfig) {
+    if (!hasSiteEventsConfig) {
       setLiveEvents(specialEvents);
       return specialEvents;
     }
@@ -194,6 +194,7 @@ function App() {
             <Admin
               authReady={authReady}
               hasSupabaseConfig={hasSupabaseConfig}
+              hasSiteEventsConfig={hasSiteEventsConfig}
               membership={membership}
               navigate={navigate}
               poll={livePoll}

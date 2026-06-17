@@ -22,3 +22,8 @@ Voting is backed by Supabase auth, approved memberships, and a database uniquene
 7. Use `/admin` to approve future members.
 
 The database enforces one vote per approved account per poll through the `votes_one_per_user_per_poll` constraint.
+
+## Optional live event content
+
+The site uses bundled event content by default. To manage events from Supabase, run
+`supabase/site-content.sql`, then set `VITE_ENABLE_SITE_EVENTS=true` in `.env.local`.
