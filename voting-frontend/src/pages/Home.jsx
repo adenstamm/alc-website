@@ -168,8 +168,8 @@ function Home({
         </p>
         <span>{formatSessionDetails(nextSession)}</span>
         <span>{nextSession?.location || "Hayden Library C8"}</span>
-        <button type="button" onClick={() => navigate("/vote")}>
-          Vote -&gt;
+        <button type="button" onClick={() => navigate("/current")}>
+          Current -&gt;
         </button>
       </section>
 

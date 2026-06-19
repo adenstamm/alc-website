@@ -129,6 +129,20 @@ function getAccountStatus(session, membership) {
   return "approved";
 }
 
+function getVoteSubmissionError(error) {
+  const message = error?.message || "";
+
+  if (
+    error?.code === "23505" ||
+    message.includes("ALREADY_VOTED") ||
+    message.includes("votes_one_per_user_per_poll_phase")
+  ) {
+    return "Your account already submitted this phase.";
+  }
+
+  return message || "Something went wrong while saving your vote.";
+}
+
 function Poll({
   authReady,
   hasSupabaseConfig,
@@ -146,7 +160,11 @@ function Poll({
   const [storedBallot, setStoredBallot] = useState(null);
   const [isLoadingVote, setIsLoadingVote] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [displayNameDraft, setDisplayNameDraft] = useState(membership?.display_name || "");
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [formError, setFormError] = useState(null);
+  const [profileMessage, setProfileMessage] = useState(null);
+  const [profileError, setProfileError] = useState(null);
 
   const phaseDetails = phaseContent[poll.phase] || phaseContent.nominations;
   const userId = session?.user?.id;
@@ -177,11 +195,48 @@ function Poll({
     setStoredBallot(null);
   }
 
+  async function handleProfileSave(event) {
+    event.preventDefault();
+    setProfileMessage(null);
+    setProfileError(null);
+
+    const cleanDisplayName = displayNameDraft.trim();
+
+    if (!cleanDisplayName) {
+      setProfileError("Add the name you want admins to see.");
+      return;
+    }
+
+    if (!supabase || !userId) {
+      setProfileError("Sign in again before updating your name.");
+      return;
+    }
+
+    setIsSavingProfile(true);
+
+    const { error } = await supabase.rpc("update_own_display_name", {
+      display_name_input: cleanDisplayName,
+    });
+
+    setIsSavingProfile(false);
+
+    if (error) {
+      setProfileError(error.message || "Could not update your name.");
+      return;
+    }
+
+    setProfileMessage("Name updated.");
+    await refreshMembership();
+  }
+
   useEffect(() => {
     setFormState(createDefaultFormState(poll));
-    setStoredBallot(null);
     setFormError(null);
   }, [poll]);
+
+  useEffect(() => {
+    setDisplayNameDraft(membership?.display_name || "");
+  }, [membership?.display_name]);
 
   useEffect(() => {
     if (!supabase || !userId || accountStatus !== "approved") {
@@ -301,7 +356,7 @@ function Poll({
       setIsSubmitting(false);
 
       if (error) {
-        setFormError(getNominationSubmissionError(error));
+        setFormError(getNominationSubmissionError(error, getVoteSubmissionError));
         return;
       }
 
@@ -335,7 +390,7 @@ function Poll({
       setIsSubmitting(false);
 
       if (error) {
-        setFormError(error.code === "23505" ? "Your account already submitted this phase." : error.message);
+        setFormError(getVoteSubmissionError(error));
         return;
       }
 
@@ -368,7 +423,7 @@ function Poll({
     setIsSubmitting(false);
 
     if (error) {
-      setFormError(error.code === "23505" ? "Your account already submitted this phase." : error.message);
+      setFormError(getVoteSubmissionError(error));
       return;
     }
 
@@ -628,10 +683,6 @@ function Poll({
             <h1 className="page-title">{poll.question}</h1>
             <p className="page-intro">{poll.description}</p>
           </div>
-
-          <button className="sideb-button sideb-button-ghost" type="button" onClick={() => navigate("/")}>
-            Back to home
-          </button>
         </section>
 
         <section className="vote-layout">
@@ -685,6 +736,23 @@ function Poll({
                 <p className="eyebrow">Account</p>
                 <h2 className="sidebar-title">{membership?.display_name || "Signed in"}</h2>
                 <p className="sidebar-copy">{session.user.email}</p>
+                <form className="profile-form" onSubmit={handleProfileSave}>
+                  <div className="field-group">
+                    <label htmlFor="displayNameDraft">Display name</label>
+                    <input
+                      id="displayNameDraft"
+                      type="text"
+                      placeholder="Your name"
+                      value={displayNameDraft}
+                      onChange={(event) => setDisplayNameDraft(event.target.value)}
+                    />
+                  </div>
+                  {profileError ? <p className="form-error">{profileError}</p> : null}
+                  {profileMessage ? <p className="form-success">{profileMessage}</p> : null}
+                  <button className="button button-secondary full-width" type="submit" disabled={isSavingProfile}>
+                    {isSavingProfile ? "Saving..." : "Save name"}
+                  </button>
+                </form>
                 <div className="member-badges compact-badges">
                   <span>{accountStatus}</span>
                   <span>{membership?.role || "member"}</span>

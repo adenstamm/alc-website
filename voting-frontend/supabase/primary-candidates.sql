@@ -44,7 +44,7 @@ begin
   ),
   ranked_nominations as (
     select
-      md5(normalized_album_title || '|' || normalized_artist_name) as candidate_id,
+      md5(target_poll_id || '|' || normalized_album_title || '|' || normalized_artist_name) as candidate_id,
       display_album_title as album_title,
       display_artist_name as artist_name,
       total_nominations as nomination_count,

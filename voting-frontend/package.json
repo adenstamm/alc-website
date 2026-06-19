@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "node src/lib/votingLogic.test.js && node src/lib/siteContent.test.js"
+    "test": "node src/lib/votingLogic.test.js && node src/lib/siteContent.test.js && node src/lib/albumArchive.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.1",
@@ -24,6 +24,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
+    "playwright": "^1.61.0",
     "vite": "^8.0.4"
   }
 }

@@ -55,7 +55,11 @@ begin
   values (
     new.id,
     new.email,
-    nullif(new.raw_user_meta_data ->> 'display_name', '')
+    coalesce(
+      nullif(new.raw_user_meta_data ->> 'display_name', ''),
+      nullif(new.raw_user_meta_data ->> 'full_name', ''),
+      nullif(new.raw_user_meta_data ->> 'name', '')
+    )
   )
   on conflict (user_id) do update
     set email = excluded.email,
@@ -98,7 +102,43 @@ as $$
     from public.memberships
     where user_id = auth.uid()
       and status = 'approved'
+	  );
+$$;
+
+create or replace function public.update_own_display_name(display_name_input text)
+returns public.memberships
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  clean_display_name text;
+  updated_membership public.memberships%rowtype;
+begin
+  if auth.uid() is null then
+    raise exception 'AUTH_REQUIRED: Sign in before updating your profile.' using errcode = 'P0001';
+  end if;
+
+  clean_display_name := nullif(
+    regexp_replace(trim(coalesce(display_name_input, '')), '[[:space:]]+', ' ', 'g'),
+    ''
   );
+
+  if clean_display_name is null then
+    raise exception 'DISPLAY_NAME_REQUIRED: Add the name you want admins to see.' using errcode = 'P0001';
+  end if;
+
+  update public.memberships
+  set display_name = clean_display_name
+  where user_id = auth.uid()
+  returning * into updated_membership;
+
+  if updated_membership.user_id is null then
+    raise exception 'MEMBERSHIP_NOT_FOUND: Create an account before updating your profile.' using errcode = 'P0001';
+  end if;
+
+  return updated_membership;
+end;
 $$;
 
 alter table public.memberships enable row level security;
@@ -116,6 +156,8 @@ on public.memberships
 for update
 using (public.is_admin())
 with check (public.is_admin());
+
+drop policy if exists "members can update own profile" on public.memberships;
 
 drop policy if exists "members can read own votes" on public.votes;
 create policy "members can read own votes"
@@ -137,3 +179,5 @@ create policy "admins can delete votes"
 on public.votes
 for delete
 using (public.is_admin());
+
+grant execute on function public.update_own_display_name(text) to authenticated;

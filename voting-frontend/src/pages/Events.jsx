@@ -57,7 +57,7 @@ function Events({ specialEvents, navigate, showAdminLink }) {
   const nextEvent = upcomingEvents[0];
 
   return (
-    <div className="sideb-page sideb-subpage">
+    <div className="sideb-page sideb-subpage sideb-events-page">
       <SideBNav activePath="/events" navigate={navigate} showAdminLink={showAdminLink} />
 
       <main className="sideb-subpage-main">

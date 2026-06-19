@@ -28,7 +28,7 @@ const steps = [
   {
     title: "Talk it out",
     description:
-      "Discussion can move from favorite tracks to production, lyrics, memories, rankings, and side quests.",
+      "Discussion can move from favorite tracks to production, lyrics, memories, rankings, and general thoughts.",
   },
   {
     title: "Vote on what comes next",
@@ -37,9 +37,32 @@ const steps = [
   },
 ];
 
+const firstMeetingFaq = [
+  {
+    question: "Where do I go?",
+    answer:
+      "Regular meetings are in Hayden Library basement C8 unless an event listing says otherwise.",
+  },
+  {
+    question: "Do I need to finish the album?",
+    answer:
+      "No. Come with whatever you heard. Half-listened thoughts, favorite tracks, and confused first impressions all count.",
+  },
+  {
+    question: "Do I have to talk?",
+    answer:
+      "No pressure. Listening is welcome, and conversation usually opens up naturally once people start comparing notes.",
+  },
+  {
+    question: "How do voting and joining work?",
+    answer:
+      "Join through Sun Devil Central for official access, then create a voting account. An admin approves members before ballots open.",
+  },
+];
+
 function About({ clubLinks, navigate, showAdminLink }) {
   return (
-    <div className="sideb-page sideb-subpage">
+    <div className="sideb-page sideb-subpage sideb-about-page">
       <SideBNav activePath="/about" navigate={navigate} showAdminLink={showAdminLink} />
 
       <main className="sideb-subpage-main">
@@ -77,6 +100,24 @@ function About({ clubLinks, navigate, showAdminLink }) {
                 <span>{String(index + 1).padStart(2, "0")}</span>
                 <strong>{step.title}</strong>
                 <p>{step.description}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="sideb-panel first-meeting-panel" aria-labelledby="first-meeting-heading">
+          <div className="sideb-section-heading">
+            <div>
+              <p>First meeting</p>
+              <h2 id="first-meeting-heading">The tiny questions before you walk in.</h2>
+            </div>
+          </div>
+
+          <div className="faq-grid">
+            {firstMeetingFaq.map((item) => (
+              <article className="faq-card" key={item.question}>
+                <h3>{item.question}</h3>
+                <p>{item.answer}</p>
               </article>
             ))}
           </div>

@@ -41,6 +41,10 @@ function createPollId(cycleLabel) {
   return slug ? `poll-${slug}` : `poll-${new Date().toISOString().slice(0, 10)}`;
 }
 
+function getNextUpcomingEvent(siteEvents) {
+  return siteEvents.find((eventItem) => eventItem.status === "upcoming") || siteEvents[0];
+}
+
 function Admin({
   authReady,
   hasSupabaseConfig,
@@ -119,7 +123,9 @@ function Admin({
   const adminCount = memberships.filter(
     (member) => member.status === "approved" && member.role === "admin",
   ).length;
+  const approvedMemberCount = memberships.filter((member) => member.status === "approved").length;
   const pendingMembers = memberships.filter((member) => member.status === "pending");
+  const nextUpcomingEvent = getNextUpcomingEvent(sortedSiteEvents);
   const accountFilters = [
     { id: "active", label: "Active members" },
     { id: "admins", label: "Admins" },
@@ -448,6 +454,13 @@ function Admin({
     await loadResults();
   }
 
+  function scrollToAdminPanel(panelId) {
+    document.getElementById(panelId)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
+
   function handleCurrentAlbumChange(event) {
     const { name, value } = event.target;
 
@@ -579,13 +592,106 @@ function Admin({
     await refreshEvents();
   }
 
+  function renderAdminSnapshot() {
+    if (!canManage) {
+      return null;
+    }
+
+    const phaseMetric =
+      poll.phase === "nominations"
+        ? {
+            label: "Nominations",
+            value: nominationRows.length,
+            detail: "unique albums in the pool",
+          }
+        : poll.phase === "primary"
+          ? {
+              label: "Primary votes",
+              value: primaryRows.reduce((total, candidate) => total + (candidate.primaryVotes || 0), 0),
+              detail: `${selectedCount}/5 finalists selected`,
+            }
+          : {
+              label: "Final status",
+              value: irvWinner ? "Winner" : irvTie ? "Tie" : irvRounds.length || 0,
+              detail: irvWinner?.title || (irvTie ? "manual decision needed" : "IRV rounds ready"),
+            };
+
+    const snapshotItems = [
+      {
+        label: "Phase",
+        value: formatPhaseLabel(poll.phase),
+        detail: poll.status,
+      },
+      {
+        label: "Pending",
+        value: pendingMembers.length,
+        detail: "accounts waiting",
+      },
+      {
+        label: "Members",
+        value: approvedMemberCount,
+        detail: `${formatCount(adminCount, "admin")} approved`,
+      },
+      phaseMetric,
+    ];
+
+    return (
+      <article className="surface-card vote-form-card admin-snapshot-panel">
+        <div className="form-header">
+          <div>
+            <span className="phase-pill phase-primary">Snapshot</span>
+            <h2>Operational snapshot</h2>
+          </div>
+          <p>Current voting, member, and event signals at a glance.</p>
+        </div>
+
+        <div className="admin-snapshot-grid">
+          {snapshotItems.map((item) => (
+            <article className="admin-snapshot-card" key={item.label}>
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+              <p>{item.detail}</p>
+            </article>
+          ))}
+        </div>
+
+        <div className="admin-next-event">
+          <span>Next event</span>
+          <strong>{nextUpcomingEvent?.title || "No event posted"}</strong>
+          <p>
+            {nextUpcomingEvent
+              ? `${nextUpcomingEvent.displayDate} at ${nextUpcomingEvent.time} - ${nextUpcomingEvent.location}`
+              : "Add an event when the next club plan is ready."}
+          </p>
+        </div>
+
+        <div className="admin-action-row admin-snapshot-actions">
+          <button className="button button-secondary" type="button" onClick={() => scrollToAdminPanel("admin-members")}>
+            Review members
+          </button>
+          {hasSiteEventsConfig ? (
+            <button className="button button-secondary" type="button" onClick={() => scrollToAdminPanel("admin-events")}>
+              Manage events
+            </button>
+          ) : null}
+          <button className="button button-secondary" type="button" onClick={() => scrollToAdminPanel("admin-results")}>
+            View results
+          </button>
+          <button className="button button-primary" type="button" onClick={() => scrollToAdminPanel("admin-create-poll")}>
+            Create poll
+          </button>
+        </div>
+      </article>
+    );
+  }
+
   function renderCreatePoll() {
     if (!canManage) {
       return null;
     }
 
     return (
-      <article className="surface-card vote-form-card admin-create-poll">
+      <article className="surface-card vote-form-card admin-create-poll" id="admin-create-poll">
         <div className="form-header">
           <div>
             <span className="phase-pill phase-nominations">New poll</span>
@@ -681,7 +787,7 @@ function Admin({
     }
 
     return (
-      <article className="surface-card vote-form-card admin-content-panel">
+      <article className="surface-card vote-form-card admin-content-panel" id="admin-current-album">
         <div className="form-header">
           <div>
             <span className="phase-pill phase-primary">Home</span>
@@ -752,7 +858,7 @@ function Admin({
     }
 
     return (
-      <article className="surface-card vote-form-card admin-content-panel">
+      <article className="surface-card vote-form-card admin-content-panel" id="admin-events">
         <div className="form-header">
           <div>
             <span className="phase-pill phase-final">Events</span>
@@ -898,7 +1004,7 @@ function Admin({
     }
 
     return (
-      <article className="surface-card vote-form-card admin-results-panel">
+      <article className="surface-card vote-form-card admin-results-panel" id="admin-results">
         <div className="form-header">
           <div>
             <span className={`phase-pill phase-${poll.phase}`}>{poll.phase}</span>
@@ -1174,7 +1280,7 @@ function Admin({
     }
 
     return (
-      <article className="surface-card vote-form-card admin-shelf-panel">
+      <article className="surface-card vote-form-card admin-shelf-panel" id="admin-shelf">
         <div className="form-header">
           <div>
             <span className="phase-pill phase-final">Shelf</span>
@@ -1441,7 +1547,7 @@ function Admin({
     }
 
     return (
-      <article className="surface-card vote-form-card admin-members-panel">
+      <article className="surface-card vote-form-card admin-members-panel" id="admin-members">
         <div className="form-header">
           <div>
             <span className="phase-pill phase-primary">Accounts</span>
@@ -1526,6 +1632,7 @@ function Admin({
           </aside>
         </section>
 
+        {renderAdminSnapshot()}
         {renderCreatePoll()}
         {renderCurrentAlbumManager()}
         {renderEventsManager()}

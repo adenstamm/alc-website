@@ -8,6 +8,7 @@ function AuthPanel({ supabase }) {
   const [status, setStatus] = useState(null);
   const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isOAuthSubmitting, setIsOAuthSubmitting] = useState(false);
 
   const isSignUp = mode === "sign-up";
   const isReset = mode === "reset";
@@ -16,6 +17,24 @@ function AuthPanel({ supabase }) {
     setMode(nextMode);
     setStatus(null);
     setError(null);
+  }
+
+  async function handleGoogleSignIn() {
+    setError(null);
+    setStatus(null);
+    setIsOAuthSubmitting(true);
+
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/vote`,
+      },
+    });
+
+    if (oauthError) {
+      setError(oauthError.message || "Could not start Google sign in.");
+      setIsOAuthSubmitting(false);
+    }
   }
 
   async function handleSubmit(event) {
@@ -89,6 +108,15 @@ function AuthPanel({ supabase }) {
           Create account
         </button>
       </div>
+
+      <button
+        className="button button-oauth"
+        type="button"
+        disabled={isOAuthSubmitting || isSubmitting}
+        onClick={handleGoogleSignIn}
+      >
+        {isOAuthSubmitting ? "Opening Google..." : "Continue with Google"}
+      </button>
 
       <form className="vote-form" onSubmit={handleSubmit}>
         {isSignUp ? (

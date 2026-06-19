@@ -1,6 +1,8 @@
 const navItems = [
   { label: "Home", path: "/" },
+  { label: "Current", path: "/current" },
   { label: "About", path: "/about" },
+  { label: "Archive", path: "/archive" },
   { label: "Events", path: "/events" },
   { label: "Vote", path: "/vote" },
 ];

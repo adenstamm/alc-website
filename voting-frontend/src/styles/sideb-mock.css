@@ -31,6 +31,7 @@
   top: 0;
   z-index: 20;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 28px;
@@ -84,7 +85,9 @@
 .sideb-links {
   display: flex;
   flex-wrap: wrap;
-  gap: clamp(18px, 4vw, 56px);
+  min-width: 0;
+  justify-content: flex-end;
+  gap: clamp(14px, 3vw, 42px);
 }
 
 .sideb-links button {
@@ -301,12 +304,84 @@
 }
 
 .sideb-subpage {
+  --subpage-accent: 196, 121, 56;
+  --subpage-accent-soft: 238, 227, 207;
+  --subpage-cross: 34deg;
+  position: relative;
+  overflow: hidden;
   background:
-    radial-gradient(circle at 80% 0%, rgba(196, 121, 56, 0.12), transparent 34%),
-    linear-gradient(180deg, #15100a 0%, #110c07 100%);
+    linear-gradient(135deg, rgba(var(--subpage-accent), 0.16) 0 1px, transparent 1px 18px),
+    repeating-linear-gradient(
+      var(--subpage-cross),
+      transparent 0 18px,
+      rgba(var(--subpage-accent-soft), 0.025) 18px 19px
+    ),
+    linear-gradient(180deg, #171109 0%, #110c07 48%, #15100a 100%);
+}
+
+.sideb-subpage::before,
+.sideb-subpage::after {
+  content: "";
+  position: fixed;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.sideb-subpage::before {
+  top: 88px;
+  right: -140px;
+  width: min(58vw, 720px);
+  aspect-ratio: 1;
+  border: 1px solid rgba(var(--subpage-accent), 0.22);
+  border-radius: 50%;
+  background:
+    repeating-radial-gradient(
+      circle,
+      rgba(var(--subpage-accent-soft), 0.12) 0 1px,
+      transparent 1px 15px
+    ),
+    radial-gradient(circle, transparent 0 12%, rgba(var(--subpage-accent), 0.08) 13% 14%, transparent 15%);
+  mask-image: linear-gradient(115deg, transparent 0%, #000 24%, #000 76%, transparent 100%);
+  opacity: 0.55;
+}
+
+.sideb-subpage::after {
+  inset: 92px 0 0;
+  background:
+    linear-gradient(112deg, transparent 0 24%, rgba(var(--subpage-accent), 0.1) 24% 25%, transparent 25% 100%),
+    linear-gradient(148deg, transparent 0 62%, rgba(238, 227, 207, 0.05) 62% 63%, transparent 63% 100%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 5px);
+  opacity: 0.72;
+}
+
+.sideb-about-page {
+  --subpage-accent: 185, 115, 62;
+  --subpage-cross: 28deg;
+}
+
+.sideb-events-page {
+  --subpage-accent: 82, 120, 146;
+  --subpage-cross: -24deg;
+}
+
+.sideb-archive-page {
+  --subpage-accent: 124, 97, 151;
+  --subpage-cross: 18deg;
+}
+
+.sideb-current-page {
+  --subpage-accent: 96, 132, 112;
+  --subpage-cross: -18deg;
+}
+
+.sideb-vote-page {
+  --subpage-accent: 210, 123, 54;
+  --subpage-cross: 42deg;
 }
 
 .sideb-subpage-main {
+  position: relative;
+  z-index: 1;
   display: grid;
   gap: clamp(28px, 4vw, 56px);
   padding: clamp(56px, 8vw, 108px) clamp(24px, 5vw, 76px) clamp(80px, 10vw, 140px);
@@ -322,17 +397,17 @@
   margin: 0;
   color: #f3ead8;
   font-family: "Instrument Serif", Georgia, serif;
-  font-size: clamp(3.2rem, 7.2vw, 5.8rem);
+  font-size: clamp(2.55rem, 5.4vw, 4.55rem);
   font-weight: 400;
-  line-height: 0.95;
+  line-height: 1;
 }
 
 .sideb-page-hero p:not(.sideb-kicker) {
   max-width: 720px;
-  margin: 34px 0 0;
+  margin: 26px 0 0;
   color: rgba(238, 227, 207, 0.62);
   font-family: "Instrument Serif", Georgia, serif;
-  font-size: clamp(1.35rem, 2.4vw, 2rem);
+  font-size: clamp(1.08rem, 1.7vw, 1.48rem);
   font-style: italic;
   line-height: 1.5;
 }
@@ -511,6 +586,352 @@
   font-weight: 700;
 }
 
+.first-meeting-panel .sideb-section-heading {
+  margin-bottom: 28px;
+}
+
+.faq-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 14px;
+}
+
+.faq-card {
+  min-height: 190px;
+  padding: 24px;
+  border: 1px solid rgba(196, 121, 56, 0.2);
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, rgba(196, 121, 56, 0.12), transparent 42%),
+    rgba(17, 12, 7, 0.42);
+}
+
+.faq-card h3 {
+  margin: 0;
+  color: #f3ead8;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(1.65rem, 3vw, 2.2rem);
+  font-weight: 400;
+  line-height: 1;
+}
+
+.faq-card p {
+  margin: 18px 0 0;
+  color: rgba(238, 227, 207, 0.58);
+  line-height: 1.6;
+}
+
+.sideb-archive-page .archive-count-card strong {
+  font-size: clamp(3rem, 7vw, 5rem);
+}
+
+.archive-search-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: end;
+}
+
+.archive-search-panel .field-group {
+  display: grid;
+  gap: 10px;
+}
+
+.archive-search-panel label {
+  color: #c47938;
+  font-family: "Space Mono", monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.archive-search-panel input {
+  width: 100%;
+  min-height: 58px;
+  padding: 0 16px;
+  border: 1px solid rgba(238, 227, 207, 0.18);
+  border-radius: 8px;
+  background: rgba(17, 12, 7, 0.82);
+  color: #f3ead8;
+  font: inherit;
+}
+
+.archive-search-panel input:focus {
+  outline: none;
+  border-color: rgba(124, 97, 151, 0.78);
+  box-shadow: 0 0 0 4px rgba(124, 97, 151, 0.18);
+}
+
+.archive-search-panel p {
+  margin: 0;
+  color: rgba(238, 227, 207, 0.56);
+  font-family: "Space Mono", monospace;
+  font-size: 0.86rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.archive-section .sideb-section-heading {
+  margin-bottom: 28px;
+}
+
+.archive-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: 14px;
+}
+
+.archive-grid-compact {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+}
+
+.archive-card {
+  position: relative;
+  min-height: 190px;
+  overflow: hidden;
+  padding: 22px;
+  border: 1px solid rgba(238, 227, 207, 0.14);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 88% 18%, rgba(124, 97, 151, 0.2), transparent 28%),
+    linear-gradient(135deg, rgba(196, 121, 56, 0.12), rgba(31, 22, 14, 0.76));
+}
+
+.archive-card::after {
+  content: "";
+  position: absolute;
+  right: -42px;
+  bottom: -48px;
+  width: 120px;
+  aspect-ratio: 1;
+  border: 1px solid rgba(238, 227, 207, 0.16);
+  border-radius: 50%;
+  background:
+    repeating-radial-gradient(circle, rgba(238, 227, 207, 0.12) 0 1px, transparent 1px 10px),
+    radial-gradient(circle, rgba(17, 12, 7, 0.62) 0 12%, transparent 13%);
+}
+
+.archive-card-number {
+  position: relative;
+  z-index: 1;
+  color: #c47938;
+  font-family: "Space Mono", monospace;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.archive-card h3 {
+  position: relative;
+  z-index: 1;
+  margin: 34px 0 0;
+  color: #f3ead8;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(1.7rem, 3vw, 2.45rem);
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.04;
+}
+
+.archive-card p {
+  position: relative;
+  z-index: 1;
+  margin: 14px 0 0;
+  color: rgba(238, 227, 207, 0.58);
+  font-weight: 700;
+}
+
+.archive-empty h2 {
+  margin: 0;
+  color: #f3ead8;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 400;
+}
+
+.archive-empty p:not(.sideb-kicker) {
+  color: rgba(238, 227, 207, 0.58);
+}
+
+.current-album-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 460px);
+  gap: clamp(32px, 6vw, 88px);
+  align-items: center;
+}
+
+.current-album-copy h1 {
+  max-width: 11ch;
+  margin: 0;
+  color: #f3ead8;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(3.2rem, 7vw, 5.8rem);
+  font-style: italic;
+  font-weight: 400;
+  line-height: 0.96;
+}
+
+.current-album-copy > p {
+  margin: 24px 0 0;
+  color: rgba(238, 227, 207, 0.72);
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(1.35rem, 2.6vw, 2rem);
+  line-height: 1.2;
+}
+
+.current-album-copy > span {
+  display: block;
+  max-width: 580px;
+  margin-top: 18px;
+  color: rgba(238, 227, 207, 0.52);
+  line-height: 1.6;
+}
+
+.current-album-actions {
+  margin-top: 42px;
+}
+
+.current-album-cover {
+  position: relative;
+  margin: 0;
+}
+
+.current-album-cover::before {
+  content: "";
+  position: absolute;
+  inset: 9% -12% -9% 18%;
+  z-index: -1;
+  border: 1px solid rgba(238, 227, 207, 0.16);
+  border-radius: 50%;
+  background:
+    repeating-radial-gradient(circle, rgba(238, 227, 207, 0.12) 0 1px, transparent 1px 14px),
+    radial-gradient(circle, rgba(17, 12, 7, 0.66) 0 10%, transparent 11%);
+}
+
+.current-album-cover img,
+.current-generated-cover {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid rgba(238, 227, 207, 0.18);
+  border-radius: 8px;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.28);
+  object-fit: cover;
+}
+
+.current-generated-cover {
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 50% 50%, #110c07 0 10%, transparent 11%),
+    radial-gradient(circle at 50% 50%, transparent 0 30%, rgba(238, 227, 207, 0.15) 31% 32%, transparent 33%),
+    linear-gradient(135deg, #324252, #608470 54%, #1b140d);
+  color: #f3ead8;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(3rem, 9vw, 6rem);
+}
+
+.current-generated-cover span {
+  display: grid;
+  width: 42%;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(17, 12, 7, 0.72);
+}
+
+.current-album-cover figcaption {
+  margin-top: 14px;
+  color: rgba(238, 227, 207, 0.46);
+  font-family: "Space Mono", monospace;
+  font-size: 0.82rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.current-album-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 18px;
+}
+
+.current-session-card h2 {
+  margin: 0;
+  color: #f3ead8;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-weight: 400;
+  line-height: 1;
+}
+
+.current-session-card p,
+.current-session-card span {
+  display: block;
+  margin-top: 16px;
+  color: rgba(238, 227, 207, 0.56);
+}
+
+.current-listen-links {
+  display: grid;
+  gap: 10px;
+}
+
+.current-listen-links a {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border: 1px solid rgba(238, 227, 207, 0.16);
+  border-radius: 8px;
+  background: rgba(17, 12, 7, 0.46);
+  color: #f3ead8;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.current-listen-links a::after {
+  content: "->";
+  color: #c47938;
+}
+
+.current-prompts-panel .sideb-section-heading {
+  margin-bottom: 28px;
+}
+
+.current-prompt-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 14px;
+}
+
+.current-prompt-card {
+  min-height: 170px;
+  padding: 22px;
+  border: 1px solid rgba(96, 132, 112, 0.3);
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, rgba(96, 132, 112, 0.16), transparent 48%),
+    rgba(17, 12, 7, 0.46);
+}
+
+.current-prompt-card span {
+  color: #c47938;
+  font-family: "Space Mono", monospace;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.current-prompt-card p {
+  margin: 28px 0 0;
+  color: rgba(238, 227, 207, 0.72);
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(1.45rem, 3vw, 2.05rem);
+  line-height: 1.15;
+}
+
 .sideb-vote-page .sideb-subpage-main {
   gap: clamp(24px, 4vw, 42px);
 }
@@ -534,22 +955,22 @@
 }
 
 .sideb-vote-page .page-title {
-  max-width: 11ch;
+  max-width: 13ch;
   margin: 0;
   color: #f3ead8;
   font-family: "Instrument Serif", Georgia, serif;
-  font-size: clamp(3.2rem, 7.2vw, 5.8rem);
+  font-size: clamp(2.55rem, 5.2vw, 4.45rem);
   font-weight: 400;
   letter-spacing: 0;
-  line-height: 0.95;
+  line-height: 1;
 }
 
 .sideb-vote-page .page-intro {
   max-width: 680px;
-  margin: 28px 0 0;
+  margin: 22px 0 0;
   color: rgba(238, 227, 207, 0.62);
   font-family: "Instrument Serif", Georgia, serif;
-  font-size: clamp(1.25rem, 2.2vw, 1.8rem);
+  font-size: clamp(1.05rem, 1.65vw, 1.42rem);
   font-style: italic;
   line-height: 1.5;
 }
@@ -678,6 +1099,14 @@
   border: 1px solid rgba(196, 121, 56, 0.36);
   background: rgba(196, 121, 56, 0.14);
   color: #fff5e2;
+}
+
+.sideb-vote-page .button-oauth {
+  width: 100%;
+  border: 1px solid rgba(238, 227, 207, 0.18);
+  background: rgba(243, 234, 216, 0.92);
+  color: #171109;
+  box-shadow: none;
 }
 
 .sideb-vote-page .button:disabled {
@@ -946,6 +1375,7 @@
 .sideb-admin-page .admin-content-panel,
 .sideb-admin-page .admin-create-poll,
 .sideb-admin-page .admin-results-panel,
+.sideb-admin-page .admin-snapshot-panel,
 .sideb-admin-page .admin-event-list,
 .sideb-admin-page .admin-event-form,
 .sideb-admin-page .member-list {
@@ -1133,6 +1563,52 @@
   justify-content: space-between;
 }
 
+.sideb-admin-page .admin-snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 14px;
+}
+
+.sideb-admin-page .admin-snapshot-card,
+.sideb-admin-page .admin-next-event {
+  padding: 18px;
+  border: 1px solid rgba(196, 121, 56, 0.24);
+  border-radius: 8px;
+  background: rgba(17, 12, 7, 0.48);
+}
+
+.sideb-admin-page .admin-snapshot-card span,
+.sideb-admin-page .admin-next-event span {
+  color: #c47938;
+  font-family: "Space Mono", monospace;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.sideb-admin-page .admin-snapshot-card strong,
+.sideb-admin-page .admin-next-event strong {
+  display: block;
+  margin-top: 14px;
+  color: #f3ead8;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(1.9rem, 4vw, 2.8rem);
+  font-weight: 400;
+  line-height: 1;
+}
+
+.sideb-admin-page .admin-snapshot-card p,
+.sideb-admin-page .admin-next-event p {
+  margin: 12px 0 0;
+  color: rgba(238, 227, 207, 0.56);
+  line-height: 1.5;
+}
+
+.sideb-admin-page .admin-snapshot-actions {
+  justify-content: end;
+}
+
 .sideb-admin-page .admin-shelf-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
@@ -1301,8 +1777,15 @@
     flex-direction: column;
   }
 
+  .sideb-links {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
   .sideb-session-strip,
   .sideb-page-hero-split,
+  .current-album-hero,
+  .current-album-grid,
   .sideb-join-strip,
   .sideb-event-card,
   .sideb-vote-page .vote-layout,
@@ -1313,6 +1796,7 @@
   .sideb-admin-page .admin-events-layout,
   .sideb-admin-page .admin-shelf-upload,
   .sideb-admin-page .member-toolbar,
+  .archive-search-panel,
   .sideb-admin-page .admin-result-row,
   .sideb-admin-page .admin-result-row.candidate-option,
   .sideb-admin-page .admin-event-row,
@@ -1334,11 +1818,12 @@
   }
 
   .sideb-links {
-    gap: 14px;
+    gap: 12px 16px;
   }
 
   .sideb-links button {
-    font-size: 0.82rem;
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
   }
 
   .sideb-hero {
@@ -1372,9 +1857,17 @@
     width: 100%;
   }
 
+  .sideb-admin-page .admin-snapshot-actions {
+    justify-content: start;
+  }
+
   .sideb-page-hero h1,
   .sideb-join-strip h2 {
-    font-size: clamp(3.4rem, 18vw, 5.6rem);
+    font-size: clamp(2.45rem, 13vw, 4rem);
+  }
+
+  .sideb-vote-page .page-title {
+    font-size: clamp(2.45rem, 13vw, 4rem);
   }
 
   .sideb-subpage-main {

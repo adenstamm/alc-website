@@ -287,9 +287,14 @@ begin
 
   perform public.assert_poll_phase(target_poll_id, 'nominations');
 
-  insert into public.votes (poll_id, phase, user_id, album_title, artist_name)
-  values (target_poll_id, 'nominations', auth.uid(), album_title_input, artist_name_input)
-  returning * into saved_vote;
+  begin
+    insert into public.votes (poll_id, phase, user_id, album_title, artist_name)
+    values (target_poll_id, 'nominations', auth.uid(), album_title_input, artist_name_input)
+    returning * into saved_vote;
+  exception
+    when unique_violation then
+      raise exception 'ALREADY_VOTED: Your account already submitted this phase.' using errcode = 'P0001';
+  end;
 
   return public.format_vote_json(saved_vote.id);
 end;
@@ -312,7 +317,7 @@ begin
     nomination_count
   )
   select
-    md5(public.normalize_music_name(v.album_title) || '|' || public.normalize_music_name(v.artist_name)),
+    md5(target_poll_id || '|' || public.normalize_music_name(v.album_title) || '|' || public.normalize_music_name(v.artist_name)),
     target_poll_id,
     (array_agg(public.clean_music_text(v.album_title) order by v.created_at desc))[1],
     (array_agg(public.clean_music_text(v.artist_name) order by v.created_at desc))[1],
@@ -396,9 +401,14 @@ begin
     raise exception 'INVALID_CANDIDATE: Primary choices must come from this poll.' using errcode = 'P0001';
   end if;
 
-  insert into public.votes (poll_id, phase, user_id)
-  values (target_poll_id, 'primary', auth.uid())
-  returning * into saved_vote;
+  begin
+    insert into public.votes (poll_id, phase, user_id)
+    values (target_poll_id, 'primary', auth.uid())
+    returning * into saved_vote;
+  exception
+    when unique_violation then
+      raise exception 'ALREADY_VOTED: Your account already submitted this phase.' using errcode = 'P0001';
+  end;
 
   foreach candidate_id_value in array candidate_ids loop
     insert into public.vote_choices (vote_id, candidate_id, rank)
@@ -538,9 +548,14 @@ begin
     raise exception 'INVALID_FINALIST: Final rankings must use the five finalists.' using errcode = 'P0001';
   end if;
 
-  insert into public.votes (poll_id, phase, user_id)
-  values (target_poll_id, 'final', auth.uid())
-  returning * into saved_vote;
+  begin
+    insert into public.votes (poll_id, phase, user_id)
+    values (target_poll_id, 'final', auth.uid())
+    returning * into saved_vote;
+  exception
+    when unique_violation then
+      raise exception 'ALREADY_VOTED: Your account already submitted this phase.' using errcode = 'P0001';
+  end;
 
   foreach candidate_id_value in array ranked_candidate_ids loop
     insert into public.vote_choices (vote_id, candidate_id, rank)

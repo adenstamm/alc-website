@@ -1,4 +1,5 @@
 import bannedAlbumsText from "../bannedAlbums.txt?raw";
+import { parseAlbumArchiveText } from "./albumArchive";
 
 export const RECORD_SHELF_BUCKET = "record-shelf-covers";
 
@@ -30,19 +31,25 @@ function getArtistOverride(title) {
 }
 
 export function getRecentShelfAlbums() {
-  const recentAlbumTitles = bannedAlbumsText
-    .split("\n")
-    .map((albumTitle) => albumTitle.trim())
-    .filter(Boolean)
+  const recentAlbums = parseAlbumArchiveText(bannedAlbumsText)
     .slice(-5)
     .reverse();
 
-  return recentAlbumTitles.map((title, index) => ({
-    id: slugify(title) || `recent-album-${index}`,
-    title,
-    artist: "ALC archive",
+  return recentAlbums.map((album, index) => ({
+    id: slugify(album.title) || `recent-album-${index}`,
+    title: album.title,
+    artist: album.artist || "ALC archive",
     period: index === 0 ? "Most recent listen" : `${index + 1} listens ago`,
     note: "Recently added to the club archive.",
+  }));
+}
+
+export function getAlbumArchive() {
+  return parseAlbumArchiveText(bannedAlbumsText).map((album, index, albums) => ({
+    ...album,
+    id: `${slugify(album.title) || "archive-album"}-${index}`,
+    sessionNumber: index + 1,
+    reverseSessionNumber: albums.length - index,
   }));
 }
 

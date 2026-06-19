@@ -1,5 +1,6 @@
 import bannedAlbumsText from "../bannedAlbums.txt?raw";
 import bannedArtistsText from "../bannedArtists.txt?raw";
+import { parseAlbumArchiveText } from "./albumArchive";
 
 function parseList(rawText) {
   return rawText
@@ -21,7 +22,9 @@ export function normalizeMusicName(value) {
     .trim();
 }
 
-const bannedAlbumNames = new Set(parseList(bannedAlbumsText).map(normalizeMusicName));
+const bannedAlbumNames = new Set(
+  parseAlbumArchiveText(bannedAlbumsText).map((album) => normalizeMusicName(album.title)),
+);
 const bannedArtistNames = new Set(parseList(bannedArtistsText).map(normalizeMusicName));
 
 export function validateNominationInput({ albumTitle, artistName }) {
@@ -56,8 +59,12 @@ export function validateNominationInput({ albumTitle, artistName }) {
   };
 }
 
-export function getNominationSubmissionError(error) {
+export function getNominationSubmissionError(error, getFallbackError = null) {
   const message = error?.message || "";
+
+  if (message.includes("ALREADY_VOTED") || message.includes("votes_one_per_user_per_poll_phase")) {
+    return getFallbackError ? getFallbackError(error) : "Your account already submitted this phase.";
+  }
 
   if (message.includes("BANNED_ARTIST")) {
     return "That artist is on the banned artist list, so this nomination cannot be submitted.";
