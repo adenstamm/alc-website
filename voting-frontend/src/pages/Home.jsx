@@ -169,7 +169,7 @@ function Home({
         <span>{formatSessionDetails(nextSession)}</span>
         <span>{nextSession?.location || "Hayden Library C8"}</span>
         <button type="button" onClick={() => navigate("/current")}>
-          Current -&gt;
+          Current <span aria-hidden="true">-&gt;</span>
         </button>
       </section>
 

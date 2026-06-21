@@ -35,13 +35,6 @@ function getSearchLinks(album) {
   ];
 }
 
-const listeningPrompts = [
-  "Which track would you replay first?",
-  "Where does the album feel most like itself?",
-  "What production choice or lyric stuck with you?",
-  "Would you recommend this to someone outside the club?",
-];
-
 function CurrentAlbum({ currentPoll, navigate, showAdminLink, specialEvents }) {
   const album = currentPoll.albumOfWeek;
   const [metadata, setMetadata] = useState(null);
@@ -80,22 +73,50 @@ function CurrentAlbum({ currentPoll, navigate, showAdminLink, specialEvents }) {
     <div className="sideb-page sideb-subpage sideb-current-page">
       <SideBNav activePath="/current" navigate={navigate} showAdminLink={showAdminLink} />
 
-      <main className="sideb-subpage-main">
-        <section className="current-album-hero" aria-labelledby="current-album-title">
-          <div className="current-album-copy">
+      <main className="sideb-subpage-main current-listen-main">
+        <section className="current-record-room" aria-labelledby="current-album-title">
+          <figure className="current-record-sleeve">
+            <div className="current-cover-frame">
+              {coverUrl ? (
+                <img src={coverUrl} alt={`${album.title} album cover`} />
+              ) : (
+                <div className="current-generated-cover" aria-hidden="true">
+                  <span>{album.title.slice(0, 2)}</span>
+                </div>
+              )}
+            </div>
+          </figure>
+
+          <div className="current-record-copy">
             <p className="sideb-kicker">Current listen</p>
             <h1 id="current-album-title">{album.title}</h1>
-            <p>{album.artist}</p>
-            <span>{album.note || "Current club listen"}</span>
+            <p className="current-record-artist">{album.artist}</p>
+            <p className="current-record-note">{album.note || "Current club listen"}</p>
 
-            <div className="sideb-actions current-album-actions">
-              <button
-                className="sideb-button sideb-button-primary"
-                type="button"
-                onClick={() => navigate("/vote")}
-              >
-                Vote next
-              </button>
+            <dl className="current-record-meta">
+              <div>
+                <dt>Next session</dt>
+                <dd>{formatSessionDetails(nextSession)}</dd>
+              </div>
+              <div>
+                <dt>Location</dt>
+                <dd>{nextSession?.location || "Hayden Library C8"}</dd>
+              </div>
+            </dl>
+
+            <div className="current-listen-block">
+              <p className="sideb-kicker">Listen</p>
+              <div className="current-listen-links">
+                {searchLinks.map((link) => (
+                  <a href={link.href} key={link.label} rel="noreferrer" target="_blank">
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+            </div>
+
+            <div className="current-record-footer">
+              <span>{currentPoll.status}</span>
               <button
                 className="sideb-button sideb-button-ghost"
                 type="button"
@@ -104,55 +125,6 @@ function CurrentAlbum({ currentPoll, navigate, showAdminLink, specialEvents }) {
                 Meeting details
               </button>
             </div>
-          </div>
-
-          <figure className="current-album-cover">
-            {coverUrl ? (
-              <img src={coverUrl} alt={`${album.title} album cover`} />
-            ) : (
-              <div className="current-generated-cover" aria-hidden="true">
-                <span>{album.title.slice(0, 2)}</span>
-              </div>
-            )}
-            <figcaption>{album.artist}</figcaption>
-          </figure>
-        </section>
-
-        <section className="current-album-grid">
-          <article className="sideb-panel current-session-card">
-            <p className="sideb-kicker">Next session</p>
-            <h2>{formatSessionDetails(nextSession)}</h2>
-            <p>{nextSession?.location || "Hayden Library C8"}</p>
-            <span>{currentPoll.status}</span>
-          </article>
-
-          <article className="sideb-panel current-links-card">
-            <p className="sideb-kicker">Listen</p>
-            <div className="current-listen-links">
-              {searchLinks.map((link) => (
-                <a href={link.href} key={link.label} rel="noreferrer" target="_blank">
-                  {link.label}
-                </a>
-              ))}
-            </div>
-          </article>
-        </section>
-
-        <section className="sideb-panel current-prompts-panel" aria-labelledby="prompts-heading">
-          <div className="sideb-section-heading">
-            <div>
-              <p>For discussion</p>
-              <h2 id="prompts-heading">Bring one thought. That is enough.</h2>
-            </div>
-          </div>
-
-          <div className="current-prompt-grid">
-            {listeningPrompts.map((prompt, index) => (
-              <article className="current-prompt-card" key={prompt}>
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <p>{prompt}</p>
-              </article>
-            ))}
           </div>
         </section>
       </main>

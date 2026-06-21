@@ -2,7 +2,6 @@ function Navbar({ currentPath, navigate, showAdminLink }) {
   const links = [
     { path: "/", label: "Home" },
     { path: "/vote", label: "Vote" },
-    { path: "/results", label: "Results" },
     { path: "/events", label: "Events" },
     { path: "/about", label: "About" },
     ...(showAdminLink ? [{ path: "/admin", label: "Admin" }] : []),

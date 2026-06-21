@@ -17,10 +17,9 @@ import Home from "./pages/Home";
 import Poll from "./pages/Poll";
 import ResetPassword from "./pages/ResetPassword";
 import Events from "./pages/Events";
-import Results from "./pages/Results";
 import { normalizeSiteEvent } from "./lib/siteContent";
 
-const ROUTES = new Set(["/", "/admin", "/vote", "/results", "/events", "/about", "/archive", "/current", "/reset-password"]);
+const ROUTES = new Set(["/", "/admin", "/vote", "/events", "/about", "/archive", "/current", "/reset-password"]);
 
 function normalizePath(pathname) {
   const normalizedPath = pathname.replace(/\/+$/, "") || "/";
@@ -219,17 +218,6 @@ function App() {
               pollError={pollError}
               refreshMembership={refreshCurrentMembership}
               refreshPoll={refreshPoll}
-              session={session}
-              showAdminLink={showAdminLink}
-              supabase={supabase}
-            />
-          ) : currentPath === "/results" ? (
-            <Results
-              hasSupabaseConfig={hasSupabaseConfig}
-              membership={membership}
-              navigate={navigate}
-              poll={livePoll}
-              pollError={pollError}
               session={session}
               showAdminLink={showAdminLink}
               supabase={supabase}
