@@ -21,22 +21,14 @@ export const homeActions = [
     kind: "external",
     target: "sunDevilCentral",
   },
-  {
-    id: "events",
-    label: "Events",
-    title: "Special events",
-    description: "Live concerts, volunteering, and occasional hangs beyond the weekly meeting.",
-    kind: "route",
-    target: "/events",
-  },
 ];
 
 export const specialEvents = [
   {
     id: "record-store-run",
     title: "Record store run",
-    date: "2026-06-06",
-    displayDate: "June 6, 2026",
+    date: "2026-06-27",
+    displayDate: "June 27, 2026",
     time: "2:00 PM",
     location: "Zia Records Tempe",
     status: "upcoming",
@@ -47,8 +39,8 @@ export const specialEvents = [
   {
     id: "summer-listening-night",
     title: "Summer listening night",
-    date: "2026-06-18",
-    displayDate: "June 18, 2026",
+    date: "2026-06-24",
+    displayDate: "June 24, 2026",
     time: "7:15 PM",
     location: "Hayden Library C8",
     status: "upcoming",

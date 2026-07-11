@@ -3,6 +3,8 @@ import { parseAlbumArchiveText } from "./albumArchive";
 
 export const RECORD_SHELF_BUCKET = "record-shelf-covers";
 
+const albumMetadataCache = new Map();
+
 const albumCoverOverrides = {
   "flying beagle": "https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/3f/7e/cc/3f7ecc19-2dd8-88c5-0f1e-c2c4f997d51f/4582290397055.jpg/600x600bb.jpg",
 };
@@ -20,6 +22,14 @@ export function slugify(value) {
 
 function normalizeAlbumTitle(value) {
   return value.trim().toLowerCase();
+}
+
+function normalizeLookupValue(value = "") {
+  return value
+    .normalize("NFKD")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 function getCoverOverride(title) {
@@ -53,14 +63,21 @@ export function getAlbumArchive() {
   }));
 }
 
-export async function fetchAlbumCover(title, signal) {
-  const metadata = await fetchAlbumMetadata(title, signal);
+export async function fetchAlbumCover(title, signal, artist = "") {
+  const metadata = await fetchAlbumMetadata(title, signal, artist);
   return metadata.coverUrl;
 }
 
-export async function fetchAlbumMetadata(title, signal) {
+export async function fetchAlbumMetadata(title, signal, artist = "") {
+  const cacheKey = `${normalizeAlbumTitle(title)}::${normalizeAlbumTitle(artist)}`;
+
+  if (albumMetadataCache.has(cacheKey)) {
+    return albumMetadataCache.get(cacheKey);
+  }
+
+  const searchTerm = [title, artist].filter(Boolean).join(" ");
   const response = await fetch(
-    `https://itunes.apple.com/search?term=${encodeURIComponent(title)}&entity=album&media=music&limit=1`,
+    `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=album&media=music&limit=8`,
     { signal },
   );
 
@@ -68,20 +85,36 @@ export async function fetchAlbumMetadata(title, signal) {
   const artistOverride = getArtistOverride(title);
 
   if (!response.ok) {
-    return {
-      artist: artistOverride || "Unknown artist",
+    const fallbackMetadata = {
+      artist: artistOverride || artist || "Unknown artist",
       coverUrl: coverOverride || null,
     };
+
+    albumMetadataCache.set(cacheKey, fallbackMetadata);
+    return fallbackMetadata;
   }
 
   const data = await response.json();
-  const result = data.results?.[0];
+  const normalizedTitle = normalizeLookupValue(title);
+  const normalizedArtist = normalizeLookupValue(artist);
+  const results = data.results || [];
+  const result = results.find((item) => {
+    const resultTitle = normalizeLookupValue(item.collectionName);
+    const resultArtist = normalizeLookupValue(item.artistName);
+    const titleMatches = resultTitle === normalizedTitle || resultTitle.includes(normalizedTitle);
+    const artistMatches = !normalizedArtist || resultArtist.includes(normalizedArtist) || normalizedArtist.includes(resultArtist);
+
+    return titleMatches && artistMatches;
+  }) || results.find((item) => normalizeLookupValue(item.collectionName) === normalizedTitle);
   const artworkUrl = result?.artworkUrl100;
 
-  return {
-    artist: artistOverride || result?.artistName || "Unknown artist",
+  const metadata = {
+    artist: artistOverride || artist || result?.artistName || "Unknown artist",
     coverUrl: coverOverride || (artworkUrl ? artworkUrl.replace("100x100bb", "600x600bb") : null),
   };
+
+  albumMetadataCache.set(cacheKey, metadata);
+  return metadata;
 }
 
 export async function loadRecordShelfCoverOverrides(supabase, hasSupabaseConfig, albumIds) {

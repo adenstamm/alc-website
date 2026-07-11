@@ -9,7 +9,15 @@ npm install
 npm run dev
 ```
 
-REMEMBER TO CHANGE GOOGLE OAUTH REDIRECT!! WHEN U GO LIVE
+## Launch checklist
+
+Before sharing the production URL:
+
+- Add the production site URL in Supabase Authentication > URL Configuration.
+- Add production redirect URLs for `/account` and `/reset-password`.
+- Update the Google OAuth redirect URI in Google Cloud and Supabase.
+- Configure custom SMTP for reliable signup and password reset email.
+- Run `npm run lint`, `npm run test`, and `npm run build`.
 
 ## Supabase voting setup
 
@@ -23,7 +31,8 @@ Voting is backed by Supabase auth, approved memberships, and a database uniquene
    - `supabase/nomination-validation.sql`
    - `supabase/three-phase-voting.sql`
    - `supabase/site-content.sql`
-5. Create your first account through the vote page.
+   - `supabase/security-hardening.sql` **last**
+5. Create your first account through `/account`.
 6. In Supabase, manually set that row in `memberships` to `status = 'approved'` and `role = 'admin'`.
 7. Use `/admin` to approve future members.
 
@@ -31,6 +40,10 @@ The database enforces one vote per approved account per poll phase through the `
 
 For phase-by-phase manual QA, see [`docs/manual-voting-test.md`](docs/manual-voting-test.md).
 For Google OAuth and SMTP launch setup, see [`docs/auth-launch-checklist.md`](docs/auth-launch-checklist.md).
+For the expected RLS/grant surface and read-only verification queries, see
+[`docs/supabase-security-checklist.md`](docs/supabase-security-checklist.md).
+
+Re-run `supabase/security-hardening.sql` after any older setup SQL file, because those files recreate their original grants and policies.
 
 ## Live site content
 

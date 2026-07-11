@@ -1,6 +1,3 @@
-import SideBNav from "../components/SideBNav";
-import "../styles/sideb-mock.css";
-
 const basics = [
   {
     label: "Established",
@@ -60,19 +57,18 @@ const firstMeetingFaq = [
   },
 ];
 
-function About({ clubLinks, navigate, showAdminLink }) {
+function About({ clubLinks, navigate }) {
   return (
     <div className="sideb-page sideb-subpage sideb-about-page">
-      <SideBNav activePath="/about" navigate={navigate} showAdminLink={showAdminLink} />
-
-      <main className="sideb-subpage-main">
+      <main className="sideb-subpage-main" id="main-content" tabIndex="-1">
         <section className="sideb-page-hero" aria-labelledby="about-title">
           <p className="sideb-kicker">More Info</p>
           <h1 id="about-title">A club to meet people who love music just as much as you do</h1>
           <p>
             Album Listening Club is like a book club, but for records. We all vote an album,
-            listen during the week, then share our thoughts at the meeting. Whether its an album you know or not,
-            expand your horizions, figure out what you like, and meet other people who love music
+            listen during the week, then share our thoughts at the meeting. Whether it is an album
+            you know or something completely new, come expand your horizons, figure out what you
+            like, and meet other people who love music.
           </p>
         </section>
 
@@ -134,10 +130,10 @@ function About({ clubLinks, navigate, showAdminLink }) {
           </div>
 
           <div className="sideb-actions sideb-actions-compact">
-            <a className="sideb-button sideb-button-primary" href={clubLinks.sunDevilCentral}>
+            <a className="sideb-button sideb-button-primary" href={clubLinks.sunDevilCentral} rel="noreferrer" target="_blank">
               Join the Club
             </a>
-            <a className="sideb-button sideb-button-ghost" href={clubLinks.instagram}>
+            <a className="sideb-button sideb-button-ghost" href={clubLinks.instagram} rel="noreferrer" target="_blank">
               Instagram
             </a>
             <button

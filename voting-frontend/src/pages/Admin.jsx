@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import SideBNav from "../components/SideBNav";
 import {
   getRecentShelfAlbums,
   loadRecordShelfCoverOverrides,
@@ -12,7 +11,6 @@ import {
   eventToUpsertPayload,
   validateEventForm,
 } from "../lib/siteContent";
-import "../styles/sideb-mock.css";
 
 function isAdmin(membership) {
   return membership?.status === "approved" && membership?.role === "admin";
@@ -50,13 +48,11 @@ function Admin({
   hasSupabaseConfig,
   hasSiteEventsConfig,
   membership,
-  navigate,
   poll,
   pollError,
   refreshEvents,
   refreshPoll,
   session,
-  showAdminLink,
   siteEvents,
   supabase,
 }) {
@@ -879,6 +875,7 @@ function Admin({
 
                 <div className="admin-action-row">
                   <button
+                    aria-label={`Edit ${eventItem.title}`}
                     className="button button-secondary"
                     type="button"
                     onClick={() => handleEventEdit(eventItem)}
@@ -886,6 +883,7 @@ function Admin({
                     Edit
                   </button>
                   <button
+                    aria-label={`Delete ${eventItem.title}`}
                     className="button button-secondary"
                     type="button"
                     disabled={isSavingContent}
@@ -1013,7 +1011,7 @@ function Admin({
           <p>{poll.status}</p>
         </div>
 
-        {pollError ? <p className="form-error">{pollError}</p> : null}
+        {pollError ? <p className="form-error" role="alert">{pollError}</p> : null}
         {isLoadingResults ? <p className="helper-note">Loading live results...</p> : null}
 
         {poll.phase === "nominations" ? (
@@ -1106,7 +1104,7 @@ function Admin({
               </div>
             ) : null}
             {irvTie ? (
-              <p className="form-error">
+              <p className="form-error" role="alert">
                 Manual decision needed in round {irvTie.round}: {irvTie.candidateIds.length} candidates tied for elimination.
               </p>
             ) : null}
@@ -1289,8 +1287,8 @@ function Admin({
           <p>Upload a custom image to replace one of the five current shelf album covers.</p>
         </div>
 
-        {error ? <p className="form-error">{error}</p> : null}
-        {message ? <p className="form-success">{message}</p> : null}
+        {error ? <p className="form-error" role="alert">{error}</p> : null}
+        {message ? <p className="form-success" role="status">{message}</p> : null}
 
         <div className="admin-shelf-grid">
           {shelfAlbums.map((album) => {
@@ -1321,6 +1319,7 @@ function Admin({
                   />
                 </div>
                 <button
+                  aria-label={`Save artist for ${album.title}`}
                   className="button button-secondary"
                   type="button"
                   disabled={isSavingShelfCover}
@@ -1329,6 +1328,7 @@ function Admin({
                   Save artist
                 </button>
                 <button
+                  aria-label={`Clear cover and artist overrides for ${album.title}`}
                   className="button button-secondary"
                   type="button"
                   disabled={!override || isSavingShelfCover}
@@ -1388,6 +1388,7 @@ function Admin({
       <div className="member-actions">
         {member.status !== "approved" ? (
           <button
+            aria-label={`Approve ${getMemberName(member)}`}
             className="button button-secondary"
             type="button"
             onClick={() => updateMembership(member.user_id, { status: "approved" })}
@@ -1398,6 +1399,7 @@ function Admin({
 
         {member.status !== "rejected" ? (
           <button
+            aria-label={`Reject ${getMemberName(member)}`}
             className="button button-secondary"
             type="button"
             onClick={() => updateMembership(member.user_id, { status: "rejected" })}
@@ -1408,6 +1410,7 @@ function Admin({
 
         {member.status === "rejected" ? (
           <button
+            aria-label={`Restore ${getMemberName(member)} to pending`}
             className="button button-secondary"
             type="button"
             onClick={() => updateMembership(member.user_id, { status: "pending" })}
@@ -1418,6 +1421,7 @@ function Admin({
 
         {member.status === "approved" && member.role !== "admin" ? (
           <button
+            aria-label={`Make ${getMemberName(member)} an admin`}
             className="button button-secondary"
             type="button"
             onClick={() => updateMembership(member.user_id, { role: "admin" })}
@@ -1428,6 +1432,7 @@ function Admin({
 
         {member.status === "approved" && member.role === "admin" ? (
           <button
+            aria-label={`Remove admin access from ${getMemberName(member)}`}
             className="button button-secondary"
             type="button"
             disabled={!canRemoveAdmin}
@@ -1528,7 +1533,7 @@ function Admin({
       return (
         <article className="surface-card vote-form-card">
           <p className="eyebrow">Admin only</p>
-          <h2 className="sidebar-title">Sign in on the vote page first.</h2>
+          <h2 className="sidebar-title">Sign in from the Account page first.</h2>
           <p className="sidebar-copy">Only approved ALC admins can manage member approvals.</p>
         </article>
       );
@@ -1556,11 +1561,12 @@ function Admin({
           <p>Pending approvals stay separate from the full account directory.</p>
         </div>
 
-        {error ? <p className="form-error">{error}</p> : null}
-        {memberMessage ? <p className="form-success">{memberMessage}</p> : null}
+        {error ? <p className="form-error" role="alert">{error}</p> : null}
+        {memberMessage ? <p className="form-success" role="status">{memberMessage}</p> : null}
 
-        <div className="member-tabs" role="tablist" aria-label="Membership views">
+        <div className="member-tabs" role="group" aria-label="Membership views">
           <button
+            aria-pressed={memberTab === "pending"}
             className={memberTab === "pending" ? "is-active" : ""}
             type="button"
             onClick={() => handleMemberTabChange("pending")}
@@ -1568,6 +1574,7 @@ function Admin({
             Pending approvals ({pendingMembers.length})
           </button>
           <button
+            aria-pressed={memberTab === "all"}
             className={memberTab === "all" ? "is-active" : ""}
             type="button"
             onClick={() => handleMemberTabChange("all")}
@@ -1592,6 +1599,7 @@ function Admin({
             <div className="member-filter-group" aria-label="Account filters">
               {accountFilters.map((filter) => (
                 <button
+                  aria-pressed={accountFilter === filter.id}
                   className={accountFilter === filter.id ? "is-active" : ""}
                   key={filter.id}
                   type="button"
@@ -1611,9 +1619,7 @@ function Admin({
 
   return (
     <div className="sideb-page sideb-subpage sideb-admin-page">
-      <SideBNav activePath="/admin" navigate={navigate} showAdminLink={showAdminLink} />
-
-      <main className="sideb-subpage-main">
+      <main className="sideb-subpage-main" id="main-content" tabIndex="-1">
         <section className="sideb-page-hero sideb-page-hero-split sideb-admin-hero">
           <div>
             <p className="sideb-kicker">Admin</p>

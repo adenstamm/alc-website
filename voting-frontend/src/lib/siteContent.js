@@ -57,6 +57,40 @@ export function normalizeSiteEvent(row) {
   };
 }
 
+function getDateKey(referenceDate = new Date()) {
+  if (typeof referenceDate === "string") {
+    return referenceDate.slice(0, 10);
+  }
+
+  const year = referenceDate.getFullYear();
+  const month = String(referenceDate.getMonth() + 1).padStart(2, "0");
+  const day = String(referenceDate.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+export function getUpcomingEvents(events, referenceDate) {
+  const today = getDateKey(referenceDate);
+
+  return [...events]
+    .filter((eventItem) => eventItem.status === "upcoming" && eventItem.date >= today)
+    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+}
+
+export function getRecentEvents(events, referenceDate) {
+  const today = getDateKey(referenceDate);
+
+  return [...events]
+    .filter((eventItem) => eventItem.status === "recent" || (eventItem.date && eventItem.date < today))
+    .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+}
+
+export function getNextUpcomingEvent(events, referenceDate) {
+  const upcomingEvents = getUpcomingEvents(events, referenceDate);
+
+  return upcomingEvents[0] || null;
+}
+
 export function eventToUpsertPayload(eventForm) {
   const title = (eventForm.title || "").trim();
   const date = eventForm.date;

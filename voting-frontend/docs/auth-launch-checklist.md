@@ -20,14 +20,14 @@ In Supabase:
 4. Open Authentication > URL Configuration.
 5. Add the production site URL.
 6. Add redirect URLs for:
-   - `http://localhost:5173/vote`
-   - Production `/vote`
+   - `http://localhost:5173/account`
+   - Production `/account`
    - Production `/reset-password`
 
 In the app:
 
-- The vote page now includes "Continue with Google".
-- Google OAuth redirects users back to `/vote`.
+- The Account page includes "Continue with Google".
+- Google OAuth redirects users back to `/account`.
 - New Google users still land in `memberships` as pending until an admin approves them.
 
 ## SMTP
@@ -60,7 +60,7 @@ Test these before sharing the site:
 5. Confirm the Google account appears in `/admin` as pending.
 6. Approve the Google account.
 7. Confirm that account can vote.
-8. Sign in as that user on `/vote`, save a display name, and confirm `/admin` shows the updated name.
+8. Sign in as that user on `/account`, save a display name, and confirm `/admin` shows the updated name.
 
 ## Important Notes
 

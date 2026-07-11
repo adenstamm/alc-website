@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 
-import "./App.css";
-import Navbar from "./components/Navbar";
+import RouteErrorBoundary from "./components/RouteErrorBoundary";
+import SideBNav from "./components/SideBNav";
+import SiteFooter from "./components/SiteFooter";
 import {
   clubLinks,
   currentPoll,
@@ -9,25 +10,56 @@ import {
   specialEvents,
 } from "./data/clubContent";
 import { hasSiteEventsConfig, hasSupabaseConfig, supabase } from "./lib/supabaseClient";
-import Admin from "./pages/Admin";
-import About from "./pages/About";
-import Archive from "./pages/Archive";
-import CurrentAlbum from "./pages/CurrentAlbum";
 import Home from "./pages/Home";
-import Poll from "./pages/Poll";
-import ResetPassword from "./pages/ResetPassword";
-import Events from "./pages/Events";
 import { normalizeSiteEvent } from "./lib/siteContent";
+import "./styles/sideb-mock.css";
 
-const ROUTES = new Set(["/", "/admin", "/vote", "/events", "/about", "/archive", "/current", "/reset-password"]);
+const About = lazy(() => import("./pages/About"));
+const Account = lazy(() => import("./pages/Account"));
+const Admin = lazy(() => import("./pages/Admin"));
+const Archive = lazy(() => import("./pages/Archive"));
+const CurrentAlbum = lazy(() => import("./pages/CurrentAlbum"));
+const Events = lazy(() => import("./pages/Events"));
+const Poll = lazy(() => import("./pages/Poll"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+
+const ROUTES = new Set(["/", "/account", "/admin", "/vote", "/events", "/about", "/archive", "/current", "/reset-password"]);
+const ROUTE_REDIRECTS = new Map([
+  ["/results", "/vote"],
+]);
+const ROUTE_TITLES = {
+  "/": "Album Listening Club",
+  "/account": "Account · Album Listening Club",
+  "/about": "About · Album Listening Club",
+  "/admin": "Admin · Album Listening Club",
+  "/archive": "Archive · Album Listening Club",
+  "/current": "Current Listen · Album Listening Club",
+  "/events": "Events · Album Listening Club",
+  "/reset-password": "Reset Password · Album Listening Club",
+  "/vote": "Vote · Album Listening Club",
+};
+const POLL_ROUTES = new Set(["/", "/admin", "/current", "/vote"]);
+const EVENT_ROUTES = new Set(["/", "/admin", "/current", "/events"]);
 
 function normalizePath(pathname) {
   const normalizedPath = pathname.replace(/\/+$/, "") || "/";
+  const redirectPath = ROUTE_REDIRECTS.get(normalizedPath);
+
+  if (redirectPath) {
+    return redirectPath;
+  }
+
   return ROUTES.has(normalizedPath) ? normalizedPath : "/";
 }
 
 function getCurrentPath() {
-  return normalizePath(window.location.pathname);
+  const normalizedPath = normalizePath(window.location.pathname);
+
+  if (window.location.pathname !== normalizedPath) {
+    window.history.replaceState({}, "", `${normalizedPath}${window.location.search}${window.location.hash}`);
+  }
+
+  return normalizedPath;
 }
 
 function normalizeLivePoll(data) {
@@ -47,6 +79,7 @@ function normalizeLivePoll(data) {
 
 function App() {
   const [currentPath, setCurrentPath] = useState(getCurrentPath);
+  const previousPath = useRef(currentPath);
   const [authReady, setAuthReady] = useState(!hasSupabaseConfig);
   const [session, setSession] = useState(null);
   const [membership, setMembership] = useState(null);
@@ -91,7 +124,7 @@ function App() {
     }
 
     const nextEvents = data.map(normalizeSiteEvent);
-    setLiveEvents(nextEvents.length ? nextEvents : specialEvents);
+    setLiveEvents(nextEvents);
     return nextEvents;
   }, []);
 
@@ -128,9 +161,26 @@ function App() {
   }, []);
 
   useEffect(() => {
-    refreshPoll();
-    refreshEvents();
-  }, [refreshEvents, refreshPoll]);
+    if (POLL_ROUTES.has(currentPath)) {
+      refreshPoll();
+    }
+
+    if (EVENT_ROUTES.has(currentPath)) {
+      refreshEvents();
+    }
+  }, [currentPath, refreshEvents, refreshPoll]);
+
+  useEffect(() => {
+    document.title = ROUTE_TITLES[currentPath] || ROUTE_TITLES["/"];
+
+    if (previousPath.current !== currentPath) {
+      window.requestAnimationFrame(() => {
+        document.getElementById("main-content")?.focus({ preventScroll: true });
+      });
+    }
+
+    previousPath.current = currentPath;
+  }, [currentPath]);
 
   useEffect(() => {
     if (!hasSupabaseConfig) {
@@ -175,98 +225,133 @@ function App() {
       setCurrentPath(normalizedPath);
     }
 
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: prefersReducedMotion ? "auto" : "smooth" });
   }, [currentPath]);
 
   const refreshCurrentMembership = useCallback(() => loadMembership(session), [loadMembership, session]);
   const showAdminLink = membership?.status === "approved" && membership?.role === "admin";
 
+  function renderRoute() {
+    if (currentPath === "/account") {
+      return (
+        <Account
+          authReady={authReady}
+          hasSupabaseConfig={hasSupabaseConfig}
+          membership={membership}
+          navigate={navigate}
+          refreshMembership={refreshCurrentMembership}
+          session={session}
+          supabase={supabase}
+        />
+      );
+    }
+
+    if (currentPath === "/admin") {
+      return (
+        <Admin
+          authReady={authReady}
+          hasSupabaseConfig={hasSupabaseConfig}
+          hasSiteEventsConfig={hasSiteEventsConfig}
+          membership={membership}
+          poll={livePoll}
+          pollError={pollError}
+          refreshEvents={refreshEvents}
+          refreshPoll={refreshPoll}
+          session={session}
+          siteEvents={liveEvents}
+          supabase={supabase}
+        />
+      );
+    }
+
+    if (currentPath === "/vote") {
+      return (
+        <Poll
+          key={`${livePoll.id}-${livePoll.phase}`}
+          authReady={authReady}
+          hasSupabaseConfig={hasSupabaseConfig}
+          membership={membership}
+          navigate={navigate}
+          poll={livePoll}
+          pollError={pollError}
+          refreshPoll={refreshPoll}
+          session={session}
+          supabase={supabase}
+        />
+      );
+    }
+
+    if (currentPath === "/events") {
+      return <Events specialEvents={liveEvents} />;
+    }
+
+    if (currentPath === "/about") {
+      return <About clubLinks={clubLinks} navigate={navigate} />;
+    }
+
+    if (currentPath === "/archive") {
+      return <Archive />;
+    }
+
+    if (currentPath === "/current") {
+      return (
+        <CurrentAlbum
+          currentPoll={livePoll}
+          navigate={navigate}
+          specialEvents={liveEvents}
+        />
+      );
+    }
+
+    if (currentPath === "/reset-password") {
+      return (
+        <ResetPassword
+          hasSupabaseConfig={hasSupabaseConfig}
+          navigate={navigate}
+          supabase={supabase}
+        />
+      );
+    }
+
+    return (
+      <Home
+        clubLinks={clubLinks}
+        currentPoll={livePoll}
+        hasSupabaseConfig={hasSupabaseConfig}
+        homeActions={homeActions}
+        navigate={navigate}
+        specialEvents={liveEvents}
+        supabase={supabase}
+      />
+    );
+  }
+
   return (
     <div className="page">
-      <div className="page-shell">
-        <Navbar
-          currentPath={currentPath}
-          navigate={navigate}
-          showAdminLink={showAdminLink}
-        />
-
-        <main className="view">
-          {currentPath === "/admin" ? (
-            <Admin
-              authReady={authReady}
-              hasSupabaseConfig={hasSupabaseConfig}
-              hasSiteEventsConfig={hasSiteEventsConfig}
-              membership={membership}
-              navigate={navigate}
-              poll={livePoll}
-              pollError={pollError}
-              refreshEvents={refreshEvents}
-              refreshPoll={refreshPoll}
-              session={session}
-              showAdminLink={showAdminLink}
-              siteEvents={liveEvents}
-              supabase={supabase}
-            />
-          ) : currentPath === "/vote" ? (
-            <Poll
-              key={`${livePoll.id}-${livePoll.phase}`}
-              authReady={authReady}
-              hasSupabaseConfig={hasSupabaseConfig}
-              membership={membership}
-              navigate={navigate}
-              poll={livePoll}
-              pollError={pollError}
-              refreshMembership={refreshCurrentMembership}
-              refreshPoll={refreshPoll}
-              session={session}
-              showAdminLink={showAdminLink}
-              supabase={supabase}
-            />
-          ) : currentPath === "/events" ? (
-            <Events
-              specialEvents={liveEvents}
-              navigate={navigate}
-              showAdminLink={showAdminLink}
-            />
-          ) : currentPath === "/about" ? (
-            <About
-              clubLinks={clubLinks}
-              navigate={navigate}
-              showAdminLink={showAdminLink}
-            />
-          ) : currentPath === "/archive" ? (
-            <Archive
-              navigate={navigate}
-              showAdminLink={showAdminLink}
-            />
-          ) : currentPath === "/current" ? (
-            <CurrentAlbum
-              currentPoll={livePoll}
-              navigate={navigate}
-              showAdminLink={showAdminLink}
-              specialEvents={liveEvents}
-            />
-          ) : currentPath === "/reset-password" ? (
-            <ResetPassword
-              hasSupabaseConfig={hasSupabaseConfig}
-              navigate={navigate}
-              showAdminLink={showAdminLink}
-              supabase={supabase}
-            />
-          ) : (
-            <Home
-              clubLinks={clubLinks}
-              currentPoll={livePoll}
-              hasSupabaseConfig={hasSupabaseConfig}
-              homeActions={homeActions}
-              navigate={navigate}
-              showAdminLink={showAdminLink}
-              specialEvents={liveEvents}
-              supabase={supabase}
-            />
+      <SideBNav
+        activePath={currentPath}
+        authReady={authReady}
+        membership={membership}
+        navigate={navigate}
+        session={session}
+        showAdminLink={showAdminLink}
+      />
+      <RouteErrorBoundary resetKey={currentPath}>
+        <Suspense
+          fallback={(
+            <div className="route-loading" role="status">
+              <span className="route-loading-record" aria-hidden="true" />
+              <p>Pulling the record from the shelf…</p>
+            </div>
           )}
-        </main>
-      </div>
+        >
+          <>
+            {renderRoute()}
+            <SiteFooter clubLinks={clubLinks} navigate={navigate} />
+          </>
+        </Suspense>
+      </RouteErrorBoundary>
     </div>
   );
 }

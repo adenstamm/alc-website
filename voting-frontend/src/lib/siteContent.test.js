@@ -4,6 +4,9 @@ import {
   createEventId,
   eventToUpsertPayload,
   formatDisplayDate,
+  getNextUpcomingEvent,
+  getRecentEvents,
+  getUpcomingEvents,
   validateEventForm,
 } from "./siteContent.js";
 
@@ -57,4 +60,30 @@ test("event validation requires public-facing essentials", () => {
     tag: "",
     id: "",
   }).isValid, true);
+});
+
+test("event helpers sort upcoming and recent events for public display", () => {
+  const events = [
+    { id: "later", date: "2026-06-27", status: "upcoming" },
+    { id: "older", date: "2026-05-01", status: "recent" },
+    { id: "next", date: "2026-06-24", status: "upcoming" },
+    { id: "newer", date: "2026-06-18", status: "recent" },
+  ];
+
+  const referenceDate = "2026-06-01";
+
+  assert.deepEqual(getUpcomingEvents(events, referenceDate).map((event) => event.id), ["next", "later"]);
+  assert.deepEqual(getRecentEvents(events, referenceDate).map((event) => event.id), ["newer", "older"]);
+  assert.equal(getNextUpcomingEvent(events, referenceDate).id, "next");
+});
+
+test("past events never remain upcoming and no future event returns null", () => {
+  const events = [
+    { id: "past", date: "2026-06-27", status: "upcoming" },
+    { id: "older", date: "2026-05-01", status: "recent" },
+  ];
+
+  assert.deepEqual(getUpcomingEvents(events, "2026-07-10"), []);
+  assert.deepEqual(getRecentEvents(events, "2026-07-10").map((event) => event.id), ["past", "older"]);
+  assert.equal(getNextUpcomingEvent(events, "2026-07-10"), null);
 });

@@ -33,17 +33,17 @@ The five member accounts are useful because the app intentionally allows one nom
 Expected:
 
 - `/vote` shows the nominations form.
-- `/results` hides aggregate totals from non-admins.
-- `/admin` shows phase controls and an empty nominations result list.
+- `/admin` shows phase controls and an empty nominations result list for approved admins.
+- Non-admin accounts cannot see aggregate results.
 
 ## Phase 1: Nominations
 
 For each approved member test account:
 
-1. Sign in on `/vote`.
+1. Sign in on `/account`, then open `/vote`.
 2. Submit a unique album and artist.
 3. Confirm the page locks the submission for that phase.
-4. Sign out.
+4. Return to `/account` and sign out.
 
 Suggested safe test nominations:
 
@@ -78,7 +78,7 @@ Expected:
 
 For at least one approved member account:
 
-1. Sign in on `/vote`.
+1. Sign in on `/account`, then open `/vote`.
 2. Select one to five albums.
 3. Submit the primary ballot.
 4. Confirm the page locks the ballot for the primary phase.
@@ -114,7 +114,7 @@ Expected:
 
 For at least one approved member account:
 
-1. Sign in on `/vote`.
+1. Sign in on `/account`, then open `/vote`.
 2. Use the up/down controls to reorder the five finalists.
 3. Submit the final ranking.
 4. Confirm the page locks the ballot for the final phase.
@@ -122,8 +122,8 @@ For at least one approved member account:
 Also test:
 
 - Refresh after submitting and confirm the saved ranking still appears.
-- Sign in as admin and open `/results`.
-- Confirm IRV rounds are visible only to admins.
+- Sign in as admin and open `/admin`.
+- Confirm IRV rounds are visible in the admin results panel only.
 
 Expected:
 

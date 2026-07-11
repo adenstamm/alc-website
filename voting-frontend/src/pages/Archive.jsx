@@ -1,10 +1,8 @@
 import { useMemo, useState } from "react";
 
-import SideBNav from "../components/SideBNav";
 import { getAlbumArchive } from "../lib/recordShelf";
-import "../styles/sideb-mock.css";
 
-function Archive({ navigate, showAdminLink }) {
+function Archive() {
   const [searchTerm, setSearchTerm] = useState("");
   const archiveAlbums = useMemo(() => getAlbumArchive().toReversed(), []);
   const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -34,9 +32,7 @@ function Archive({ navigate, showAdminLink }) {
 
   return (
     <div className="sideb-page sideb-subpage sideb-archive-page">
-      <SideBNav activePath="/archive" navigate={navigate} showAdminLink={showAdminLink} />
-
-      <main className="sideb-subpage-main">
+      <main className="sideb-subpage-main" id="main-content" tabIndex="-1">
         <section className="sideb-page-hero sideb-page-hero-split" aria-labelledby="archive-title">
           <div>
             <p className="sideb-kicker">Archive</p>
@@ -58,17 +54,19 @@ function Archive({ navigate, showAdminLink }) {
             <label htmlFor="archiveSearch">Search archive</label>
             <input
               id="archiveSearch"
+              aria-controls="archive-results"
               type="search"
               placeholder="Album or artist"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
             />
           </div>
-          <p>
+          <p aria-live="polite">
             Showing {visibleAlbums.length} of {archiveAlbums.length} archived albums.
           </p>
         </section>
 
+        <div id="archive-results">
         {visibleAlbums.length ? (
           <>
             <section className="sideb-panel archive-section" aria-labelledby="recent-archive-heading">
@@ -106,6 +104,7 @@ function Archive({ navigate, showAdminLink }) {
             <p>Try another album title or artist.</p>
           </section>
         )}
+        </div>
       </main>
     </div>
   );

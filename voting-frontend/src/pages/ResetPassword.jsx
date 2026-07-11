@@ -1,15 +1,12 @@
 import { useEffect, useState } from "react";
 
-import SideBNav from "../components/SideBNav";
-import "../styles/sideb-mock.css";
-
 function hasRecoveryParams() {
   const urlParams = new URLSearchParams(window.location.search);
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
   return urlParams.get("type") === "recovery" || hashParams.get("type") === "recovery";
 }
 
-function ResetPassword({ hasSupabaseConfig, navigate, showAdminLink, supabase }) {
+function ResetPassword({ hasSupabaseConfig, navigate, supabase }) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [status, setStatus] = useState(null);
@@ -94,9 +91,7 @@ function ResetPassword({ hasSupabaseConfig, navigate, showAdminLink, supabase })
 
   return (
     <div className="sideb-page sideb-subpage sideb-vote-page sideb-reset-page">
-      <SideBNav activePath="/reset-password" navigate={navigate} showAdminLink={showAdminLink} />
-
-      <main className="sideb-subpage-main">
+      <main className="sideb-subpage-main" id="main-content" tabIndex="-1">
         <section className="sideb-page-hero sideb-page-hero-split">
           <div>
             <p className="sideb-kicker">Account</p>
@@ -106,8 +101,8 @@ function ResetPassword({ hasSupabaseConfig, navigate, showAdminLink, supabase })
             </p>
           </div>
 
-          <button className="sideb-button sideb-button-ghost" type="button" onClick={() => navigate("/vote")}>
-            Back to voting
+          <button className="sideb-button sideb-button-ghost" type="button" onClick={() => navigate("/account")}>
+            Back to account
           </button>
         </section>
 
@@ -129,8 +124,8 @@ function ResetPassword({ hasSupabaseConfig, navigate, showAdminLink, supabase })
               <p>
                 Supabase only allows password changes after the recovery link creates a temporary session.
               </p>
-              <button className="button button-secondary" type="button" onClick={() => navigate("/vote")}>
-                Back to sign in
+              <button className="button button-secondary" type="button" onClick={() => navigate("/account")}>
+                Back to account
               </button>
             </div>
           ) : (
@@ -161,8 +156,8 @@ function ResetPassword({ hasSupabaseConfig, navigate, showAdminLink, supabase })
                 />
               </div>
 
-              {error ? <p className="form-error">{error}</p> : null}
-              {status ? <p className="form-success">{status}</p> : null}
+              {error ? <p className="form-error" role="alert">{error}</p> : null}
+              {status ? <p className="form-success" role="status">{status}</p> : null}
 
               <button className="button button-primary" type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Updating..." : "Update password"}

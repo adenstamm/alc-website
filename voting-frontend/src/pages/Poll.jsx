@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
-import AuthPanel from "../components/AuthPanel";
-import SideBNav from "../components/SideBNav";
 import { phaseContent } from "../data/clubContent";
+import { getAccountStatus } from "../lib/accountStatus";
 import {
   getNominationSubmissionError,
   validateNominationInput,
@@ -12,7 +11,6 @@ import {
   validateFinalRanking,
   validatePrimarySelection,
 } from "../lib/votingLogic";
-import "../styles/sideb-mock.css";
 
 function getStorageKey(userId, pollId, phase) {
   return `alc-ballot-${userId}-${pollId}-${phase}`;
@@ -109,26 +107,6 @@ function formatNominationCount(count) {
   return `${count} nomination${count === 1 ? "" : "s"}`;
 }
 
-function getAccountStatus(session, membership) {
-  if (!session) {
-    return "signed-out";
-  }
-
-  if (!session.user.email_confirmed_at) {
-    return "unverified";
-  }
-
-  if (!membership || membership.status === "pending") {
-    return "pending";
-  }
-
-  if (membership.status !== "approved") {
-    return "blocked";
-  }
-
-  return "approved";
-}
-
 function getVoteSubmissionError(error) {
   const message = error?.message || "";
 
@@ -150,21 +128,15 @@ function Poll({
   navigate,
   poll,
   pollError,
-  refreshMembership,
   refreshPoll,
   session,
-  showAdminLink,
   supabase,
 }) {
   const [formState, setFormState] = useState(() => createDefaultFormState(poll));
   const [storedBallot, setStoredBallot] = useState(null);
   const [isLoadingVote, setIsLoadingVote] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [displayNameDraft, setDisplayNameDraft] = useState(membership?.display_name || "");
-  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [formError, setFormError] = useState(null);
-  const [profileMessage, setProfileMessage] = useState(null);
-  const [profileError, setProfileError] = useState(null);
 
   const phaseDetails = phaseContent[poll.phase] || phaseContent.nominations;
   const userId = session?.user?.id;
@@ -186,57 +158,10 @@ function Poll({
     [candidateOptions, formState.rankedCandidateIds],
   );
 
-  async function handleSignOut() {
-    if (!supabase) {
-      return;
-    }
-
-    await supabase.auth.signOut();
-    setStoredBallot(null);
-  }
-
-  async function handleProfileSave(event) {
-    event.preventDefault();
-    setProfileMessage(null);
-    setProfileError(null);
-
-    const cleanDisplayName = displayNameDraft.trim();
-
-    if (!cleanDisplayName) {
-      setProfileError("Add the name you want admins to see.");
-      return;
-    }
-
-    if (!supabase || !userId) {
-      setProfileError("Sign in again before updating your name.");
-      return;
-    }
-
-    setIsSavingProfile(true);
-
-    const { error } = await supabase.rpc("update_own_display_name", {
-      display_name_input: cleanDisplayName,
-    });
-
-    setIsSavingProfile(false);
-
-    if (error) {
-      setProfileError(error.message || "Could not update your name.");
-      return;
-    }
-
-    setProfileMessage("Name updated.");
-    await refreshMembership();
-  }
-
   useEffect(() => {
     setFormState(createDefaultFormState(poll));
     setFormError(null);
   }, [poll]);
-
-  useEffect(() => {
-    setDisplayNameDraft(membership?.display_name || "");
-  }, [membership?.display_name]);
 
   useEffect(() => {
     if (!supabase || !userId || accountStatus !== "approved") {
@@ -347,6 +272,13 @@ function Poll({
         return;
       }
 
+      if (!window.confirm(
+        `Submit ${nominationValidation.albumTitle} by ${nominationValidation.artistName}? Your nomination cannot be changed during this phase.`,
+      )) {
+        setIsSubmitting(false);
+        return;
+      }
+
       const { data, error } = await supabase.rpc("submit_nomination", {
         target_poll_id: poll.id,
         album_title_input: nominationValidation.albumTitle,
@@ -382,6 +314,13 @@ function Poll({
         return;
       }
 
+      if (!window.confirm(
+        `Submit ${formState.selectedCandidateIds.length} album ${formState.selectedCandidateIds.length === 1 ? "choice" : "choices"}? Your ballot cannot be changed during this phase.`,
+      )) {
+        setIsSubmitting(false);
+        return;
+      }
+
       const { data, error } = await supabase.rpc("submit_primary_ballot", {
         target_poll_id: poll.id,
         candidate_ids: formState.selectedCandidateIds,
@@ -411,6 +350,11 @@ function Poll({
 
     if (!finalValidation.isValid) {
       setFormError(finalValidation.message);
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!window.confirm("Submit this final ranking? Your ballot cannot be changed during this phase.")) {
       setIsSubmitting(false);
       return;
     }
@@ -480,7 +424,16 @@ function Poll({
           <p>
             Voting opens after your email is verified and an admin approves your membership.
           </p>
-          <AuthPanel supabase={supabase} />
+          <a
+            className="sideb-button sideb-button-primary"
+            href="/account"
+            onClick={(event) => {
+              event.preventDefault();
+              navigate("/account");
+            }}
+          >
+            Open your account <span aria-hidden="true">→</span>
+          </a>
         </div>
       );
     }
@@ -491,6 +444,9 @@ function Poll({
           <p className="eyebrow">Verify email</p>
           <h3>Check your inbox before voting.</h3>
           <p>{session.user.email} needs to be verified before your account can vote.</p>
+          <a className="button button-secondary" href="/account" onClick={(event) => { event.preventDefault(); navigate("/account"); }}>
+            View account status
+          </a>
         </div>
       );
     }
@@ -502,11 +458,11 @@ function Poll({
           <h3>Your account is waiting for member approval.</h3>
           <p>
             You are signed in as {session.user.email}. Ask an ALC admin to approve your
-            membership, then refresh your access.
+            membership, then refresh your status from the Account page.
           </p>
-          <button className="button button-secondary" type="button" onClick={refreshMembership}>
-            Refresh access
-          </button>
+          <a className="button button-secondary" href="/account" onClick={(event) => { event.preventDefault(); navigate("/account"); }}>
+            View account status
+          </a>
         </div>
       );
     }
@@ -517,6 +473,9 @@ function Poll({
           <p className="eyebrow">Access unavailable</p>
           <h3>This account is not approved for voting.</h3>
           <p>Ask an ALC admin if you think this is a mistake.</p>
+          <a className="button button-secondary" href="/account" onClick={(event) => { event.preventDefault(); navigate("/account"); }}>
+            View account details
+          </a>
         </div>
       );
     }
@@ -608,6 +567,7 @@ function Poll({
             </div>
             <div className="ranked-actions">
               <button
+                aria-label={`Move ${candidate.title} up one rank`}
                 className="button button-secondary"
                 type="button"
                 disabled={index === 0}
@@ -616,6 +576,7 @@ function Poll({
                 Up
               </button>
               <button
+                aria-label={`Move ${candidate.title} down one rank`}
                 className="button button-secondary"
                 type="button"
                 disabled={index === rankedCandidates.length - 1}
@@ -674,9 +635,7 @@ function Poll({
 
   return (
     <div className="sideb-page sideb-subpage sideb-vote-page">
-      <SideBNav activePath="/vote" navigate={navigate} showAdminLink={showAdminLink} />
-
-      <main className="sideb-subpage-main">
+      <main className="sideb-subpage-main" id="main-content" tabIndex="-1">
         <section className="sideb-page-hero sideb-page-hero-split sideb-vote-hero">
           <div>
             <p className="eyebrow">Voting page</p>
@@ -717,7 +676,7 @@ function Poll({
                   </p>
                 ) : null}
 
-                {formError ? <p className="form-error">{formError}</p> : null}
+                {formError ? <p className="form-error" role="alert">{formError}</p> : null}
 
                 <button
                   className="button button-primary"
@@ -733,33 +692,23 @@ function Poll({
           <aside className="poll-sidebar">
             {session ? (
               <article className="surface-card sidebar-card">
-                <p className="eyebrow">Account</p>
+                <p className="eyebrow">Voting as</p>
                 <h2 className="sidebar-title">{membership?.display_name || "Signed in"}</h2>
                 <p className="sidebar-copy">{session.user.email}</p>
-                <form className="profile-form" onSubmit={handleProfileSave}>
-                  <div className="field-group">
-                    <label htmlFor="displayNameDraft">Display name</label>
-                    <input
-                      id="displayNameDraft"
-                      type="text"
-                      placeholder="Your name"
-                      value={displayNameDraft}
-                      onChange={(event) => setDisplayNameDraft(event.target.value)}
-                    />
-                  </div>
-                  {profileError ? <p className="form-error">{profileError}</p> : null}
-                  {profileMessage ? <p className="form-success">{profileMessage}</p> : null}
-                  <button className="button button-secondary full-width" type="submit" disabled={isSavingProfile}>
-                    {isSavingProfile ? "Saving..." : "Save name"}
-                  </button>
-                </form>
                 <div className="member-badges compact-badges">
                   <span>{accountStatus}</span>
                   <span>{membership?.role || "member"}</span>
                 </div>
-                <button className="button button-secondary full-width" type="button" onClick={handleSignOut}>
-                  Sign out
-                </button>
+                <a
+                  className="button button-secondary full-width"
+                  href="/account"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    navigate("/account");
+                  }}
+                >
+                  Manage account
+                </a>
               </article>
             ) : null}
 

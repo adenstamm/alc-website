@@ -1,16 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 
-import SideBNav from "../components/SideBNav";
 import { fetchAlbumMetadata } from "../lib/recordShelf";
-import "../styles/sideb-mock.css";
-
-function getNextSession(specialEvents) {
-  return specialEvents.find((event) => event.status === "upcoming") || specialEvents[0];
-}
+import { getNextUpcomingEvent } from "../lib/siteContent";
 
 function formatSessionDetails(nextSession) {
   if (!nextSession) {
-    return "Next club night at 7:15 PM";
+    return "New date coming soon";
   }
 
   return `${nextSession.displayDate} at ${nextSession.time}`;
@@ -35,14 +30,17 @@ function getSearchLinks(album) {
   ];
 }
 
-function CurrentAlbum({ currentPoll, navigate, showAdminLink, specialEvents }) {
+function CurrentAlbum({ currentPoll, navigate, specialEvents }) {
   const album = currentPoll.albumOfWeek;
   const [metadata, setMetadata] = useState(null);
-  const nextSession = getNextSession(specialEvents);
-  const coverUrl = album.coverUrl || metadata?.coverUrl;
+  const [coverFailed, setCoverFailed] = useState(false);
+  const nextSession = getNextUpcomingEvent(specialEvents);
+  const coverUrl = coverFailed ? null : album.coverUrl || metadata?.coverUrl;
   const searchLinks = useMemo(() => getSearchLinks(album), [album]);
 
   useEffect(() => {
+    setCoverFailed(false);
+
     if (album.coverUrl) {
       setMetadata(null);
       return undefined;
@@ -52,7 +50,7 @@ function CurrentAlbum({ currentPoll, navigate, showAdminLink, specialEvents }) {
 
     async function loadAlbumMetadata() {
       try {
-        const nextMetadata = await fetchAlbumMetadata(album.title, controller.signal);
+        const nextMetadata = await fetchAlbumMetadata(album.title, controller.signal, album.artist);
 
         if (!controller.signal.aborted) {
           setMetadata(nextMetadata);
@@ -67,18 +65,23 @@ function CurrentAlbum({ currentPoll, navigate, showAdminLink, specialEvents }) {
     loadAlbumMetadata();
 
     return () => controller.abort();
-  }, [album.coverUrl, album.title]);
+  }, [album.artist, album.coverUrl, album.title]);
 
   return (
     <div className="sideb-page sideb-subpage sideb-current-page">
-      <SideBNav activePath="/current" navigate={navigate} showAdminLink={showAdminLink} />
-
-      <main className="sideb-subpage-main current-listen-main">
+      <main className="sideb-subpage-main current-listen-main" id="main-content" tabIndex="-1">
         <section className="current-record-room" aria-labelledby="current-album-title">
           <figure className="current-record-sleeve">
             <div className="current-cover-frame">
               {coverUrl ? (
-                <img src={coverUrl} alt={`${album.title} album cover`} />
+                <img
+                  alt={`${album.title} album cover`}
+                  decoding="async"
+                  height="600"
+                  onError={() => setCoverFailed(true)}
+                  src={coverUrl}
+                  width="600"
+                />
               ) : (
                 <div className="current-generated-cover" aria-hidden="true">
                   <span>{album.title.slice(0, 2)}</span>
@@ -100,7 +103,7 @@ function CurrentAlbum({ currentPoll, navigate, showAdminLink, specialEvents }) {
               </div>
               <div>
                 <dt>Location</dt>
-                <dd>{nextSession?.location || "Hayden Library C8"}</dd>
+                <dd>{nextSession?.location || "Watch club updates"}</dd>
               </div>
             </dl>
 

@@ -1,5 +1,4 @@
-import SideBNav from "../components/SideBNav";
-import "../styles/sideb-mock.css";
+import { getRecentEvents, getUpcomingEvents } from "../lib/siteContent";
 
 function EventCard({ event }) {
   return (
@@ -13,7 +12,7 @@ function EventCard({ event }) {
       <dl className="sideb-event-meta">
         <div>
           <dt>Date</dt>
-          <dd>{event.displayDate}</dd>
+          <dd><time dateTime={event.date}>{event.displayDate}</time></dd>
         </div>
         <div>
           <dt>Time</dt>
@@ -51,16 +50,14 @@ function EventSection({ emptyMessage, events, eyebrow, title }) {
   );
 }
 
-function Events({ specialEvents, navigate, showAdminLink }) {
-  const upcomingEvents = specialEvents.filter((event) => event.status === "upcoming");
-  const recentEvents = specialEvents.filter((event) => event.status === "recent");
+function Events({ specialEvents }) {
+  const upcomingEvents = getUpcomingEvents(specialEvents);
+  const recentEvents = getRecentEvents(specialEvents);
   const nextEvent = upcomingEvents[0];
 
   return (
     <div className="sideb-page sideb-subpage sideb-events-page">
-      <SideBNav activePath="/events" navigate={navigate} showAdminLink={showAdminLink} />
-
-      <main className="sideb-subpage-main">
+      <main className="sideb-subpage-main" id="main-content" tabIndex="-1">
         <section className="sideb-page-hero sideb-page-hero-split" aria-labelledby="events-title">
           <div>
             <p className="sideb-kicker">Events</p>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-function AuthPanel({ supabase }) {
+function AuthPanel({ redirectPath = "/account", supabase }) {
   const [mode, setMode] = useState("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,14 +24,18 @@ function AuthPanel({ supabase }) {
     setStatus(null);
     setIsOAuthSubmitting(true);
 
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/vote`,
-      },
-    });
+    try {
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}${redirectPath}`,
+        },
+      });
 
-    if (oauthError) {
+      if (oauthError) {
+        throw oauthError;
+      }
+    } catch (oauthError) {
       setError(oauthError.message || "Could not start Google sign in.");
       setIsOAuthSubmitting(false);
     }
@@ -92,8 +96,9 @@ function AuthPanel({ supabase }) {
 
   return (
     <div className="auth-panel">
-      <div className="auth-mode-switch" role="tablist" aria-label="Account mode">
+      <div className="auth-mode-switch" role="group" aria-label="Account mode">
         <button
+          aria-pressed={mode === "sign-in"}
           className={mode === "sign-in" ? "is-active" : ""}
           type="button"
           onClick={() => handleModeChange("sign-in")}
@@ -101,6 +106,7 @@ function AuthPanel({ supabase }) {
           Sign in
         </button>
         <button
+          aria-pressed={mode === "sign-up"}
           className={mode === "sign-up" ? "is-active" : ""}
           type="button"
           onClick={() => handleModeChange("sign-up")}
@@ -109,14 +115,16 @@ function AuthPanel({ supabase }) {
         </button>
       </div>
 
-      <button
-        className="button button-oauth"
-        type="button"
-        disabled={isOAuthSubmitting || isSubmitting}
-        onClick={handleGoogleSignIn}
-      >
-        {isOAuthSubmitting ? "Opening Google..." : "Continue with Google"}
-      </button>
+      {!isReset ? (
+        <button
+          className="button button-oauth"
+          type="button"
+          disabled={isOAuthSubmitting || isSubmitting}
+          onClick={handleGoogleSignIn}
+        >
+          {isOAuthSubmitting ? "Opening Google..." : "Continue with Google"}
+        </button>
+      ) : null}
 
       <form className="vote-form" onSubmit={handleSubmit}>
         {isSignUp ? (
@@ -154,16 +162,20 @@ function AuthPanel({ supabase }) {
               name="password"
               type="password"
               autoComplete={isSignUp ? "new-password" : "current-password"}
+              aria-describedby={isSignUp ? "accountPasswordHelp" : undefined}
               minLength={8}
               required
               value={password}
               onChange={(event) => setPassword(event.target.value)}
             />
+            {isSignUp ? (
+              <p className="field-help" id="accountPasswordHelp">Use at least 8 characters.</p>
+            ) : null}
           </div>
         ) : null}
 
-        {error ? <p className="form-error">{error}</p> : null}
-        {status ? <p className="form-success">{status}</p> : null}
+        {error ? <p className="form-error" role="alert">{error}</p> : null}
+        {status ? <p className="form-success" role="status">{status}</p> : null}
 
         <button className="button button-primary" type="submit" disabled={isSubmitting}>
           {isSubmitting
