@@ -1,33 +1,28 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
+import { getVisibleArchiveAlbums } from "../lib/archiveCatalog";
 import { getAlbumArchive } from "../lib/recordShelf";
+
+const archiveSortLabels = {
+  newest: "Newest first",
+  oldest: "Oldest first",
+  az: "A–Z",
+};
 
 function Archive() {
   const [searchTerm, setSearchTerm] = useState("");
-  const archiveAlbums = useMemo(() => getAlbumArchive().toReversed(), []);
-  const normalizedSearch = searchTerm.trim().toLowerCase();
-  const visibleAlbums = useMemo(() => {
-    if (!normalizedSearch) {
-      return archiveAlbums;
-    }
+  const [sortMode, setSortMode] = useState("newest");
+  const searchInputRef = useRef(null);
+  const archiveAlbums = useMemo(() => getAlbumArchive(), []);
+  const visibleAlbums = useMemo(
+    () => getVisibleArchiveAlbums(archiveAlbums, searchTerm, sortMode),
+    [archiveAlbums, searchTerm, sortMode],
+  );
+  const hasSearchTerm = Boolean(searchTerm.trim());
 
-    return archiveAlbums.filter((album) =>
-      `${album.title} ${album.artist}`.toLowerCase().includes(normalizedSearch),
-    );
-  }, [archiveAlbums, normalizedSearch]);
-  const recentAlbums = visibleAlbums.slice(0, 12);
-  const olderAlbums = visibleAlbums.slice(12);
-
-  function renderAlbumCard(album) {
-    return (
-      <article className="archive-card" key={album.id}>
-        <span className="archive-card-number">
-          Session {String(album.sessionNumber).padStart(3, "0")}
-        </span>
-        <h3>{album.title}</h3>
-        {album.artist ? <p>{album.artist}</p> : null}
-      </article>
-    );
+  function handleClearSearch() {
+    setSearchTerm("");
+    searchInputRef.current?.focus();
   }
 
   return (
@@ -49,61 +44,98 @@ function Archive() {
           </aside>
         </section>
 
-        <section className="sideb-panel archive-search-panel" aria-label="Search archive">
-          <div className="field-group">
+        <form
+          className="archive-toolbar"
+          onSubmit={(event) => event.preventDefault()}
+          role="search"
+        >
+          <div className="field-group archive-search-field">
             <label htmlFor="archiveSearch">Search archive</label>
-            <input
-              id="archiveSearch"
-              aria-controls="archive-results"
-              type="search"
-              placeholder="Album or artist"
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-            />
+            <div className="archive-search-control">
+              <input
+                id="archiveSearch"
+                aria-controls="archive-results"
+                aria-describedby="archive-results-summary"
+                autoComplete="off"
+                placeholder="Album, artist, or session number"
+                ref={searchInputRef}
+                spellCheck="false"
+                type="search"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+              />
+              {searchTerm ? (
+                <button
+                  aria-label="Clear archive search"
+                  className="archive-clear-button"
+                  onClick={handleClearSearch}
+                  type="button"
+                >
+                  Clear
+                </button>
+              ) : null}
+            </div>
           </div>
-          <p aria-live="polite">
+
+          <div className="field-group archive-sort-field">
+            <label htmlFor="archiveSort">Sort by</label>
+            <select
+              id="archiveSort"
+              value={sortMode}
+              onChange={(event) => setSortMode(event.target.value)}
+            >
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="az">A–Z</option>
+            </select>
+          </div>
+
+          <p id="archive-results-summary" aria-live="polite" role="status">
             Showing {visibleAlbums.length} of {archiveAlbums.length} archived albums.
           </p>
-        </section>
+        </form>
 
         <div id="archive-results">
-        {visibleAlbums.length ? (
-          <>
-            <section className="sideb-panel archive-section" aria-labelledby="recent-archive-heading">
-              <div className="sideb-section-heading">
+          {visibleAlbums.length ? (
+            <section className="archive-catalog-section" aria-labelledby="archive-results-heading">
+              <div className="archive-catalog-heading">
                 <div>
-                  <p>Newest</p>
-                  <h2 id="recent-archive-heading">Recent archive entries.</h2>
+                  <p className="sideb-kicker">Catalog</p>
+                  <h2 id="archive-results-heading">
+                    {hasSearchTerm ? "Matching records." : "Full listening history."}
+                  </h2>
                 </div>
+                <span>{archiveSortLabels[sortMode]}</span>
               </div>
 
-              <div className="archive-grid">
-                {recentAlbums.map(renderAlbumCard)}
-              </div>
+              <ul className="archive-catalog" aria-label="Archived albums">
+                {visibleAlbums.map((album) => (
+                  <li className="archive-catalog-row" key={album.id}>
+                    <span className="archive-catalog-session">
+                      Session {String(album.sessionNumber).padStart(3, "0")}
+                    </span>
+                    <span className="archive-catalog-title">{album.title}</span>
+                    <span
+                      className={album.artist
+                        ? "archive-catalog-artist"
+                        : "archive-catalog-artist archive-catalog-artist-missing"}
+                    >
+                      {album.artist || "Artist not listed"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </section>
-
-            {olderAlbums.length ? (
-              <section className="sideb-panel archive-section" aria-labelledby="older-archive-heading">
-                <div className="sideb-section-heading">
-                  <div>
-                    <p>History</p>
-                    <h2 id="older-archive-heading">Earlier listens.</h2>
-                  </div>
-                </div>
-
-                <div className="archive-grid archive-grid-compact">
-                  {olderAlbums.map(renderAlbumCard)}
-                </div>
-              </section>
-            ) : null}
-          </>
-        ) : (
-          <section className="sideb-panel archive-empty" aria-live="polite">
-            <p className="sideb-kicker">No match</p>
-            <h2>No archived albums match that search.</h2>
-            <p>Try another album title or artist.</p>
-          </section>
-        )}
+          ) : (
+            <section className="archive-empty" aria-labelledby="archive-empty-heading">
+              <p className="sideb-kicker">No match</p>
+              <h2 id="archive-empty-heading">No archived albums match that search.</h2>
+              <p>Try another album title, artist, or session number.</p>
+              <button className="button button-secondary" onClick={handleClearSearch} type="button">
+                Clear search
+              </button>
+            </section>
+          )}
         </div>
       </main>
     </div>

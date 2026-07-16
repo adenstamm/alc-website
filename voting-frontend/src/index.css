@@ -1,10 +1,10 @@
 :root {
   color-scheme: dark;
-  --color-ink: #0d0906;
-  --color-ink-soft: #130d09;
-  --color-surface: #1a120c;
-  --color-surface-raised: #21160f;
-  --color-surface-warm: #2a1a11;
+  --color-ink: #0c0907;
+  --color-ink-soft: #130e0b;
+  --color-surface: #1b130f;
+  --color-surface-raised: #251912;
+  --color-surface-warm: #302016;
   --color-cream: #f2e7d1;
   --color-cream-strong: #fff4dc;
   --color-muted: #b7a995;
@@ -15,10 +15,18 @@
   --color-olive: #849079;
   --color-danger: #e47f73;
   --color-success: #9fbd8c;
-  --border-subtle: rgba(231, 161, 94, 0.16);
-  --border-strong: rgba(231, 161, 94, 0.34);
-  --shadow-low: 0 14px 44px rgba(0, 0, 0, 0.18);
-  --shadow-high: 0 28px 80px rgba(0, 0, 0, 0.34);
+  --border-subtle: rgba(242, 231, 209, 0.08);
+  --border-strong: rgba(242, 231, 209, 0.17);
+  --border-accent: rgba(231, 161, 94, 0.4);
+  --shadow-low:
+    inset 0 1px rgba(255, 244, 220, 0.03),
+    0 12px 34px rgba(0, 0, 0, 0.22);
+  --shadow-high:
+    inset 0 1px rgba(255, 244, 220, 0.04),
+    0 24px 68px rgba(0, 0, 0, 0.32);
+  --radius-control: 9px;
+  --radius-card: 13px;
+  --radius-feature: 16px;
   --font-display: "Instrument Serif", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
   --font-body: "Work Sans", "Avenir Next", Avenir, "Segoe UI", sans-serif;
   --font-mono: "Space Mono", "SFMono-Regular", Consolas, monospace;
@@ -56,8 +64,8 @@ body {
   margin: 0;
   overflow-x: clip;
   background:
-    radial-gradient(circle at 88% 8%, rgba(151, 73, 31, 0.13), transparent 31rem),
-    radial-gradient(circle at 8% 62%, rgba(94, 56, 30, 0.12), transparent 34rem),
+    radial-gradient(circle at 88% 8%, rgba(169, 89, 43, 0.11), transparent 31rem),
+    radial-gradient(circle at 8% 62%, rgba(109, 62, 35, 0.12), transparent 34rem),
     var(--color-ink);
 }
 
