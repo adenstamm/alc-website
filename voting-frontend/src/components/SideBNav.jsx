@@ -87,13 +87,20 @@ function SideBNav({
       <a className="skip-link" href="#main-content">Skip to content</a>
 
       <div className="sideb-nav-inner">
-        <a className="sideb-brand" href="/" onClick={(event) => handleNavigate(event, "/")}>
-          <span className="sideb-logo" aria-hidden="true">
-            <span />
-          </span>
-          <span className="sideb-brand-copy">
-            <strong>side b</strong>
-            <small>listening room · 33⅓ rpm</small>
+        <a
+          aria-label="Album Listening Club home"
+          className="sideb-brand sideb-brand-image-link"
+          href="/"
+          onClick={(event) => handleNavigate(event, "/")}
+        >
+          <span className="sideb-brand-image-frame" aria-hidden="true">
+            <img
+              alt=""
+              className="sideb-brand-image"
+              height="1200"
+              src="/alc-logo.png"
+              width="1200"
+            />
           </span>
         </a>
 
