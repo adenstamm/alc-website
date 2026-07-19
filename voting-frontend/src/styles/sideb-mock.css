@@ -4998,3 +4998,108 @@
     margin-top: 54px;
   }
 }
+
+/* Above-the-fold subpage framing */
+.sideb-subpage-main {
+  padding-top: clamp(12px, 1.4vw, 18px);
+}
+
+.sideb-page-hero {
+  min-height: 0;
+  padding: clamp(26px, 3.4vw, 46px);
+}
+
+.sideb-page-hero h1,
+.page-title {
+  font-size: clamp(3.2rem, 5.2vw, 6rem);
+}
+
+.sideb-page-hero > p:not(.sideb-kicker),
+.sideb-page-hero > div > p:not(.sideb-kicker),
+.page-intro {
+  margin-top: 18px;
+  line-height: 1.55;
+}
+
+.sideb-next-card {
+  min-height: 200px;
+  padding: clamp(22px, 2.6vw, 32px);
+}
+
+.sideb-hero {
+  min-height: calc(100svh - 95px);
+}
+
+@media (min-width: 921px) {
+  .current-record-room {
+    min-height: 0;
+    grid-template-columns: minmax(300px, 0.9fr) minmax(0, 1.1fr);
+    gap: clamp(36px, 5.5vw, 76px);
+    padding: clamp(28px, 3.4vw, 46px);
+  }
+
+  .current-record-sleeve {
+    width: min(100%, 440px);
+    justify-self: center;
+  }
+
+  .current-signal-line {
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+  }
+
+  .current-record-copy > .sideb-kicker {
+    margin-bottom: 10px;
+  }
+
+  .current-record-copy h1 {
+    font-size: clamp(3.4rem, 5.5vw, 6.5rem);
+  }
+
+  .current-record-artist {
+    margin-top: 12px;
+    font-size: clamp(1.6rem, 2.8vw, 2.5rem);
+  }
+
+  .current-record-note {
+    margin-top: 10px;
+    line-height: 1.5;
+  }
+
+  .current-record-meta {
+    margin-top: 18px;
+    padding-top: 14px;
+  }
+
+  .current-listen-block {
+    margin-top: 18px;
+  }
+
+  .current-listen-block .sideb-kicker {
+    margin-bottom: 10px;
+  }
+
+  .current-listen-links a {
+    min-height: 40px;
+    padding-inline: 14px;
+  }
+
+  .current-record-footer {
+    margin-top: 20px;
+  }
+}
+
+@media (max-width: 920px) {
+  .sideb-subpage-main {
+    padding-top: 12px;
+  }
+
+  .sideb-page-hero {
+    padding: 26px;
+  }
+
+  .sideb-page-hero h1,
+  .page-title {
+    font-size: clamp(3rem, 10vw, 5rem);
+  }
+}
