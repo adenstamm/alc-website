@@ -5,15 +5,6 @@ import {
   getRecentShelfAlbums,
   loadRecordShelfCoverOverrides,
 } from "../lib/recordShelf";
-import { getNextUpcomingEvent } from "../lib/siteContent";
-
-function formatSessionDetails(nextSession) {
-  if (!nextSession) {
-    return "New date coming soon";
-  }
-
-  return `${nextSession.displayDate} at ${nextSession.time}`;
-}
 
 function Home({
   clubLinks,
@@ -21,7 +12,6 @@ function Home({
   hasSupabaseConfig,
   homeActions,
   navigate,
-  specialEvents,
   supabase,
 }) {
   const [albumMetadata, setAlbumMetadata] = useState({});
@@ -55,7 +45,6 @@ function Home({
     ],
     [homeActions],
   );
-  const nextSession = getNextUpcomingEvent(specialEvents);
   const currentAlbum = currentPoll.albumOfWeek;
   const configuredAlbumCover = currentAlbum.coverUrl || null;
   const albumCover = configuredAlbumCover === failedAlbumCover ? null : configuredAlbumCover;
@@ -330,24 +319,6 @@ function Home({
               </span>
             </a>
           </aside>
-        </section>
-
-        <section className="sideb-session-strip" aria-label="Next listening session">
-          <div className="sideb-session-inner">
-            <div className="sideb-strip-label">
-              <span className="sideb-strip-mark" aria-hidden="true" />
-              <strong>Next program</strong>
-            </div>
-            <p>
-              <span>Date &amp; time</span>
-              <strong>{formatSessionDetails(nextSession)}</strong>
-            </p>
-            <span><small>Room</small>{nextSession?.location || "Watch club updates"}</span>
-            <span><small>Format</small>Full album · group discussion</span>
-            <a href="/events" onClick={(event) => handleRouteLink(event, "/events")}>
-              View schedule <span aria-hidden="true">→</span>
-            </a>
-          </div>
         </section>
 
         <section className="sideb-link-grid" aria-label="Club links">
