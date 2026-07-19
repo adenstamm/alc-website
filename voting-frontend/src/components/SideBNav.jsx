@@ -102,6 +102,10 @@ function SideBNav({
               width="1200"
             />
           </span>
+          <span className="sideb-brand-wordmark" aria-hidden="true">
+            <strong>Album Listening Club</strong>
+            <small>Arizona State University</small>
+          </span>
         </a>
 
         <button
