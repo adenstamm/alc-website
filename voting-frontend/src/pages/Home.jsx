@@ -271,11 +271,6 @@ function Home({
           aria-labelledby="home-title"
         >
           <div className="sideb-hero-copy">
-            <div className="sideb-hero-signal" aria-label="Listening room status">
-              <span><i aria-hidden="true" /> Room signal</span>
-              <strong>Wednesday nights</strong>
-              <small>33⅓ RPM</small>
-            </div>
             <p className="sideb-kicker">New album every week · ASU</p>
             <h1 id="home-title">
               <span>Album Listening</span>

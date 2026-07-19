@@ -81,7 +81,7 @@ function SideBNav({
 
   return (
     <header
-      className={`sideb-nav ${activePath === "/" ? "sideb-nav-floating" : ""}`}
+      className="sideb-nav"
       ref={headerRef}
     >
       <a className="skip-link" href="#main-content">Skip to content</a>
@@ -96,11 +96,6 @@ function SideBNav({
             <small>listening room · 33⅓ rpm</small>
           </span>
         </a>
-
-        <span className="sideb-nav-signal" aria-label="Listening room signal active">
-          <i aria-hidden="true" />
-          Room signal
-        </span>
 
         <button
           aria-controls="primary-navigation"
