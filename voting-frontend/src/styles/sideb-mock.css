@@ -4213,7 +4213,7 @@
 
 /* Shared public-page editorial frame */
 .sideb-subpage-main {
-  padding-top: clamp(48px, 6vw, 82px);
+  padding-top: clamp(18px, 2.2vw, 30px);
 }
 
 .sideb-page-hero {
@@ -4695,7 +4695,7 @@
 
 @media (max-width: 920px) {
   .sideb-subpage-main {
-    padding-top: 36px;
+    padding-top: 20px;
   }
 
   .poll-sidebar {
