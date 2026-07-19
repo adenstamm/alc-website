@@ -91,6 +91,10 @@ function CurrentAlbum({ currentPoll, navigate, specialEvents }) {
           </figure>
 
           <div className="current-record-copy">
+            <div className="current-signal-line">
+              <span><i aria-hidden="true" /> Now spinning</span>
+              <small>{currentPoll.cycleLabel}</small>
+            </div>
             <p className="sideb-kicker">Current listen</p>
             <h1 id="current-album-title">{album.title}</h1>
             <p className="current-record-artist">{album.artist}</p>

@@ -271,6 +271,11 @@ function Home({
           aria-labelledby="home-title"
         >
           <div className="sideb-hero-copy">
+            <div className="sideb-hero-signal" aria-label="Listening room status">
+              <span><i aria-hidden="true" /> Room signal</span>
+              <strong>Wednesday nights</strong>
+              <small>33⅓ RPM</small>
+            </div>
             <p className="sideb-kicker">New album every week · ASU</p>
             <h1 id="home-title">
               <span>Album Listening</span>
@@ -304,7 +309,9 @@ function Home({
               href="/current"
               onClick={(event) => handleRouteLink(event, "/current")}
             >
-              <span className="sideb-floating-album-label">Now listening</span>
+              <span className="sideb-floating-album-label">
+                <i aria-hidden="true" /> Now spinning
+              </span>
               <span className="sideb-floating-album-art" aria-hidden="true">
                 {albumCover ? (
                   <img
@@ -324,7 +331,7 @@ function Home({
                 <span>{currentPoll.cycleLabel}</span>
                 <h2 id="home-current-album-title">{currentAlbum.title}</h2>
                 <span>{currentAlbum.artist}</span>
-                <small>Open current album <span aria-hidden="true">→</span></small>
+                <small>Open listening notes <span aria-hidden="true">→</span></small>
               </span>
             </a>
           </aside>
@@ -334,22 +341,22 @@ function Home({
           <div className="sideb-session-inner">
             <div className="sideb-strip-label">
               <span className="sideb-strip-mark" aria-hidden="true" />
-              <strong>Next session</strong>
+              <strong>Next program</strong>
             </div>
             <p>
-              <span>{currentPoll.albumOfWeek.artist}</span>
-              <strong>{currentPoll.albumOfWeek.title}</strong>
+              <span>Date &amp; time</span>
+              <strong>{formatSessionDetails(nextSession)}</strong>
             </p>
-            <span>{formatSessionDetails(nextSession)}</span>
-            <span>{nextSession?.location || "Watch club updates"}</span>
-            <a href="/current" onClick={(event) => handleRouteLink(event, "/current")}>
-              Current listen <span aria-hidden="true">→</span>
+            <span><small>Room</small>{nextSession?.location || "Watch club updates"}</span>
+            <span><small>Format</small>Full album · group discussion</span>
+            <a href="/events" onClick={(event) => handleRouteLink(event, "/events")}>
+              View schedule <span aria-hidden="true">→</span>
             </a>
           </div>
         </section>
 
         <section className="sideb-link-grid" aria-label="Club links">
-          {quickLinks.map((action) => (
+          {quickLinks.map((action, index) => (
             <a
               key={action.id}
               className="sideb-link-card"
@@ -358,7 +365,10 @@ function Home({
               target={action.kind === "external" ? "_blank" : undefined}
               rel={action.kind === "external" ? "noopener noreferrer" : undefined}
             >
-              <span>{action.label}</span>
+              <span className="sideb-link-card-channel">
+                <span>{action.label}</span>
+                <small>CH {String(index + 1).padStart(2, "0")}</small>
+              </span>
               <strong>{action.title}</strong>
               <p>{action.description}</p>
             </a>
@@ -448,7 +458,7 @@ function Home({
                         />
                       ) : null}
                     </div>
-                    <p>session {String(index + 1).padStart(2, "0")}</p>
+                    <p>listening log · {String(index + 1).padStart(2, "0")}</p>
                     <h3>{album.title}</h3>
                     <span>{artist}</span>
                   </article>

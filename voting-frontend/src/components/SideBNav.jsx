@@ -93,9 +93,14 @@ function SideBNav({
           </span>
           <span className="sideb-brand-copy">
             <strong>side b</strong>
-            <small>album listening club</small>
+            <small>listening room · 33⅓ rpm</small>
           </span>
         </a>
+
+        <span className="sideb-nav-signal" aria-label="Listening room signal active">
+          <i aria-hidden="true" />
+          Room signal
+        </span>
 
         <button
           aria-controls="primary-navigation"
@@ -117,7 +122,7 @@ function SideBNav({
           id="primary-navigation"
           aria-label="Primary navigation"
         >
-          {visibleNavItems.map((item) => {
+          {visibleNavItems.map((item, index) => {
             const isActive = item.path === activePath;
 
             return (
@@ -128,6 +133,7 @@ function SideBNav({
                 key={item.path}
                 onClick={(event) => handleNavigate(event, item.path)}
               >
+                <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
                 {item.label}
               </a>
             );

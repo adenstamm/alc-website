@@ -17,7 +17,7 @@ function SiteFooter({ clubLinks, navigate }) {
         <div className="site-footer-statement">
           <span className="sideb-logo" aria-hidden="true"><span /></span>
           <div>
-            <p>Album Listening Club</p>
+            <p><i aria-hidden="true" /> Room signal · ASU</p>
             <strong>One record. One week. A room full of opinions.</strong>
           </div>
         </div>
@@ -41,7 +41,7 @@ function SiteFooter({ clubLinks, navigate }) {
       </div>
 
       <div className="site-footer-fineprint">
-        <span>Side B · established 2020</span>
+        <span>Side B · listening log established 2020</span>
         <span>Student-led at Arizona State University</span>
       </div>
     </footer>
