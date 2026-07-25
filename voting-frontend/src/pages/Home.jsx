@@ -5,15 +5,6 @@ import {
   getRecentShelfAlbums,
   loadRecordShelfCoverOverrides,
 } from "../lib/recordShelf";
-import { getNextUpcomingEvent } from "../lib/siteContent";
-
-function formatSessionDetails(nextSession) {
-  if (!nextSession) {
-    return "New date coming soon";
-  }
-
-  return `${nextSession.displayDate} at ${nextSession.time}`;
-}
 
 function Home({
   clubLinks,
@@ -21,7 +12,6 @@ function Home({
   hasSupabaseConfig,
   homeActions,
   navigate,
-  specialEvents,
   supabase,
 }) {
   const [albumMetadata, setAlbumMetadata] = useState({});
@@ -55,7 +45,6 @@ function Home({
     ],
     [homeActions],
   );
-  const nextSession = getNextUpcomingEvent(specialEvents);
   const currentAlbum = currentPoll.albumOfWeek;
   const configuredAlbumCover = currentAlbum.coverUrl || null;
   const albumCover = configuredAlbumCover === failedAlbumCover ? null : configuredAlbumCover;
@@ -271,7 +260,7 @@ function Home({
           aria-labelledby="home-title"
         >
           <div className="sideb-hero-copy">
-            <p className="sideb-kicker">New album every week · ASU</p>
+            <p className="sideb-kicker">Album Listening Club at ASU</p>
             <h1 id="home-title">
               <span>Album Listening</span>
               <span>Club</span>
@@ -304,7 +293,9 @@ function Home({
               href="/current"
               onClick={(event) => handleRouteLink(event, "/current")}
             >
-              <span className="sideb-floating-album-label">Now listening</span>
+              <span className="sideb-floating-album-label">
+                <i aria-hidden="true" /> Now spinning
+              </span>
               <span className="sideb-floating-album-art" aria-hidden="true">
                 {albumCover ? (
                   <img
@@ -324,32 +315,14 @@ function Home({
                 <span>{currentPoll.cycleLabel}</span>
                 <h2 id="home-current-album-title">{currentAlbum.title}</h2>
                 <span>{currentAlbum.artist}</span>
-                <small>Open current album <span aria-hidden="true">→</span></small>
+                <small>Open listening notes <span aria-hidden="true">→</span></small>
               </span>
             </a>
           </aside>
         </section>
 
-        <section className="sideb-session-strip" aria-label="Next listening session">
-          <div className="sideb-session-inner">
-            <div className="sideb-strip-label">
-              <span className="sideb-strip-mark" aria-hidden="true" />
-              <strong>Next session</strong>
-            </div>
-            <p>
-              <span>{currentPoll.albumOfWeek.artist}</span>
-              <strong>{currentPoll.albumOfWeek.title}</strong>
-            </p>
-            <span>{formatSessionDetails(nextSession)}</span>
-            <span>{nextSession?.location || "Watch club updates"}</span>
-            <a href="/current" onClick={(event) => handleRouteLink(event, "/current")}>
-              Current listen <span aria-hidden="true">→</span>
-            </a>
-          </div>
-        </section>
-
         <section className="sideb-link-grid" aria-label="Club links">
-          {quickLinks.map((action) => (
+          {quickLinks.map((action, index) => (
             <a
               key={action.id}
               className="sideb-link-card"
@@ -358,7 +331,10 @@ function Home({
               target={action.kind === "external" ? "_blank" : undefined}
               rel={action.kind === "external" ? "noopener noreferrer" : undefined}
             >
-              <span>{action.label}</span>
+              <span className="sideb-link-card-channel">
+                <span>{action.label}</span>
+                <small>CH {String(index + 1).padStart(2, "0")}</small>
+              </span>
               <strong>{action.title}</strong>
               <p>{action.description}</p>
             </a>
@@ -448,7 +424,7 @@ function Home({
                         />
                       ) : null}
                     </div>
-                    <p>session {String(index + 1).padStart(2, "0")}</p>
+                    <p>Session {String(index + 1).padStart(2, "0")}</p>
                     <h3>{album.title}</h3>
                     <span>{artist}</span>
                   </article>

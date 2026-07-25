@@ -77,8 +77,16 @@ function CurrentAlbum({ currentPoll, navigate, specialEvents }) {
                 <img
                   alt={`${album.title} album cover`}
                   decoding="async"
+                  fetchPriority="high"
                   height="600"
+                  loading="eager"
+                  onLoad={(event) => {
+                    if (!event.currentTarget.naturalWidth) {
+                      setCoverFailed(true);
+                    }
+                  }}
                   onError={() => setCoverFailed(true)}
+                  referrerPolicy="no-referrer"
                   src={coverUrl}
                   width="600"
                 />
@@ -91,7 +99,10 @@ function CurrentAlbum({ currentPoll, navigate, specialEvents }) {
           </figure>
 
           <div className="current-record-copy">
-            <p className="sideb-kicker">Current listen</p>
+            <div className="current-signal-line">
+              <span><i aria-hidden="true" /> Now spinning</span>
+              <small>{currentPoll.cycleLabel}</small>
+            </div>
             <h1 id="current-album-title">{album.title}</h1>
             <p className="current-record-artist">{album.artist}</p>
             <p className="current-record-note">{album.note || "Current club listen"}</p>
@@ -108,7 +119,7 @@ function CurrentAlbum({ currentPoll, navigate, specialEvents }) {
             </dl>
 
             <div className="current-listen-block">
-              <p className="sideb-kicker">Listen</p>
+              <h2>Listen</h2>
               <div className="current-listen-links">
                 {searchLinks.map((link) => (
                   <a href={link.href} key={link.label} rel="noreferrer" target="_blank">

@@ -18,11 +18,11 @@ In Supabase:
 2. Enable Google.
 3. Paste the Google client id and client secret.
 4. Open Authentication > URL Configuration.
-5. Add the production site URL.
+5. Set **Site URL** to `https://albumasu.com`.
 6. Add redirect URLs for:
    - `http://localhost:5173/account`
-   - Production `/account`
-   - Production `/reset-password`
+   - `https://albumasu.com/account`
+   - `https://albumasu.com/reset-password`
 
 In the app:
 
@@ -61,6 +61,7 @@ Test these before sharing the site:
 6. Approve the Google account.
 7. Confirm that account can vote.
 8. Sign in as that user on `/account`, save a display name, and confirm `/admin` shows the updated name.
+9. Repeat Google sign-in from `https://albumasu.com/account` in a private browser window and confirm the callback returns to the production domain, not `localhost`.
 
 ## Important Notes
 

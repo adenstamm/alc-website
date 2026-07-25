@@ -36,6 +36,14 @@ function SideBNav({
     navigate(path);
   }
 
+  function handleSkipToContent(event) {
+    event.preventDefault();
+
+    const mainContent = document.getElementById("main-content");
+    mainContent?.focus({ preventScroll: true });
+    mainContent?.scrollIntoView({ block: "start" });
+  }
+
   useEffect(() => {
     const compactNavQuery = window.matchMedia("(max-width: 760px)");
 
@@ -81,19 +89,32 @@ function SideBNav({
 
   return (
     <header
-      className={`sideb-nav ${activePath === "/" ? "sideb-nav-floating" : ""}`}
+      className="sideb-nav"
       ref={headerRef}
     >
-      <a className="skip-link" href="#main-content">Skip to content</a>
+      <a className="skip-link" href="#main-content" onClick={handleSkipToContent}>
+        Skip to content
+      </a>
 
       <div className="sideb-nav-inner">
-        <a className="sideb-brand" href="/" onClick={(event) => handleNavigate(event, "/")}>
-          <span className="sideb-logo" aria-hidden="true">
-            <span />
+        <a
+          aria-label="Album Listening Club home"
+          className="sideb-brand sideb-brand-image-link"
+          href="/"
+          onClick={(event) => handleNavigate(event, "/")}
+        >
+          <span className="sideb-brand-image-frame" aria-hidden="true">
+            <img
+              alt=""
+              className="sideb-brand-image"
+              height="1200"
+              src="/alc-logo.png"
+              width="1200"
+            />
           </span>
-          <span className="sideb-brand-copy">
-            <strong>side b</strong>
-            <small>album listening club</small>
+          <span className="sideb-brand-wordmark" aria-hidden="true">
+            <strong>Album Listening Club</strong>
+            <small>Arizona State University</small>
           </span>
         </a>
 

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { getVisibleArchiveAlbums } from "../lib/archiveCatalog";
 import { getAlbumArchive } from "../lib/recordShelf";
@@ -6,19 +6,27 @@ import { getAlbumArchive } from "../lib/recordShelf";
 const archiveSortLabels = {
   newest: "Newest first",
   oldest: "Oldest first",
-  az: "A–Z",
+  az: "A-Z",
 };
+const ARCHIVE_PAGE_SIZE = 36;
 
 function Archive() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortMode, setSortMode] = useState("newest");
+  const [visibleCount, setVisibleCount] = useState(ARCHIVE_PAGE_SIZE);
   const searchInputRef = useRef(null);
   const archiveAlbums = useMemo(() => getAlbumArchive(), []);
   const visibleAlbums = useMemo(
     () => getVisibleArchiveAlbums(archiveAlbums, searchTerm, sortMode),
     [archiveAlbums, searchTerm, sortMode],
   );
+  const renderedAlbums = visibleAlbums.slice(0, visibleCount);
+  const remainingCount = Math.max(0, visibleAlbums.length - renderedAlbums.length);
   const hasSearchTerm = Boolean(searchTerm.trim());
+
+  useEffect(() => {
+    setVisibleCount(ARCHIVE_PAGE_SIZE);
+  }, [searchTerm, sortMode]);
 
   function handleClearSearch() {
     setSearchTerm("");
@@ -86,12 +94,13 @@ function Archive() {
             >
               <option value="newest">Newest</option>
               <option value="oldest">Oldest</option>
-              <option value="az">A–Z</option>
+              <option value="az">A-Z</option>
             </select>
           </div>
 
           <p id="archive-results-summary" aria-live="polite" role="status">
-            Showing {visibleAlbums.length} of {archiveAlbums.length} archived albums.
+            Showing {renderedAlbums.length} of {visibleAlbums.length}
+            {hasSearchTerm ? " matching" : ""} archived albums.
           </p>
         </form>
 
@@ -100,7 +109,6 @@ function Archive() {
             <section className="archive-catalog-section" aria-labelledby="archive-results-heading">
               <div className="archive-catalog-heading">
                 <div>
-                  <p className="sideb-kicker">Catalog</p>
                   <h2 id="archive-results-heading">
                     {hasSearchTerm ? "Matching records." : "Full listening history."}
                   </h2>
@@ -109,7 +117,7 @@ function Archive() {
               </div>
 
               <ul className="archive-catalog" aria-label="Archived albums">
-                {visibleAlbums.map((album) => (
+                {renderedAlbums.map((album) => (
                   <li className="archive-catalog-row" key={album.id}>
                     <span className="archive-catalog-session">
                       Session {String(album.sessionNumber).padStart(3, "0")}
@@ -125,6 +133,19 @@ function Archive() {
                   </li>
                 ))}
               </ul>
+
+              {remainingCount > 0 ? (
+                <div className="archive-load-more">
+                  <button
+                    className="button button-secondary"
+                    onClick={() => setVisibleCount((count) => count + ARCHIVE_PAGE_SIZE)}
+                    type="button"
+                  >
+                    Load {Math.min(ARCHIVE_PAGE_SIZE, remainingCount)} more
+                  </button>
+                  <span>{remainingCount} records remain</span>
+                </div>
+              ) : null}
             </section>
           ) : (
             <section className="archive-empty" aria-labelledby="archive-empty-heading">

@@ -119,15 +119,31 @@ function Account({
           </article>
 
           <aside className="account-side-note" aria-label="How account approval works">
-            <span className="account-note-number">01</span>
-            <div>
-              <p className="eyebrow">A small door policy</p>
-              <h3>Real listeners, considered ballots.</h3>
-              <p>
-                Verify your email after joining. A club admin will then approve your
-                membership before voting opens for the account.
-              </p>
-            </div>
+            <p className="eyebrow">How membership works</p>
+            <h3>Join the room in three steps.</h3>
+            <ol className="account-steps">
+              <li>
+                <span>01</span>
+                <div>
+                  <strong>Create your account</strong>
+                  <p>Use Google or sign up with your email.</p>
+                </div>
+              </li>
+              <li>
+                <span>02</span>
+                <div>
+                  <strong>Verify your email</strong>
+                  <p>Confirm the link we send to your inbox.</p>
+                </div>
+              </li>
+              <li>
+                <span>03</span>
+                <div>
+                  <strong>Get club access</strong>
+                  <p>Once approved, you can nominate albums and vote.</p>
+                </div>
+              </li>
+            </ol>
           </aside>
         </div>
       );
@@ -230,7 +246,7 @@ function Account({
   return (
     <div className="sideb-page sideb-subpage sideb-account-page">
       <main className="sideb-subpage-main" id="main-content" tabIndex="-1">
-        <section className="sideb-page-hero sideb-page-hero-split account-page-hero">
+        <section className="sideb-page-hero account-page-hero">
           <div>
             <p className="sideb-kicker">Your account</p>
             <h1>One pass for every side.</h1>
@@ -239,13 +255,6 @@ function Account({
               next listening-club vote.
             </p>
           </div>
-
-          <aside className="account-hero-pass" aria-label="Club account access">
-            <span>Side B · Member access</span>
-            <div className="account-hero-groove" aria-hidden="true"><i /></div>
-            <strong>{session ? accountName : "Guest list"}</strong>
-            <small>{session ? statusContent.label : "Sign in or create an account"}</small>
-          </aside>
         </section>
 
         {renderAccountBody()}

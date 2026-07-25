@@ -636,7 +636,7 @@ function Poll({
   return (
     <div className="sideb-page sideb-subpage sideb-vote-page">
       <main className="sideb-subpage-main" id="main-content" tabIndex="-1">
-        <section className="sideb-page-hero sideb-page-hero-split sideb-vote-hero">
+        <section className="sideb-page-hero sideb-vote-hero">
           <div>
             <p className="eyebrow">Voting page</p>
             <h1 className="page-title">{poll.question}</h1>

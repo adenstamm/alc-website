@@ -5,6 +5,8 @@
   --color-surface: #1b130f;
   --color-surface-raised: #251912;
   --color-surface-warm: #302016;
+  --color-console: var(--color-surface);
+  --color-console-raised: var(--color-surface-raised);
   --color-cream: #f2e7d1;
   --color-cream-strong: #fff4dc;
   --color-muted: #b7a995;
@@ -12,23 +14,27 @@
   --color-copper: #c97b3c;
   --color-copper-bright: #e7a15e;
   --color-copper-deep: #8e4b24;
+  --color-signal: var(--color-copper);
+  --color-signal-soft: var(--color-copper-bright);
   --color-olive: #849079;
   --color-danger: #e47f73;
   --color-success: #9fbd8c;
   --border-subtle: rgba(242, 231, 209, 0.08);
   --border-strong: rgba(242, 231, 209, 0.17);
   --border-accent: rgba(231, 161, 94, 0.4);
+  --border-console: var(--border-accent);
   --shadow-low:
     inset 0 1px rgba(255, 244, 220, 0.03),
     0 12px 34px rgba(0, 0, 0, 0.22);
   --shadow-high:
     inset 0 1px rgba(255, 244, 220, 0.04),
     0 24px 68px rgba(0, 0, 0, 0.32);
+  --shadow-signal: 0 0 22px rgba(201, 123, 60, 0.1);
   --radius-control: 9px;
   --radius-card: 13px;
   --radius-feature: 16px;
-  --font-display: "Instrument Serif", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-  --font-body: "Work Sans", "Avenir Next", Avenir, "Segoe UI", sans-serif;
+  --font-display: "Newsreader Variable", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-body: "Work Sans Variable", "Avenir Next", Avenir, "Segoe UI", sans-serif;
   --font-mono: "Space Mono", "SFMono-Regular", Consolas, monospace;
   --content-width: 1360px;
   --nav-height: 88px;
@@ -123,14 +129,5 @@ img {
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
-  }
-
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
   }
 }
