@@ -13,11 +13,13 @@ npm run dev
 
 Before sharing the production URL:
 
-- Add the production site URL in Supabase Authentication > URL Configuration.
-- Add production redirect URLs for `/account` and `/reset-password`.
+- Set the Supabase production Site URL to `https://albumasu.com`.
+- Add `https://albumasu.com/account` and `https://albumasu.com/reset-password`
+  to the Supabase redirect allow list.
 - Update the Google OAuth redirect URI in Google Cloud and Supabase.
 - Configure custom SMTP for reliable signup and password reset email.
 - Run `npm run lint`, `npm run test`, and `npm run build`.
+- Complete [`docs/production-launch-checklist.md`](docs/production-launch-checklist.md).
 
 ## Automated quality checks
 

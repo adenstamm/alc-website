@@ -20,36 +20,69 @@ const Admin = lazy(() => import("./pages/Admin"));
 const Archive = lazy(() => import("./pages/Archive"));
 const CurrentAlbum = lazy(() => import("./pages/CurrentAlbum"));
 const Events = lazy(() => import("./pages/Events"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 const Poll = lazy(() => import("./pages/Poll"));
+const Privacy = lazy(() => import("./pages/Privacy"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 
-const ROUTES = new Set(["/", "/account", "/admin", "/vote", "/events", "/about", "/archive", "/current", "/reset-password"]);
+const ROUTES = new Set(["/", "/account", "/admin", "/vote", "/events", "/about", "/archive", "/current", "/privacy", "/reset-password"]);
 const ROUTE_REDIRECTS = new Map([
   ["/results", "/vote"],
 ]);
-const ROUTE_TITLES = {
-  "/": "Album Listening Club",
-  "/account": "Account · Album Listening Club",
-  "/about": "About · Album Listening Club",
-  "/admin": "Admin · Album Listening Club",
-  "/archive": "Archive · Album Listening Club",
-  "/current": "Current Listen · Album Listening Club",
-  "/events": "Events · Album Listening Club",
-  "/reset-password": "Reset Password · Album Listening Club",
-  "/vote": "Vote · Album Listening Club",
+const ROUTE_META = {
+  "/": {
+    title: "Album Listening Club",
+    description: "Album Listening Club at Arizona State University: current listens, upcoming sessions, archive browsing, and member voting.",
+  },
+  "/account": {
+    title: "Account | Album Listening Club",
+    description: "Sign in, create an Album Listening Club account, and check your membership status.",
+  },
+  "/about": {
+    title: "About | Album Listening Club",
+    description: "Learn how Album Listening Club at Arizona State University listens, discusses, and votes together.",
+  },
+  "/admin": {
+    title: "Admin | Album Listening Club",
+    description: "Administration tools for Album Listening Club.",
+  },
+  "/archive": {
+    title: "Archive | Album Listening Club",
+    description: "Browse every album previously selected by Album Listening Club.",
+  },
+  "/current": {
+    title: "Current Listen | Album Listening Club",
+    description: "See the album Album Listening Club is currently listening to and find the next session.",
+  },
+  "/events": {
+    title: "Events | Album Listening Club",
+    description: "Find upcoming Album Listening Club sessions, record-store trips, concerts, and recent events.",
+  },
+  "/privacy": {
+    title: "Privacy | Album Listening Club",
+    description: "Read how Album Listening Club uses account and membership information.",
+  },
+  "/reset-password": {
+    title: "Reset Password | Album Listening Club",
+    description: "Reset your Album Listening Club account password.",
+  },
+  "/vote": {
+    title: "Vote | Album Listening Club",
+    description: "Nominate albums and cast your Album Listening Club ballot.",
+  },
 };
+const NOT_FOUND_META = {
+  title: "Page Not Found | Album Listening Club",
+  description: "The requested Album Listening Club page could not be found.",
+};
+const NO_INDEX_ROUTES = new Set(["/account", "/admin", "/reset-password"]);
+const SITE_ORIGIN = "https://albumasu.com";
 const POLL_ROUTES = new Set(["/", "/admin", "/current", "/vote"]);
 const EVENT_ROUTES = new Set(["/", "/admin", "/current", "/events"]);
 
 function normalizePath(pathname) {
   const normalizedPath = pathname.replace(/\/+$/, "") || "/";
-  const redirectPath = ROUTE_REDIRECTS.get(normalizedPath);
-
-  if (redirectPath) {
-    return redirectPath;
-  }
-
-  return ROUTES.has(normalizedPath) ? normalizedPath : "/";
+  return ROUTE_REDIRECTS.get(normalizedPath) || normalizedPath;
 }
 
 function getCurrentPath() {
@@ -60,6 +93,14 @@ function getCurrentPath() {
   }
 
   return normalizedPath;
+}
+
+function setMetaContent(selector, content) {
+  const element = document.querySelector(selector);
+
+  if (element) {
+    element.setAttribute("content", content);
+  }
 }
 
 function normalizeLivePoll(data) {
@@ -83,49 +124,68 @@ function App() {
   const [authReady, setAuthReady] = useState(!hasSupabaseConfig);
   const [session, setSession] = useState(null);
   const [membership, setMembership] = useState(null);
-  const [livePoll, setLivePoll] = useState(currentPoll);
-  const [liveEvents, setLiveEvents] = useState(specialEvents);
+  const [livePoll, setLivePoll] = useState(hasSupabaseConfig ? null : currentPoll);
+  const [liveEvents, setLiveEvents] = useState(hasSiteEventsConfig ? null : specialEvents);
+  const [pollReady, setPollReady] = useState(!hasSupabaseConfig);
+  const [eventsReady, setEventsReady] = useState(!hasSiteEventsConfig);
   const [pollError, setPollError] = useState(null);
 
   const refreshPoll = useCallback(async () => {
     if (!hasSupabaseConfig) {
       setLivePoll(currentPoll);
+      setPollReady(true);
       return currentPoll;
     }
 
-    const { data, error } = await supabase.rpc("get_current_poll");
+    try {
+      const { data, error } = await supabase.rpc("get_current_poll");
 
-    if (error) {
-      setPollError(error.message);
+      if (error) {
+        setPollError(error.message);
+        setLivePoll(currentPoll);
+        return currentPoll;
+      }
+
+      const nextPoll = normalizeLivePoll(data);
+      setPollError(null);
+      setLivePoll(nextPoll);
+      return nextPoll;
+    } catch (error) {
+      setPollError(error.message || "Could not load the current poll.");
       setLivePoll(currentPoll);
       return currentPoll;
+    } finally {
+      setPollReady(true);
     }
-
-    const nextPoll = normalizeLivePoll(data);
-    setPollError(null);
-    setLivePoll(nextPoll);
-    return nextPoll;
   }, []);
 
   const refreshEvents = useCallback(async () => {
     if (!hasSiteEventsConfig) {
       setLiveEvents(specialEvents);
+      setEventsReady(true);
       return specialEvents;
     }
 
-    const { data, error } = await supabase
-      .from("site_events")
-      .select("id, title, date, display_date, time, location, status, tag, description")
-      .order("date", { ascending: true });
+    try {
+      const { data, error } = await supabase
+        .from("site_events")
+        .select("id, title, date, display_date, time, location, status, tag, description")
+        .order("date", { ascending: true });
 
-    if (error) {
+      if (error) {
+        setLiveEvents(specialEvents);
+        return specialEvents;
+      }
+
+      const nextEvents = data.map(normalizeSiteEvent);
+      setLiveEvents(nextEvents);
+      return nextEvents;
+    } catch {
       setLiveEvents(specialEvents);
       return specialEvents;
+    } finally {
+      setEventsReady(true);
     }
-
-    const nextEvents = data.map(normalizeSiteEvent);
-    setLiveEvents(nextEvents);
-    return nextEvents;
   }, []);
 
   const loadMembership = useCallback(async (nextSession) => {
@@ -171,7 +231,22 @@ function App() {
   }, [currentPath, refreshEvents, refreshPoll]);
 
   useEffect(() => {
-    document.title = ROUTE_TITLES[currentPath] || ROUTE_TITLES["/"];
+    const isKnownRoute = ROUTES.has(currentPath);
+    const meta = ROUTE_META[currentPath] || NOT_FOUND_META;
+    const canonicalPath = isKnownRoute ? currentPath : "/404";
+    const canonicalUrl = `${SITE_ORIGIN}${canonicalPath === "/" ? "" : canonicalPath}`;
+    const shouldIndex = isKnownRoute && !NO_INDEX_ROUTES.has(currentPath);
+    const canonicalLink = document.querySelector('link[rel="canonical"]');
+
+    document.title = meta.title;
+    setMetaContent('meta[name="description"]', meta.description);
+    setMetaContent('meta[name="robots"]', shouldIndex ? "index, follow" : "noindex, nofollow");
+    setMetaContent('meta[property="og:title"]', meta.title);
+    setMetaContent('meta[property="og:description"]', meta.description);
+    setMetaContent('meta[property="og:url"]', canonicalUrl);
+    setMetaContent('meta[name="twitter:title"]', meta.title);
+    setMetaContent('meta[name="twitter:description"]', meta.description);
+    canonicalLink?.setAttribute("href", canonicalUrl);
 
     if (previousPath.current !== currentPath) {
       window.requestAnimationFrame(() => {
@@ -233,6 +308,24 @@ function App() {
   const showAdminLink = membership?.status === "approved" && membership?.role === "admin";
 
   function renderRoute() {
+    const routeNeedsPoll = POLL_ROUTES.has(currentPath);
+    const routeNeedsEvents = EVENT_ROUTES.has(currentPath);
+
+    if ((routeNeedsPoll && !pollReady) || (routeNeedsEvents && !eventsReady)) {
+      return (
+        <main className="route-data-loading" id="main-content" tabIndex="-1">
+          <div className="route-data-loading-art" aria-hidden="true">
+            <span />
+          </div>
+          <div>
+            <p className="sideb-kicker">Tuning the room</p>
+            <h1>Loading the latest club update.</h1>
+            <p>Fetching the current album, ballot, and session details.</p>
+          </div>
+        </main>
+      );
+    }
+
     if (currentPath === "/account") {
       return (
         <Account
@@ -283,7 +376,7 @@ function App() {
     }
 
     if (currentPath === "/events") {
-      return <Events specialEvents={liveEvents} />;
+      return <Events clubLinks={clubLinks} specialEvents={liveEvents} />;
     }
 
     if (currentPath === "/about") {
@@ -314,17 +407,25 @@ function App() {
       );
     }
 
-    return (
-      <Home
-        clubLinks={clubLinks}
-        currentPoll={livePoll}
-        hasSupabaseConfig={hasSupabaseConfig}
-        homeActions={homeActions}
-        navigate={navigate}
-        specialEvents={liveEvents}
-        supabase={supabase}
-      />
-    );
+    if (currentPath === "/privacy") {
+      return <Privacy />;
+    }
+
+    if (currentPath === "/") {
+      return (
+        <Home
+          clubLinks={clubLinks}
+          currentPoll={livePoll}
+          hasSupabaseConfig={hasSupabaseConfig}
+          homeActions={homeActions}
+          navigate={navigate}
+          specialEvents={liveEvents}
+          supabase={supabase}
+        />
+      );
+    }
+
+    return <NotFound navigate={navigate} />;
   }
 
   return (

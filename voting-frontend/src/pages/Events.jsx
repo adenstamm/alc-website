@@ -27,14 +27,11 @@ function EventCard({ event }) {
   );
 }
 
-function EventSection({ emptyMessage, events, eyebrow, title }) {
+function EventSection({ children, events, id, title }) {
   return (
-    <section className="sideb-panel" aria-labelledby={`${eyebrow.toLowerCase()}-events-heading`}>
+    <section className="sideb-panel events-section" aria-labelledby={id}>
       <div className="sideb-section-heading">
-        <div>
-          <p>{eyebrow}</p>
-          <h2 id={`${eyebrow.toLowerCase()}-events-heading`}>{title}</h2>
-        </div>
+        <h2 id={id}>{title}</h2>
       </div>
 
       {events.length > 0 ? (
@@ -44,13 +41,13 @@ function EventSection({ emptyMessage, events, eyebrow, title }) {
           ))}
         </div>
       ) : (
-        <p className="sideb-empty">{emptyMessage}</p>
+        children
       )}
     </section>
   );
 }
 
-function Events({ specialEvents }) {
+function Events({ clubLinks, specialEvents }) {
   const upcomingEvents = getUpcomingEvents(specialEvents);
   const recentEvents = getRecentEvents(specialEvents);
   const nextEvent = upcomingEvents[0];
@@ -58,41 +55,72 @@ function Events({ specialEvents }) {
   return (
     <div className="sideb-page sideb-subpage sideb-events-page">
       <main className="sideb-subpage-main" id="main-content" tabIndex="-1">
-        <section className="sideb-page-hero sideb-page-hero-split" aria-labelledby="events-title">
+        <section
+          className={`sideb-page-hero ${nextEvent ? "sideb-page-hero-split" : "events-page-hero-empty"}`}
+          aria-labelledby="events-title"
+        >
           <div>
             <p className="sideb-kicker">Events</p>
             <h1 id="events-title">Club plans beyond the weekly vote.</h1>
             <p>
-              Keep up with listening nights, record store runs, concerts, and the
-              occasional low-key hang outside the regular meeting rhythm.
+              Listening nights, record-store runs, concerts, and low-key hangs
+              beyond the regular meeting.
             </p>
           </div>
 
-          <aside className="sideb-next-card" aria-label="Next session">
-            <span>Next Session</span>
-            <strong>{nextEvent?.title || "Nothing posted yet"}</strong>
-            <p>
-              {nextEvent
-                ? `${nextEvent.displayDate} at ${nextEvent.time}`
-                : "Check back after the next club update."}
-            </p>
-            <small>{nextEvent?.location || "Album Listening Club"}</small>
-          </aside>
+          {nextEvent ? (
+            <aside className="sideb-next-card" aria-label="Next session">
+              <span>Next session</span>
+              <strong>{nextEvent.title}</strong>
+              <p>{nextEvent.displayDate} at {nextEvent.time}</p>
+              <small>{nextEvent.location}</small>
+            </aside>
+          ) : null}
         </section>
 
         <EventSection
-          emptyMessage="No upcoming events are posted yet."
           events={upcomingEvents}
-          eyebrow="Upcoming"
-          title="What is next."
-        />
+          id="upcoming-events-heading"
+          title="Upcoming gatherings"
+        >
+          <div className="events-empty-state">
+            <div>
+              <h3>No dates are posted yet.</h3>
+              <p>New sessions and club plans are announced through our official channels.</p>
+            </div>
+            <div className="events-empty-actions">
+              <a
+                className="sideb-button sideb-button-primary"
+                href={clubLinks.instagram}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Check Instagram
+              </a>
+              <a
+                className="sideb-button sideb-button-ghost"
+                href={clubLinks.sunDevilCentral}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Join the club
+              </a>
+            </div>
+          </div>
+        </EventSection>
 
         <EventSection
-          emptyMessage="No recent events are posted yet."
           events={recentEvents}
-          eyebrow="Recent"
-          title="What we just did."
-        />
+          id="recent-events-heading"
+          title="Recent gatherings"
+        >
+          <div className="events-empty-state events-empty-state-quiet">
+            <div>
+              <h3>No recent events are listed.</h3>
+              <p>Past sessions will appear here after club updates are published.</p>
+            </div>
+          </div>
+        </EventSection>
       </main>
     </div>
   );

@@ -5,8 +5,10 @@ Azure Bicep.
 
 The infrastructure includes the original locally redundant StorageV2 website
 and an Azure Static Web Apps Free instance for the production migration.
-Cloudflare Free will provide CDN, WAF, DDoS mitigation, and rate limiting in
-front of the Static Web App after the custom domain is connected.
+Cloudflare Free will provide the public DNS, CDN, TLS, and edge security layer
+after the custom domain is connected. Azure Static Web Apps Free does not
+support origin IP allowlisting, so the Azure-generated hostname remains a
+second public route to the app unless the service plan changes.
 
 ## Validate without creating resources
 

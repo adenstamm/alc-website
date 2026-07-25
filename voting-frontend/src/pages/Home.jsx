@@ -260,7 +260,7 @@ function Home({
           aria-labelledby="home-title"
         >
           <div className="sideb-hero-copy">
-            <p className="sideb-kicker">New album every week · ASU</p>
+            <p className="sideb-kicker">Album Listening Club at ASU</p>
             <h1 id="home-title">
               <span>Album Listening</span>
               <span>Club</span>
@@ -424,7 +424,7 @@ function Home({
                         />
                       ) : null}
                     </div>
-                    <p>listening log · {String(index + 1).padStart(2, "0")}</p>
+                    <p>Session {String(index + 1).padStart(2, "0")}</p>
                     <h3>{album.title}</h3>
                     <span>{artist}</span>
                   </article>

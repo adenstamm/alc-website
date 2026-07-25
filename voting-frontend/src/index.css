@@ -33,8 +33,8 @@
   --radius-control: 9px;
   --radius-card: 13px;
   --radius-feature: 16px;
-  --font-display: "Instrument Serif", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-  --font-body: "Work Sans", "Avenir Next", Avenir, "Segoe UI", sans-serif;
+  --font-display: "Newsreader Variable", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-body: "Work Sans Variable", "Avenir Next", Avenir, "Segoe UI", sans-serif;
   --font-mono: "Space Mono", "SFMono-Regular", Consolas, monospace;
   --content-width: 1360px;
   --nav-height: 88px;
@@ -129,14 +129,5 @@ img {
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
-  }
-
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
   }
 }

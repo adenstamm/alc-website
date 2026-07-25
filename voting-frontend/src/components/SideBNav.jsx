@@ -36,6 +36,14 @@ function SideBNav({
     navigate(path);
   }
 
+  function handleSkipToContent(event) {
+    event.preventDefault();
+
+    const mainContent = document.getElementById("main-content");
+    mainContent?.focus({ preventScroll: true });
+    mainContent?.scrollIntoView({ block: "start" });
+  }
+
   useEffect(() => {
     const compactNavQuery = window.matchMedia("(max-width: 760px)");
 
@@ -84,7 +92,9 @@ function SideBNav({
       className="sideb-nav"
       ref={headerRef}
     >
-      <a className="skip-link" href="#main-content">Skip to content</a>
+      <a className="skip-link" href="#main-content" onClick={handleSkipToContent}>
+        Skip to content
+      </a>
 
       <div className="sideb-nav-inner">
         <a
@@ -128,7 +138,7 @@ function SideBNav({
           id="primary-navigation"
           aria-label="Primary navigation"
         >
-          {visibleNavItems.map((item, index) => {
+          {visibleNavItems.map((item) => {
             const isActive = item.path === activePath;
 
             return (
@@ -139,7 +149,6 @@ function SideBNav({
                 key={item.path}
                 onClick={(event) => handleNavigate(event, item.path)}
               >
-                <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
                 {item.label}
               </a>
             );

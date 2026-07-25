@@ -17,31 +17,39 @@ function SiteFooter({ clubLinks, navigate }) {
         <div className="site-footer-statement">
           <span className="sideb-logo" aria-hidden="true"><span /></span>
           <div>
-            <p><i aria-hidden="true" /> Room signal · ASU</p>
+            <p>Album Listening Club</p>
             <strong>One record. One week. A room full of opinions.</strong>
           </div>
         </div>
 
-        <nav className="site-footer-links" aria-label="Footer navigation">
+        <nav className="site-footer-links" aria-label="Explore Album Listening Club">
+          <p className="site-footer-column-label">Keep listening</p>
           {footerLinks.map((link) => (
             <a
               href={link.path}
               key={link.path}
               onClick={(event) => handleNavigate(event, link.path)}
             >
-              {link.label}
+              <span>{link.label}</span>
+              <span className="site-footer-link-arrow" aria-hidden="true">↗</span>
             </a>
           ))}
         </nav>
 
         <div className="site-footer-external">
-          <a href={clubLinks.instagram} rel="noreferrer" target="_blank">Instagram</a>
-          <a href={clubLinks.sunDevilCentral} rel="noreferrer" target="_blank">Join on Sun Devil Central</a>
+          <p className="site-footer-column-label">Find the room</p>
+          <a href={clubLinks.instagram} rel="noreferrer" target="_blank">
+            <span>Instagram</span><span aria-hidden="true">↗</span>
+          </a>
+          <a href={clubLinks.sunDevilCentral} rel="noreferrer" target="_blank">
+            <span>Sun Devil Central</span><span aria-hidden="true">↗</span>
+          </a>
         </div>
       </div>
 
       <div className="site-footer-fineprint">
-        <span>Side B · listening log established 2020</span>
+        <span>Album Listening Club</span>
+        <a href="/privacy" onClick={(event) => handleNavigate(event, "/privacy")}>Privacy</a>
         <span>Student-led at Arizona State University</span>
       </div>
     </footer>

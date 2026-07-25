@@ -1,19 +1,70 @@
 {
-  "navigationFallback": {
-    "rewrite": "/index.html",
-    "exclude": [
-      "/assets/*",
-      "/*.css",
-      "/*.ico",
-      "/*.jpg",
-      "/*.js",
-      "/*.json",
-      "/*.png",
-      "/*.svg"
-    ]
+  "routes": [
+    {
+      "route": "/assets/*",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "route": "/results",
+      "redirect": "/vote",
+      "statusCode": 301
+    },
+    {
+      "route": "/account",
+      "rewrite": "/index.html",
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "route": "/admin",
+      "rewrite": "/index.html",
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "route": "/reset-password",
+      "rewrite": "/index.html",
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "route": "/about",
+      "rewrite": "/index.html"
+    },
+    {
+      "route": "/archive",
+      "rewrite": "/index.html"
+    },
+    {
+      "route": "/current",
+      "rewrite": "/index.html"
+    },
+    {
+      "route": "/events",
+      "rewrite": "/index.html"
+    },
+    {
+      "route": "/privacy",
+      "rewrite": "/index.html"
+    },
+    {
+      "route": "/vote",
+      "rewrite": "/index.html"
+    }
+  ],
+  "responseOverrides": {
+    "404": {
+      "rewrite": "/404.html"
+    }
   },
+  "trailingSlash": "never",
   "globalHeaders": {
-    "Content-Security-Policy": "default-src 'self'; base-uri 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://itunes.apple.com https://fonts.googleapis.com https://fonts.gstatic.com; font-src 'self' https://fonts.gstatic.com; form-action 'self'; frame-ancestors 'none'; frame-src 'none'; img-src 'self' data: blob: https://*.mzstatic.com https://*.supabase.co; manifest-src 'self'; object-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; worker-src 'self' blob:; upgrade-insecure-requests",
+    "Content-Security-Policy": "default-src 'self'; base-uri 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://itunes.apple.com; font-src 'self'; form-action 'self'; frame-ancestors 'none'; frame-src 'none'; img-src 'self' data: blob: https://*.mzstatic.com https://*.supabase.co https://*.bcbits.com; manifest-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self' blob:; upgrade-insecure-requests",
     "Cross-Origin-Opener-Policy": "same-origin",
     "Permissions-Policy": "camera=(), geolocation=(), microphone=(), payment=(), usb=()",
     "Referrer-Policy": "strict-origin-when-cross-origin",
