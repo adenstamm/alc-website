@@ -19,6 +19,18 @@ Before sharing the production URL:
 - Configure custom SMTP for reliable signup and password reset email.
 - Run `npm run lint`, `npm run test`, and `npm run build`.
 
+## Automated quality checks
+
+Run the complete local quality gate with:
+
+```sh
+npm run check
+```
+
+This runs linting, voting/content unit tests, a production build, and Playwright
+smoke tests across desktop Chromium and a mobile viewport. GitHub Actions runs
+the same gate for every pull request and push to `main`.
+
 ## Supabase voting setup
 
 Voting is backed by Supabase auth, approved memberships, and a database uniqueness rule.
