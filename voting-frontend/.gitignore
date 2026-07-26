@@ -18,6 +18,8 @@ dist-ssr
 coverage
 playwright-report
 test-results
+performance-results/*
+!performance-results/.gitkeep
 
 # Editor directories and files
 .vscode/*

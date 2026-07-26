@@ -1,66 +1,127 @@
-# Album Listening Club Website
+# AlbumASU application
 
-React/Vite frontend for the Album Listening Club site and voting flow.
+The production React, authentication, and voting application behind
+[albumasu.com](https://albumasu.com).
 
-## Local setup
+AlbumASU gives Arizona State University's Album Listening Club a single system
+for member approval, album nominations, primary elections, ranked final
+ballots, instant-runoff results, events, and its listening archive. The platform
+has supported more than 100 members across four production elections.
+
+For the project overview, architecture, and measured results, start with the
+[repository README](../README.md).
+
+## Product capabilities
+
+### Member experience
+
+- Email/password and Google OAuth authentication
+- Email verification and password recovery
+- Membership approval status
+- One nomination per election
+- One-to-five album primary ballots
+- Complete ranked ballots for five finalists
+- Persistent ballot confirmation and duplicate-vote prevention
+
+### Administrator experience
+
+- Approve, reject, and review memberships
+- Create polls and advance election phases
+- Review nomination and primary totals
+- Select and order five finalists
+- Inspect instant-runoff rounds and tie states
+- Edit current-album, event, and archive content
+
+### Public website
+
+- Current listening selection
+- Searchable and sortable album archive
+- Upcoming and recent events
+- Club information and privacy documentation
+- Responsive navigation and accessible keyboard flow
+
+## Voting integrity
+
+Critical election operations are implemented as PostgreSQL RPCs rather than a
+sequence of client-side writes. Each submission validates:
+
+- the authenticated user and approved membership;
+- the active election and expected phase;
+- one submission per user and phase;
+- candidate membership and ballot shape;
+- nomination bans and normalized album/artist names.
+
+The transaction either commits the complete vote and its choices or writes
+nothing. Database constraints, row-level security, restricted grants, and
+transactional functions provide overlapping protection.
+
+The deterministic instant-runoff engine is independently unit tested for
+multi-round transfers, exhausted ballots, invalid rankings, and ties.
+
+## Local development
 
 ```sh
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
-## Launch checklist
+Configure:
 
-Before sharing the production URL:
+```dotenv
+VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+VITE_SUPABASE_ANON_KEY=YOUR_ANON_KEY
+```
 
-- Set the Supabase production Site URL to `https://albumasu.com`.
-- Add `https://albumasu.com/account` and `https://albumasu.com/reset-password`
-  to the Supabase redirect allow list.
-- Update the Google OAuth redirect URI in Google Cloud and Supabase.
-- Configure custom SMTP for reliable signup and password reset email.
-- Run `npm run lint`, `npm run test`, and `npm run build`.
-- Complete [`docs/production-launch-checklist.md`](docs/production-launch-checklist.md).
+The public interface can run without Supabase configuration. Authentication,
+live membership state, and production voting require a configured project.
 
-## Automated quality checks
+## Database setup
 
-Run the complete local quality gate with:
+Apply the SQL files in this order:
+
+1. `supabase/schema.sql`
+2. `supabase/nomination-validation.sql`
+3. `supabase/three-phase-voting.sql`
+4. `supabase/site-content.sql`
+5. `supabase/security-hardening.sql` **last**
+
+Create the first account through `/account`, then promote its `memberships` row
+to `status = 'approved'` and `role = 'admin'`. Future accounts can be reviewed
+from the application admin page.
+
+Reapply `security-hardening.sql` after any older setup script because those
+scripts recreate their original grants and policies.
+
+## Quality and delivery
 
 ```sh
 npm run check
 ```
 
-This runs linting, voting/content unit tests, a production build, and Playwright
-smoke tests across desktop Chromium and a mobile viewport. GitHub Actions runs
-the same gate for every pull request and push to `main`.
+The quality gate runs:
 
-## Supabase voting setup
+1. ESLint
+2. Voting and content unit tests
+3. A production Vite build
+4. 22 Playwright tests across desktop Chromium and a mobile viewport
 
-Voting is backed by Supabase auth, approved memberships, and a database uniqueness rule.
+GitHub Actions executes the same gate for pull requests. Merges to `main`
+deploy the verified production build to Azure Static Web Apps.
 
-1. Create a Supabase project.
-2. Copy `.env.example` to `.env.local`.
-3. Fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
-4. Run the Supabase SQL files in this order:
-   - `supabase/schema.sql`
-   - `supabase/nomination-validation.sql`
-   - `supabase/three-phase-voting.sql`
-   - `supabase/site-content.sql`
-   - `supabase/security-hardening.sql` **last**
-5. Create your first account through `/account`.
-6. In Supabase, manually set that row in `memberships` to `status = 'approved'` and `role = 'admin'`.
-7. Use `/admin` to approve future members.
+## Performance testing
 
-The database enforces one vote per approved account per poll phase through the `votes_one_per_user_per_poll_phase` constraint.
+The k6 suite covers Azure page delivery and the public Supabase/PostgreSQL poll
+RPC. A controlled profile ramps to 100 concurrent virtual users; lightweight
+production smoke checks run every six hours.
 
-For phase-by-phase manual QA, see [`docs/manual-voting-test.md`](docs/manual-voting-test.md).
-For Google OAuth and SMTP launch setup, see [`docs/auth-launch-checklist.md`](docs/auth-launch-checklist.md).
-For the expected RLS/grant surface and read-only verification queries, see
-[`docs/supabase-security-checklist.md`](docs/supabase-security-checklist.md).
+- [Test design and safety constraints](docs/performance-testing.md)
+- [Verified 100-user benchmark](docs/performance-benchmark.md)
 
-Re-run `supabase/security-hardening.sql` after any older setup SQL file, because those files recreate their original grants and policies.
+## Operational documentation
 
-## Live site content
-
-Run `supabase/site-content.sql` to enable admin editing for the current album.
-The site uses bundled event content by default; to also manage events from Supabase,
-set `VITE_ENABLE_SITE_EVENTS=true` in `.env.local`.
+- [Production launch checklist](docs/production-launch-checklist.md)
+- [Authentication and email setup](docs/auth-launch-checklist.md)
+- [Supabase security verification](docs/supabase-security-checklist.md)
+- [Manual election test plan](docs/manual-voting-test.md)
+- [Azure infrastructure](infra/README.md)
