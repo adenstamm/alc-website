@@ -64,6 +64,17 @@ membership and election data.
 Every pull request runs the application quality gate. A push to `main` builds
 the production bundle with GitHub-managed secrets and deploys it only after
 linting, unit tests, build verification, and 22 Playwright tests pass.
+# Azure infrastructure
+
+This directory defines the Album Listening Club production infrastructure with
+Azure Bicep.
+
+The infrastructure includes the original locally redundant StorageV2 website
+and an Azure Static Web Apps Free instance for the production migration.
+Cloudflare Free will provide the public DNS, CDN, TLS, and edge security layer
+after the custom domain is connected. Azure Static Web Apps Free does not
+support origin IP allowlisting, so the Azure-generated hostname remains a
+second public route to the app unless the service plan changes.
 
 ## Validate without creating resources
 
@@ -73,7 +84,7 @@ az deployment group validate \
   --template-file infra/main.bicep
 ```
 
-## Preview changes
+## Preview Azure changes
 
 ```sh
 az deployment group what-if \
@@ -81,7 +92,7 @@ az deployment group what-if \
   --template-file infra/main.bicep
 ```
 
-## Deploy
+## Deploy after reviewing the preview
 
 ```sh
 az deployment group create \
@@ -90,19 +101,5 @@ az deployment group create \
   --template-file infra/main.bicep
 ```
 
-`validate` checks the template and parameters. `what-if` previews Azure resource
-changes without applying them. `create` performs the reviewed deployment.
-
-## Design decisions
-
-- **Bicep over portal-only configuration:** infrastructure can be reviewed,
-  reproduced, and discussed in source control.
-- **Managed static hosting:** the React application does not require a
-  continuously running web server.
-- **Cloudflare Free at the edge:** the production site gains CDN and baseline
-  security controls without the cost of Azure Application Gateway and Azure
-  Web Application Firewall.
-- **Separate data platform:** Supabase provides managed PostgreSQL and
-  authentication while Azure owns frontend delivery.
-
-Return to the [main project README](../../README.md).
+Validation and `what-if` do not provision the declared resources. The `create`
+command does.

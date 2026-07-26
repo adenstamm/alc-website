@@ -94,10 +94,25 @@ Reapply `security-hardening.sql` after any older setup script because those
 scripts recreate their original grants and policies.
 
 ## Quality and delivery
+- Set the Supabase production Site URL to `https://albumasu.com`.
+- Add `https://albumasu.com/account` and `https://albumasu.com/reset-password`
+  to the Supabase redirect allow list.
+- Update the Google OAuth redirect URI in Google Cloud and Supabase.
+- Configure custom SMTP for reliable signup and password reset email.
+- Run `npm run lint`, `npm run test`, and `npm run build`.
+- Complete [`docs/production-launch-checklist.md`](docs/production-launch-checklist.md).
+
+## Automated quality checks
+
+Run the complete local quality gate with:
 
 ```sh
 npm run check
 ```
+
+This runs linting, voting/content unit tests, a production build, and Playwright
+smoke tests across desktop Chromium and a mobile viewport. GitHub Actions runs
+the same gate for every pull request and push to `main`.
 
 The quality gate runs:
 
