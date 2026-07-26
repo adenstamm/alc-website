@@ -68,6 +68,7 @@ function AuthPanel({ redirectPath = "/account", supabase }) {
             email: cleanEmail,
             password,
             options: {
+              emailRedirectTo: `${window.location.origin}${redirectPath}`,
               data: {
                 display_name: displayName.trim(),
               },
