@@ -67,6 +67,34 @@ test("unknown routes preserve the URL and show a recoverable not-found page", as
   await expect(page.getByRole("link", { name: "Return home" })).toBeVisible();
 });
 
+test("signup confirmation only accepts the AlbumASU Supabase verification URL", async ({ page }) => {
+  const confirmationUrl = new URL(
+    "https://lbcjxqxzsmsmndapvluz.supabase.co/auth/v1/verify",
+  );
+  confirmationUrl.searchParams.set("token", "test-token");
+  confirmationUrl.searchParams.set("type", "signup");
+  confirmationUrl.searchParams.set("redirect_to", "https://albumasu.com/account");
+
+  await page.goto(`/confirm-signup?confirmation_url=${confirmationUrl.toString()}`);
+
+  const confirmLink = page.getByRole("link", { name: "Confirm email address" });
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("One last step.");
+  await expect(confirmLink).toHaveAttribute("href", confirmationUrl.toString());
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+    "content",
+    "noindex, nofollow",
+  );
+});
+
+test("signup confirmation rejects an untrusted verification URL", async ({ page }) => {
+  const untrustedUrl = "https://example.com/auth/v1/verify?token=test-token&type=signup&redirect_to=https://albumasu.com/account";
+
+  await page.goto(`/confirm-signup?confirmation_url=${untrustedUrl}`);
+
+  await expect(page.getByText("Request a fresh verification email.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Confirm email address" })).toHaveCount(0);
+});
+
 test("archive progressively reveals the full catalog", async ({ page }) => {
   await page.goto("/archive");
 

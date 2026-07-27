@@ -20,12 +20,13 @@ const Admin = lazy(() => import("./pages/Admin"));
 const Archive = lazy(() => import("./pages/Archive"));
 const CurrentAlbum = lazy(() => import("./pages/CurrentAlbum"));
 const Events = lazy(() => import("./pages/Events"));
+const ConfirmSignup = lazy(() => import("./pages/ConfirmSignup"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Poll = lazy(() => import("./pages/Poll"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 
-const ROUTES = new Set(["/", "/account", "/admin", "/vote", "/events", "/about", "/archive", "/current", "/privacy", "/reset-password"]);
+const ROUTES = new Set(["/", "/account", "/admin", "/vote", "/events", "/about", "/archive", "/current", "/privacy", "/reset-password", "/confirm-signup"]);
 const ROUTE_REDIRECTS = new Map([
   ["/results", "/vote"],
 ]);
@@ -54,6 +55,10 @@ const ROUTE_META = {
     title: "Current Listen | Album Listening Club",
     description: "See the album Album Listening Club is currently listening to and find the next session.",
   },
+  "/confirm-signup": {
+    title: "Confirm Email | Album Listening Club",
+    description: "Confirm the email address associated with an Album Listening Club account.",
+  },
   "/events": {
     title: "Events | Album Listening Club",
     description: "Find upcoming Album Listening Club sessions, record-store trips, concerts, and recent events.",
@@ -75,7 +80,7 @@ const NOT_FOUND_META = {
   title: "Page Not Found | Album Listening Club",
   description: "The requested Album Listening Club page could not be found.",
 };
-const NO_INDEX_ROUTES = new Set(["/account", "/admin", "/reset-password"]);
+const NO_INDEX_ROUTES = new Set(["/account", "/admin", "/confirm-signup", "/reset-password"]);
 const SITE_ORIGIN = "https://albumasu.com";
 const POLL_ROUTES = new Set(["/", "/admin", "/current", "/vote"]);
 const EVENT_ROUTES = new Set(["/", "/admin", "/current", "/events"]);
@@ -405,6 +410,10 @@ function App() {
           supabase={supabase}
         />
       );
+    }
+
+    if (currentPath === "/confirm-signup") {
+      return <ConfirmSignup navigate={navigate} />;
     }
 
     if (currentPath === "/privacy") {
