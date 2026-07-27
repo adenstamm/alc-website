@@ -119,7 +119,7 @@ The quality gate runs:
 1. ESLint
 2. Voting and content unit tests
 3. A production Vite build
-4. 22 Playwright tests across desktop Chromium and a mobile viewport
+4. 26 Playwright tests across desktop Chromium and a mobile viewport
 
 GitHub Actions executes the same gate for pull requests. Merges to `main`
 deploy the verified production build to Azure Static Web Apps.

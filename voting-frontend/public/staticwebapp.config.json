@@ -33,6 +33,13 @@
       }
     },
     {
+      "route": "/confirm-signup",
+      "rewrite": "/index.html",
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
       "route": "/about",
       "rewrite": "/index.html"
     },

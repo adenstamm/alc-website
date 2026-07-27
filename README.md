@@ -26,7 +26,7 @@ manage membership, election phases, finalists, events, and site content.
 | Load-test requests | 3,022 |
 | p95 response time | 151.57 ms |
 | Request failures | 0.00% |
-| Automated browser tests | 22 |
+| Automated browser tests | 26 |
 
 ## What makes it technically interesting
 
@@ -43,7 +43,7 @@ manage membership, election phases, finalists, events, and site content.
   behind Cloudflare DNS, CDN, strict TLS, bot mitigation, custom WAF rules, and
   rate limiting.
 - **Automated reliability:** GitHub Actions gates deployments on linting, unit
-  tests, production builds, and 22 Playwright tests across desktop and mobile.
+  tests, production builds, and 26 Playwright tests across desktop and mobile.
 - **Measured capacity:** A read-only k6 workload exercises both Azure delivery
   and the production Supabase/PostgreSQL poll RPC at 100 concurrent virtual
   users.
@@ -57,7 +57,7 @@ flowchart LR
     A --> S["Supabase Auth<br/>Google OAuth"]
     A --> P["Supabase PostgreSQL"]
     P --> R["Transactional RPCs<br/>RLS · grants · constraints"]
-    G["GitHub Actions"] --> T["Lint · unit · build<br/>22 Playwright tests"]
+    G["GitHub Actions"] --> T["Lint · unit · build<br/>26 Playwright tests"]
     T --> A
     K["k6 capacity tests"] --> A
     K --> P

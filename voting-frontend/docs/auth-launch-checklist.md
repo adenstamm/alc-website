@@ -41,6 +41,26 @@ In Supabase:
 3. Add the SMTP host, port, username, password, sender email, and sender name.
 4. Send a test email from the dashboard.
 5. Confirm SPF, DKIM, and DMARC records are configured with the email provider.
+6. Disable open and click tracking for authentication messages.
+7. Use a sender that can receive replies, such as `membership@auth.albumasu.com`.
+
+For the **Confirm signup** email template, keep the message short and route the
+visible link through AlbumASU:
+
+```html
+<h2>Confirm your AlbumASU account</h2>
+<p>Confirm your email address to finish creating your club account.</p>
+<p>
+  <a href="{{ .SiteURL }}/confirm-signup?confirmation_url={{ .ConfirmationURL }}">
+    Confirm email address
+  </a>
+</p>
+```
+
+The `/confirm-signup` page validates the embedded URL against the production
+Supabase project before showing the final verification button. This keeps the
+email link on `albumasu.com`, prevents automatic email scanners from consuming
+the single-use Supabase link, and rejects arbitrary redirect targets.
 
 Recommended providers:
 
