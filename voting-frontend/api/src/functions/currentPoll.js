@@ -1,6 +1,11 @@
 import { app } from "@azure/functions";
 
-import { checkRateLimit, getClientAddress, loadCurrentPoll } from "../lib/pollProxy.js";
+import {
+  checkRateLimit,
+  getClientAddress,
+  hasUserAccessToken,
+  loadCurrentPoll,
+} from "../lib/pollProxy.js";
 
 const SECURITY_HEADERS = {
   "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
@@ -31,7 +36,7 @@ app.http("current-poll", {
 
     try {
       const poll = await loadCurrentPoll(authorizationHeader);
-      const isAuthenticated = Boolean(authorizationHeader);
+      const isAuthenticated = hasUserAccessToken(authorizationHeader);
 
       return {
         status: 200,

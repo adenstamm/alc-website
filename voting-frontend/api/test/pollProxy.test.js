@@ -4,10 +4,17 @@ import test from "node:test";
 import {
   checkRateLimit,
   getClientAddress,
+  hasUserAccessToken,
   loadCurrentPoll,
   resetRateLimitsForTests,
   sanitizePublicPoll,
 } from "../src/lib/pollProxy.js";
+
+test("only JWT-shaped bearer values are treated as member sessions", () => {
+  assert.equal(hasUserAccessToken("Bearer header.payload.signature"), true);
+  assert.equal(hasUserAccessToken("Bearer azure-platform-token"), false);
+  assert.equal(hasUserAccessToken(null), false);
+});
 
 test("anonymous poll responses exclude ballot candidates and unexpected fields", () => {
   const result = sanitizePublicPoll({
@@ -95,9 +102,27 @@ test("member reads forward the bearer token with the public API key", async () =
     return Response.json({ id: "poll-1", candidates: [{ id: "member-visible" }] });
   };
 
-  const poll = await loadCurrentPoll("Bearer member-token", fetchMock);
+  const poll = await loadCurrentPoll("Bearer header.payload.signature", fetchMock);
 
   assert.equal(forwardedHeaders.apikey, "public-anon-key");
-  assert.equal(forwardedHeaders.Authorization, "Bearer member-token");
+  assert.equal(forwardedHeaders.Authorization, "Bearer header.payload.signature");
   assert.equal(poll.candidates[0].id, "member-visible");
+});
+
+test("platform bearer headers use the anonymous server path", async () => {
+  process.env.SUPABASE_URL = "https://example.supabase.co";
+  process.env.SUPABASE_ANON_KEY = "public-anon-key";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "server-only-key";
+
+  let forwardedHeaders;
+  const fetchMock = async (_url, options) => {
+    forwardedHeaders = options.headers;
+    return Response.json({ id: "poll-1", candidates: [{ id: "private" }] });
+  };
+
+  const poll = await loadCurrentPoll("Bearer azure-platform-token", fetchMock);
+
+  assert.equal(forwardedHeaders.apikey, "server-only-key");
+  assert.equal(forwardedHeaders.Authorization, "Bearer server-only-key");
+  assert.deepEqual(poll, { id: "poll-1", candidates: [], finalists: [] });
 });

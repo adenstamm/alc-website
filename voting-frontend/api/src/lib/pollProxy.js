@@ -97,9 +97,14 @@ function getSupabaseConfig() {
   return { supabaseAnonKey, supabaseServiceRoleKey, supabaseUrl };
 }
 
+export function hasUserAccessToken(authorizationHeader) {
+  return /^Bearer\s+[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/i
+    .test(authorizationHeader || "");
+}
+
 export async function loadCurrentPoll(authorizationHeader, fetchImpl = fetch) {
   const { supabaseAnonKey, supabaseServiceRoleKey, supabaseUrl } = getSupabaseConfig();
-  const hasUserToken = /^Bearer\s+\S+$/i.test(authorizationHeader || "");
+  const hasUserToken = hasUserAccessToken(authorizationHeader);
   const apiKey = hasUserToken ? supabaseAnonKey : supabaseServiceRoleKey;
   const authorization = hasUserToken
     ? authorizationHeader
