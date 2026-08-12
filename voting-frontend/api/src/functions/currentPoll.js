@@ -32,7 +32,9 @@ app.http("current-poll", {
       };
     }
 
-    const authorizationHeader = request.headers.get("authorization");
+    // Azure Static Web Apps may populate Authorization with its own platform
+    // token. Only trust the application-specific header set by our client.
+    const authorizationHeader = request.headers.get("x-albumasu-authorization");
 
     try {
       const poll = await loadCurrentPoll(authorizationHeader);
