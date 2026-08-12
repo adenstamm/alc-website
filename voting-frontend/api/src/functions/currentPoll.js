@@ -33,8 +33,10 @@ app.http("current-poll", {
     }
 
     // Azure Static Web Apps may populate Authorization with its own platform
-    // token. Only trust the application-specific header set by our client.
-    const authorizationHeader = request.headers.get("x-albumasu-authorization");
+    // token. Only trust the application-specific session value set by our
+    // same-origin client and rebuild the Supabase bearer header server-side.
+    const sessionToken = request.headers.get("x-albumasu-session");
+    const authorizationHeader = sessionToken ? `Bearer ${sessionToken}` : null;
 
     try {
       const poll = await loadCurrentPoll(authorizationHeader);

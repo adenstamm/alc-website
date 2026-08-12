@@ -19,8 +19,8 @@ test("member poll requests use the application-specific session header", async (
   }
 
   assert.equal(
-    requestOptions.headers["X-AlbumASU-Authorization"],
-    "Bearer header.payload.signature",
+    requestOptions.headers["X-AlbumASU-Session"],
+    "header.payload.signature",
   );
   assert.equal(requestOptions.headers.Authorization, undefined);
 });
@@ -40,6 +40,6 @@ test("anonymous poll requests do not send a session header", async () => {
     globalThis.fetch = originalFetch;
   }
 
-  assert.equal(requestOptions.headers["X-AlbumASU-Authorization"], undefined);
+  assert.equal(requestOptions.headers["X-AlbumASU-Session"], undefined);
   assert.equal(requestOptions.headers.Authorization, undefined);
 });

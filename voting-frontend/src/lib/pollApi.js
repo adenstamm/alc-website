@@ -4,7 +4,7 @@ export async function fetchCurrentPoll(session) {
   };
 
   if (session?.access_token) {
-    headers["X-AlbumASU-Authorization"] = `Bearer ${session.access_token}`;
+    headers["X-AlbumASU-Session"] = session.access_token;
   }
 
   const response = await fetch("/api/current-poll", {
