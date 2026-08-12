@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/prerender.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "node src/lib/votingLogic.test.js && node src/lib/siteContent.test.js && node src/lib/albumArchive.test.js && node src/lib/archiveCatalog.test.js && node src/lib/accountStatus.test.js",
+    "test": "node src/lib/votingLogic.test.js && node src/lib/siteContent.test.js && node src/lib/albumArchive.test.js && node src/lib/archiveCatalog.test.js && node src/lib/accountStatus.test.js && npm --prefix api test",
     "test:e2e": "playwright test",
     "check": "npm run lint && npm run test && npm run build && npm run test:e2e"
   },

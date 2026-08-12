@@ -5,10 +5,6 @@ export const RECORD_SHELF_BUCKET = "record-shelf-covers";
 
 const albumMetadataCache = new Map();
 
-const albumCoverOverrides = {
-  "flying beagle": "https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/3f/7e/cc/3f7ecc19-2dd8-88c5-0f1e-c2c4f997d51f/4582290397055.jpg/600x600bb.jpg",
-};
-
 const albumArtistOverrides = {
   "flying beagle": "Himiko Kikuchi",
 };
@@ -30,10 +26,6 @@ function normalizeLookupValue(value = "") {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
-}
-
-function getCoverOverride(title) {
-  return albumCoverOverrides[normalizeAlbumTitle(title)];
 }
 
 function getArtistOverride(title) {
@@ -81,13 +73,12 @@ export async function fetchAlbumMetadata(title, signal, artist = "") {
     { signal },
   );
 
-  const coverOverride = getCoverOverride(title);
   const artistOverride = getArtistOverride(title);
 
   if (!response.ok) {
     const fallbackMetadata = {
       artist: artistOverride || artist || "Unknown artist",
-      coverUrl: coverOverride || null,
+      coverUrl: null,
     };
 
     albumMetadataCache.set(cacheKey, fallbackMetadata);
@@ -110,7 +101,7 @@ export async function fetchAlbumMetadata(title, signal, artist = "") {
 
   const metadata = {
     artist: artistOverride || artist || result?.artistName || "Unknown artist",
-    coverUrl: coverOverride || (artworkUrl ? artworkUrl.replace("100x100bb", "600x600bb") : null),
+    coverUrl: artworkUrl ? artworkUrl.replace("100x100bb", "600x600bb") : null,
   };
 
   albumMetadataCache.set(cacheKey, metadata);

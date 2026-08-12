@@ -2430,6 +2430,20 @@
   line-height: 1.5;
 }
 
+.turnstile-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(242, 231, 209, 0.12);
+  border-radius: var(--radius-control);
+  background: rgba(7, 5, 3, 0.3);
+}
+
+.turnstile-field > div:first-child {
+  min-height: 65px;
+}
+
 .field-group input,
 .field-group textarea,
 .field-group select {

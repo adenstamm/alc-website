@@ -2,7 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="1200x1200" href="/alc-logo.png" />
+    <link rel="apple-touch-icon" href="/alc-logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
@@ -19,19 +20,57 @@
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://albumasu.com" />
-    <meta property="og:image" content="/sideb-turntable-hero.jpg" />
+    <meta property="og:image" content="https://albumasu.com/sideb-turntable-hero.jpg" />
+    <meta property="og:image:width" content="1609" />
+    <meta property="og:image:height" content="978" />
+    <meta property="og:image:alt" content="A turntable in the Album Listening Club listening room" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Album Listening Club" />
     <meta
       name="twitter:description"
       content="Current listens, upcoming sessions, archive browsing, and member voting for Album Listening Club."
     />
-    <meta name="twitter:image" content="/sideb-turntable-hero.jpg" />
+    <meta name="twitter:image" content="https://albumasu.com/sideb-turntable-hero.jpg" />
+    <meta name="twitter:image:alt" content="A turntable in the Album Listening Club listening room" />
     <link rel="canonical" href="https://albumasu.com" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://albumasu.com/#organization",
+            "name": "Album Listening Club at ASU",
+            "url": "https://albumasu.com",
+            "logo": "https://albumasu.com/alc-logo.png",
+            "sameAs": ["https://www.instagram.com/albumasu/"]
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://albumasu.com/#website",
+            "url": "https://albumasu.com",
+            "name": "Album Listening Club",
+            "publisher": { "@id": "https://albumasu.com/#organization" }
+          }
+        ]
+      }
+    </script>
     <title>Album Listening Club</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root" data-prerendered-route="/">
+      <main id="main-content">
+        <h1>Album Listening Club</h1>
+        <p>One record. One week. A room full of opinions. Wednesday nights at ASU.</p>
+        <nav aria-label="Public pages">
+          <a href="/current">Current listen</a> ·
+          <a href="/events">Events</a> ·
+          <a href="/archive">Archive</a> ·
+          <a href="/vote">Vote</a> ·
+          <a href="/about">About</a>
+        </nav>
+      </main>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

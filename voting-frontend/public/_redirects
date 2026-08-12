@@ -1,1 +1,12 @@
-/* /index.html 200
+/results /vote 301
+/account /account/index.html 200
+/admin /admin/index.html 200
+/reset-password /reset-password/index.html 200
+/confirm-signup /confirm-signup/index.html 200
+/about /about/index.html 200
+/archive /archive/index.html 200
+/current /current/index.html 200
+/events /events/index.html 200
+/privacy /privacy/index.html 200
+/vote /vote/index.html 200
+/* /404.html 404

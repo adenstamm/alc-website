@@ -71,10 +71,16 @@ Configure:
 ```dotenv
 VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 VITE_SUPABASE_ANON_KEY=YOUR_ANON_KEY
+VITE_TURNSTILE_SITE_KEY=YOUR_PUBLIC_TURNSTILE_SITE_KEY
 ```
 
 The public interface can run without Supabase configuration. Authentication,
 live membership state, and production voting require a configured project.
+
+The production `/api/current-poll` function additionally requires
+`SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` as
+server-side Azure application settings. The service-role key must never be put
+in a `VITE_` variable or shipped to the browser.
 
 ## Database setup
 
@@ -114,6 +120,11 @@ This runs linting, voting/content unit tests, a production build, and Playwright
 smoke tests across desktop Chromium and a mobile viewport. GitHub Actions runs
 the same gate for every pull request and push to `main`.
 
+The production build also prerenders every known route into its own HTML file.
+Public pages therefore ship useful headings, descriptions, social metadata, and
+canonical URLs before React starts; authenticated routes ship equivalent
+`noindex` fallbacks.
+
 The quality gate runs:
 
 1. ESLint
@@ -126,9 +137,9 @@ deploy the verified production build to Azure Static Web Apps.
 
 ## Performance testing
 
-The k6 suite covers Azure page delivery and the public Supabase/PostgreSQL poll
-RPC. A controlled profile ramps to 100 concurrent virtual users; lightweight
-production smoke checks run every six hours.
+The k6 suite covers Cloudflare/Azure page delivery and the rate-limited
+same-origin poll API. Lightweight, read-only production smoke checks run every
+six hours; load testing is restricted to an isolated staging environment.
 
 - [Test design and safety constraints](docs/performance-testing.md)
 - [Verified 100-user benchmark](docs/performance-benchmark.md)

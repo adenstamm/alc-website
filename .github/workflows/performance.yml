@@ -4,23 +4,6 @@ on:
   schedule:
     - cron: "17 */6 * * *"
   workflow_dispatch:
-    inputs:
-      profile:
-        description: Test intensity
-        required: true
-        default: smoke
-        type: choice
-        options:
-          - smoke
-          - load
-      target:
-        description: Web delivery layer
-        required: true
-        default: edge
-        type: choice
-        options:
-          - edge
-          - azure-origin
 
 permissions:
   contents: read
@@ -38,20 +21,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      TEST_PROFILE: ${{ github.event_name == 'schedule' && 'smoke' || inputs.profile }}
-      BASE_URL: ${{ (github.event_name == 'schedule' || inputs.target == 'edge') && 'https://albumasu.com' || 'https://thankful-sand-0f7aa4a10.7.azurestaticapps.net' }}
-      SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-      SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      TEST_PROFILE: smoke
+      BASE_URL: https://albumasu.com
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Reject unsafe edge load tests
-        if: env.TEST_PROFILE == 'load' && inputs.target == 'edge'
-        run: |
-          echo "The load profile must target azure-origin."
-          echo "Cloudflare correctly rate-limits a single runner and would skew the result."
-          exit 1
 
       - uses: grafana/setup-k6-action@v1
         with:

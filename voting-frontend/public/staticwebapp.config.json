@@ -13,55 +13,55 @@
     },
     {
       "route": "/account",
-      "rewrite": "/index.html",
+      "rewrite": "/account/index.html",
       "headers": {
-        "Cache-Control": "no-store"
+        "Cache-Control": "no-store, no-transform"
       }
     },
     {
       "route": "/admin",
-      "rewrite": "/index.html",
+      "rewrite": "/admin/index.html",
       "headers": {
-        "Cache-Control": "no-store"
+        "Cache-Control": "no-store, no-transform"
       }
     },
     {
       "route": "/reset-password",
-      "rewrite": "/index.html",
+      "rewrite": "/reset-password/index.html",
       "headers": {
-        "Cache-Control": "no-store"
+        "Cache-Control": "no-store, no-transform"
       }
     },
     {
       "route": "/confirm-signup",
-      "rewrite": "/index.html",
+      "rewrite": "/confirm-signup/index.html",
       "headers": {
-        "Cache-Control": "no-store"
+        "Cache-Control": "no-store, no-transform"
       }
     },
     {
       "route": "/about",
-      "rewrite": "/index.html"
+      "rewrite": "/about/index.html"
     },
     {
       "route": "/archive",
-      "rewrite": "/index.html"
+      "rewrite": "/archive/index.html"
     },
     {
       "route": "/current",
-      "rewrite": "/index.html"
+      "rewrite": "/current/index.html"
     },
     {
       "route": "/events",
-      "rewrite": "/index.html"
+      "rewrite": "/events/index.html"
     },
     {
       "route": "/privacy",
-      "rewrite": "/index.html"
+      "rewrite": "/privacy/index.html"
     },
     {
       "route": "/vote",
-      "rewrite": "/index.html"
+      "rewrite": "/vote/index.html"
     }
   ],
   "responseOverrides": {
@@ -71,7 +71,8 @@
   },
   "trailingSlash": "never",
   "globalHeaders": {
-    "Content-Security-Policy": "default-src 'self'; base-uri 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://itunes.apple.com; font-src 'self'; form-action 'self'; frame-ancestors 'none'; frame-src 'none'; img-src 'self' data: blob: https://*.mzstatic.com https://*.supabase.co https://*.bcbits.com; manifest-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self' blob:; upgrade-insecure-requests",
+    "Cache-Control": "public, must-revalidate, max-age=30, no-transform",
+    "Content-Security-Policy": "default-src 'self'; base-uri 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://itunes.apple.com https://challenges.cloudflare.com; font-src 'self'; form-action 'self'; frame-ancestors 'none'; frame-src https://challenges.cloudflare.com; img-src 'self' data: blob: https://*.mzstatic.com https://*.supabase.co https://*.bcbits.com; manifest-src 'self'; object-src 'none'; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; worker-src 'self' blob:; upgrade-insecure-requests",
     "Cross-Origin-Opener-Policy": "same-origin",
     "Permissions-Policy": "camera=(), geolocation=(), microphone=(), payment=(), usb=()",
     "Referrer-Policy": "strict-origin-when-cross-origin",
@@ -81,5 +82,8 @@
   },
   "mimeTypes": {
     ".json": "application/json"
+  },
+  "platform": {
+    "apiRuntime": "node:22"
   }
 }

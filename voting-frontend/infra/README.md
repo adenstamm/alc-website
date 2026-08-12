@@ -1,80 +1,60 @@
 # AlbumASU cloud infrastructure
 
-This directory contains the Azure Bicep definition for
-[AlbumASU](https://albumasu.com), a production election platform serving
-Arizona State University's Album Listening Club.
-
-The infrastructure is intentionally small, reproducible, and cost-conscious:
-Azure Static Web Apps provides managed global delivery while Cloudflare adds
-the public domain, CDN, strict TLS, DDoS protection, bot mitigation, custom WAF
-rules, and rate limiting.
+This directory contains the production infrastructure definition and the
+reviewable Cloudflare security baseline for [AlbumASU](https://albumasu.com).
 
 ## Architecture
 
 ```mermaid
 flowchart LR
     U["Public traffic"] --> C["Cloudflare edge"]
-    C --> A["Azure Static Web Apps"]
+    C --> A["Azure Static Web Apps Free"]
     A --> S["React production build"]
-    G["GitHub Actions"] --> Q["Lint · tests · build"]
+    A --> F["Managed /api/current-poll function"]
+    F --> D["Supabase"]
+    G["GitHub Actions"] --> Q["Lint · tests · build · browser tests"]
     Q --> A
-    B["Azure Bicep"] --> A
-    B --> L["StorageV2 fallback"]
 ```
 
-## What the template provisions
+Cloudflare supplies strict TLS, HTTPS enforcement, DDoS and bot protection,
+custom exploit-probe blocking, and a per-IP API limit for the public domain.
+Azure Static Web Apps Free leaves its generated hostname reachable, so the API
+also enforces its own per-IP limit and Supabase remains the authorization
+boundary. Production links, monitors, and load tests must use the Cloudflare
+domain rather than advertising or targeting the Azure hostname.
 
-### Azure Static Web Apps
+## Files
 
-- Free-tier managed static hosting
-- Azure-generated production hostname
-- Environment and ownership tags
-- Output values used by deployment and DNS configuration
+- `main.bicep` provisions Azure Static Web Apps Free and the hardened
+  StorageV2 fallback resource.
+- `cloudflare-security.json` records the Cloudflare settings and rules that must
+  be applied to the `albumasu.com` zone.
+- `cloudflare-security.schema.json` validates that baseline's structure.
+- `../public/staticwebapp.config.json` contains routing, API runtime, and
+  browser security headers.
 
-### Hardened StorageV2 resource
+The Cloudflare manifest is desired-state documentation. Cloudflare dashboard
+changes must be checked against it during every production release.
 
-The template retains the original static-site resource as an infrastructure
-exercise and fallback origin. It uses:
+## Application security boundary
 
-- locally redundant storage;
-- HTTPS-only traffic and TLS 1.2 minimum;
-- disabled anonymous blob access;
-- disabled shared-key access;
-- Microsoft Entra ID as the default authentication method;
-- disabled cross-tenant replication;
-- seven-day soft-delete retention.
+The public poll read goes through `/api/current-poll`, which has an application
+rate limiter and returns candidate/finalist arrays only to approved members.
+Direct anonymous execution of `get_current_poll()` is revoked in Supabase.
 
-## Delivery and security boundaries
+Email signup, password login, and password reset include Cloudflare Turnstile
+tokens that Supabase verifies. The Turnstile secret and Supabase service-role
+key are server-side settings only and must never use a `VITE_` prefix.
 
-Cloudflare terminates public edge traffic for `albumasu.com` and proxies it to
-Azure. The production configuration uses strict TLS, HTTPS enforcement, bot
-protection, a custom exploit-probe rule, and IP-based burst limiting.
+Required Azure Static Web App application settings:
 
-Azure Static Web Apps Free does not support origin IP allowlisting. Its
-Azure-generated hostname therefore remains publicly reachable alongside the
-Cloudflare-protected custom domain. This limitation is documented rather than
-presented as private-origin isolation.
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
 
-Application authorization is separate from edge security. Supabase Auth,
-PostgreSQL row-level security, function grants, and transactional RPCs protect
-membership and election data.
+Required GitHub Actions build secret:
 
-## Deployment workflow
-
-Every pull request runs the application quality gate. A push to `main` builds
-the production bundle with GitHub-managed secrets and deploys it only after
-linting, unit tests, build verification, and 22 Playwright tests pass.
-# Azure infrastructure
-
-This directory defines the Album Listening Club production infrastructure with
-Azure Bicep.
-
-The infrastructure includes the original locally redundant StorageV2 website
-and an Azure Static Web Apps Free instance for the production migration.
-Cloudflare Free will provide the public DNS, CDN, TLS, and edge security layer
-after the custom domain is connected. Azure Static Web Apps Free does not
-support origin IP allowlisting, so the Azure-generated hostname remains a
-second public route to the app unless the service plan changes.
+- `VITE_TURNSTILE_SITE_KEY` (the public Turnstile site key)
 
 ## Validate without creating resources
 
@@ -101,5 +81,5 @@ az deployment group create \
   --template-file infra/main.bicep
 ```
 
-Validation and `what-if` do not provision the declared resources. The `create`
-command does.
+Validation and `what-if` do not provision resources. The `create` command can
+change billable infrastructure and must only run after its preview is reviewed.

@@ -1,0 +1,41 @@
+{
+  "$schema": "./cloudflare-security.schema.json",
+  "zone": "albumasu.com",
+  "settings": {
+    "sslMode": "strict",
+    "minimumTlsVersion": "1.2",
+    "alwaysUseHttps": true,
+    "botFightMode": true,
+    "browserIntegrityCheck": false
+  },
+  "customRules": [
+    {
+      "name": "Block common exploit probes",
+      "action": "block",
+      "expression": "http.request.uri.path contains \"/.env\" or http.request.uri.path contains \"/.git\" or http.request.uri.path eq \"/wp-login.php\" or http.request.uri.path contains \"/wp-admin\" or http.request.uri.path eq \"/xmlrpc.php\""
+    }
+  ],
+  "rateLimitingRules": [
+    {
+      "name": "Limit abusive request bursts",
+      "action": "block",
+      "expression": "http.host eq \"albumasu.com\" or http.host eq \"www.albumasu.com\"",
+      "characteristics": [
+        "ip.src"
+      ],
+      "requestsPerPeriod": 200,
+      "periodSeconds": 10,
+      "mitigationTimeoutSeconds": 10
+    }
+  ],
+  "origin": {
+    "provider": "Azure Static Web Apps Free",
+    "directHostnameExposure": "accepted",
+    "compensatingControls": [
+      "Application API rate limiting",
+      "Supabase grants and row-level security",
+      "Production smoke tests never target the origin hostname"
+    ],
+    "configurationFile": "../public/staticwebapp.config.json"
+  }
+}

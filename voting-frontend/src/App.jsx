@@ -9,8 +9,16 @@ import {
   homeActions,
   specialEvents,
 } from "./data/clubContent";
+import {
+  NOT_FOUND_META,
+  NO_INDEX_ROUTES,
+  ROUTE_META,
+  ROUTES,
+  SITE_ORIGIN,
+} from "./data/routeMeta";
 import { hasSiteEventsConfig, hasSupabaseConfig, supabase } from "./lib/supabaseClient";
 import Home from "./pages/Home";
+import { fetchCurrentPoll } from "./lib/pollApi";
 import { normalizeSiteEvent } from "./lib/siteContent";
 import "./styles/sideb-mock.css";
 
@@ -26,62 +34,9 @@ const Poll = lazy(() => import("./pages/Poll"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 
-const ROUTES = new Set(["/", "/account", "/admin", "/vote", "/events", "/about", "/archive", "/current", "/privacy", "/reset-password", "/confirm-signup"]);
 const ROUTE_REDIRECTS = new Map([
   ["/results", "/vote"],
 ]);
-const ROUTE_META = {
-  "/": {
-    title: "Album Listening Club",
-    description: "Album Listening Club at Arizona State University: current listens, upcoming sessions, archive browsing, and member voting.",
-  },
-  "/account": {
-    title: "Account | Album Listening Club",
-    description: "Sign in, create an Album Listening Club account, and check your membership status.",
-  },
-  "/about": {
-    title: "About | Album Listening Club",
-    description: "Learn how Album Listening Club at Arizona State University listens, discusses, and votes together.",
-  },
-  "/admin": {
-    title: "Admin | Album Listening Club",
-    description: "Administration tools for Album Listening Club.",
-  },
-  "/archive": {
-    title: "Archive | Album Listening Club",
-    description: "Browse every album previously selected by Album Listening Club.",
-  },
-  "/current": {
-    title: "Current Listen | Album Listening Club",
-    description: "See the album Album Listening Club is currently listening to and find the next session.",
-  },
-  "/confirm-signup": {
-    title: "Confirm Email | Album Listening Club",
-    description: "Confirm the email address associated with an Album Listening Club account.",
-  },
-  "/events": {
-    title: "Events | Album Listening Club",
-    description: "Find upcoming Album Listening Club sessions, record-store trips, concerts, and recent events.",
-  },
-  "/privacy": {
-    title: "Privacy | Album Listening Club",
-    description: "Read how Album Listening Club uses account and membership information.",
-  },
-  "/reset-password": {
-    title: "Reset Password | Album Listening Club",
-    description: "Reset your Album Listening Club account password.",
-  },
-  "/vote": {
-    title: "Vote | Album Listening Club",
-    description: "Nominate albums and cast your Album Listening Club ballot.",
-  },
-};
-const NOT_FOUND_META = {
-  title: "Page Not Found | Album Listening Club",
-  description: "The requested Album Listening Club page could not be found.",
-};
-const NO_INDEX_ROUTES = new Set(["/account", "/admin", "/confirm-signup", "/reset-password"]);
-const SITE_ORIGIN = "https://albumasu.com";
 const POLL_ROUTES = new Set(["/", "/admin", "/current", "/vote"]);
 const EVENT_ROUTES = new Set(["/", "/admin", "/current", "/events"]);
 
@@ -143,14 +98,7 @@ function App() {
     }
 
     try {
-      const { data, error } = await supabase.rpc("get_current_poll");
-
-      if (error) {
-        setPollError(error.message);
-        setLivePoll(currentPoll);
-        return currentPoll;
-      }
-
+      const data = await fetchCurrentPoll(session);
       const nextPoll = normalizeLivePoll(data);
       setPollError(null);
       setLivePoll(nextPoll);
@@ -162,7 +110,7 @@ function App() {
     } finally {
       setPollReady(true);
     }
-  }, []);
+  }, [session]);
 
   const refreshEvents = useCallback(async () => {
     if (!hasSiteEventsConfig) {

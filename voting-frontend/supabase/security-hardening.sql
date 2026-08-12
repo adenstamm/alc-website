@@ -361,8 +361,10 @@ begin
 end;
 $hardening$;
 
--- Public read RPC required when the app first loads.
-grant execute on function public.get_current_poll() to anon, authenticated;
+-- Poll reads now pass through the same-origin Azure Function. Anonymous callers
+-- are intentionally denied at PostgREST; the proxy uses service_role only for
+-- the sanitized public response and forwards member JWTs for private ballots.
+grant execute on function public.get_current_poll() to authenticated, service_role;
 
 -- Signed-in member RPCs.
 grant execute on function public.update_own_display_name(text) to authenticated;

@@ -4,22 +4,10 @@ import http from "k6/http";
 import { check, sleep } from "k6";
 
 const baseUrl = (__ENV.BASE_URL || "").replace(/\/+$/, "");
-const supabaseUrl = (__ENV.SUPABASE_URL || __ENV.VITE_SUPABASE_URL || "").replace(
-  /\/+$/,
-  "",
-);
-const supabaseAnonKey =
-  __ENV.SUPABASE_ANON_KEY || __ENV.VITE_SUPABASE_ANON_KEY || "";
 const profile = __ENV.TEST_PROFILE || "smoke";
 
 if (!baseUrl) {
   throw new Error("BASE_URL is required.");
-}
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    "SUPABASE_URL and SUPABASE_ANON_KEY are required to exercise the full read path.",
-  );
 }
 
 const profiles = {
@@ -29,24 +17,11 @@ const profiles = {
     duration: "1m",
     gracefulStop: "10s",
   },
-  load: {
-    executor: "ramping-vus",
-    startVUs: 0,
-    stages: [
-      { duration: "30s", target: 25 },
-      { duration: "30s", target: 50 },
-      { duration: "30s", target: 100 },
-      { duration: "2m", target: 100 },
-      { duration: "30s", target: 0 },
-    ],
-    gracefulRampDown: "15s",
-    gracefulStop: "15s",
-  },
 };
 
 if (!profiles[profile]) {
   throw new Error(
-    `Unknown TEST_PROFILE "${profile}". Choose "smoke" or "load".`,
+    `Unknown TEST_PROFILE "${profile}". Production monitoring only supports "smoke".`,
   );
 }
 
@@ -72,13 +47,6 @@ export const options = {
   userAgent: "albumasu-k6-capacity-test/1.0",
 };
 
-const supabaseHeaders = {
-  apikey: supabaseAnonKey,
-  Authorization: `Bearer ${supabaseAnonKey}`,
-  "Content-Type": "application/json",
-  "X-Client-Info": "albumasu-k6-capacity-test/1.0",
-};
-
 export default function () {
   const route = publicRoutes[(__VU + __ITER) % publicRoutes.length];
   const pageResponse = http.get(`${baseUrl}${route}`, {
@@ -94,19 +62,22 @@ export default function () {
       response.body?.includes('id="root"'),
   });
 
-  const pollResponse = http.post(
-    `${supabaseUrl}/rest/v1/rpc/get_current_poll`,
-    "{}",
-    {
-      tags: { component: "supabase-postgres", operation: "get_current_poll" },
-      headers: supabaseHeaders,
-    },
-  );
+  const pollResponse = http.get(`${baseUrl}/api/current-poll`, {
+    tags: { component: "poll-proxy", operation: "get_current_poll" },
+  });
 
   check(pollResponse, {
-    "poll RPC returns HTTP 200": (response) => response.status === 200,
-    "poll RPC returns JSON": (response) =>
+    "poll proxy returns HTTP 200": (response) => response.status === 200,
+    "poll proxy returns JSON": (response) =>
       response.headers["Content-Type"]?.includes("application/json"),
+    "anonymous poll hides ballot choices": (response) => {
+      try {
+        const poll = response.json();
+        return poll.candidates?.length === 0 && poll.finalists?.length === 0;
+      } catch {
+        return false;
+      }
+    },
   });
 
   // Active users read or navigate periodically; they do not continuously
@@ -151,9 +122,9 @@ export function handleSummary(data) {
     `- HTTP failure rate: ${formatNumber(failureRate * 100)}%`,
     `- Successful checks: ${formatNumber(checkRate * 100)}%`,
     "",
-    "The test exercises read-only Azure Static Web Apps routes and the",
-    "Supabase/PostgreSQL `get_current_poll` RPC. It never submits ballots or",
-    "modifies production election data.",
+    "The test exercises read-only Cloudflare/Azure routes and the rate-limited",
+    "same-origin poll proxy. It never submits ballots or modifies production",
+    "election data.",
     "",
   ].join("\n");
 

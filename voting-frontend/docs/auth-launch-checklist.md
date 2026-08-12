@@ -69,11 +69,30 @@ Recommended providers:
 - SendGrid
 - Amazon SES
 
+## Bot and credential-abuse protection
+
+In Cloudflare:
+
+1. Create a Turnstile widget for `albumasu.com` and `www.albumasu.com`.
+2. Use managed mode and record the public site key and secret key separately.
+3. Add the public site key as the GitHub Actions secret
+   `VITE_TURNSTILE_SITE_KEY`.
+
+In Supabase:
+
+1. Open Authentication > Attack Protection > CAPTCHA protection.
+2. Select Cloudflare Turnstile, add the secret key, and enable protection.
+3. Review email signup, password sign-in, password reset, OTP, and verification
+   rate limits before launch.
+
+The site key is intentionally public. The Turnstile secret is not: never add it
+to a `VITE_` variable, commit it, or return it to the browser.
+
 ## Launch Smoke Test
 
 Test these before sharing the site:
 
-1. Create account with email/password.
+1. Complete Turnstile and create an account with email/password.
 2. Confirm the account email arrives.
 3. Reset password and confirm the reset email arrives.
 4. Continue with Google.
@@ -82,6 +101,8 @@ Test these before sharing the site:
 7. Confirm that account can vote.
 8. Sign in as that user on `/account`, save a display name, and confirm `/admin` shows the updated name.
 9. Repeat Google sign-in from `https://albumasu.com/account` in a private browser window and confirm the callback returns to the production domain, not `localhost`.
+10. Confirm signup, password login, and password reset cannot be submitted
+    without a fresh Turnstile token.
 
 ## Important Notes
 

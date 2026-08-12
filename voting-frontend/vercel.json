@@ -4,8 +4,12 @@
       "source": "/(.*)",
       "headers": [
         {
+          "key": "Cache-Control",
+          "value": "public, must-revalidate, max-age=30, no-transform"
+        },
+        {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; base-uri 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://itunes.apple.com; font-src 'self'; form-action 'self'; frame-ancestors 'none'; frame-src 'none'; img-src 'self' data: blob: https://*.mzstatic.com https://*.supabase.co https://*.bcbits.com; manifest-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self' blob:; upgrade-insecure-requests"
+          "value": "default-src 'self'; base-uri 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://itunes.apple.com https://challenges.cloudflare.com; font-src 'self'; form-action 'self'; frame-ancestors 'none'; frame-src https://challenges.cloudflare.com; img-src 'self' data: blob: https://*.mzstatic.com https://*.supabase.co https://*.bcbits.com; manifest-src 'self'; object-src 'none'; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; worker-src 'self' blob:; upgrade-insecure-requests"
         },
         {
           "key": "Cross-Origin-Opener-Policy",
@@ -53,39 +57,43 @@
   "rewrites": [
     {
       "source": "/account",
-      "destination": "/index.html"
+      "destination": "/account/index.html"
     },
     {
       "source": "/admin",
-      "destination": "/index.html"
+      "destination": "/admin/index.html"
     },
     {
       "source": "/reset-password",
-      "destination": "/index.html"
+      "destination": "/reset-password/index.html"
+    },
+    {
+      "source": "/confirm-signup",
+      "destination": "/confirm-signup/index.html"
     },
     {
       "source": "/about",
-      "destination": "/index.html"
+      "destination": "/about/index.html"
     },
     {
       "source": "/archive",
-      "destination": "/index.html"
+      "destination": "/archive/index.html"
     },
     {
       "source": "/current",
-      "destination": "/index.html"
+      "destination": "/current/index.html"
     },
     {
       "source": "/events",
-      "destination": "/index.html"
+      "destination": "/events/index.html"
     },
     {
       "source": "/privacy",
-      "destination": "/index.html"
+      "destination": "/privacy/index.html"
     },
     {
       "source": "/vote",
-      "destination": "/index.html"
+      "destination": "/vote/index.html"
     }
   ]
 }

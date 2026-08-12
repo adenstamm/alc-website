@@ -8,7 +8,6 @@ The browser uses the publishable/anon key, so the `public` schema remains expose
 
 Anonymous visitors should only have:
 
-- `EXECUTE` on `get_current_poll()`.
 - `SELECT` on `site_events` and `record_shelf_covers`, which are public website content.
 - Public reads from the `record-shelf-covers` Storage bucket. Its files are intentionally public; only admins may upload, replace, or delete them.
 
@@ -23,7 +22,11 @@ Signed-in users additionally get the member/admin RPCs used by the app and these
 
 There should be no `anon` table privilege on `memberships`, `votes`, `vote_choices`, `polls`, `poll_candidates`, `banned_albums`, or `banned_artists`. The authenticated role should have no direct insert privilege on either ballot table.
 
-`get_current_poll()` returns public poll metadata and the current album to everyone, but only returns candidate/finalist arrays to an approved signed-in member. It is read-only and must never create a poll.
+Anonymous browsers must not have `EXECUTE` on any application RPC. The managed
+`/api/current-poll` function calls `get_current_poll()` with a server-side role,
+removes candidate/finalist arrays from anonymous responses, and applies a
+per-IP rate limit. Approved signed-in members keep direct RPC access through
+their bearer token.
 
 ## Dashboard checks before launch
 
@@ -32,12 +35,16 @@ There should be no `anon` table privilege on `memberships`, `votes`, `vote_choic
 - In **Project Settings > Data API**, turn off **Automatically expose new tables and functions** (if shown) and keep the RLS-on-by-default option enabled. The migration also revokes default grants so new objects fail closed.
 - In **Project Settings > API Keys**, use only the publishable/anon key in `VITE_SUPABASE_ANON_KEY`. Never put `service_role`, secret, or database credentials in a `VITE_` variable. Rotate any secret that has ever been committed or shipped to a browser.
 - In **Authentication > Providers**, disable anonymous sign-ins unless you deliberately add support for anonymous accounts. Keep email confirmation enabled for password signups.
-- In **Authentication > Attack Protection**, review rate limits and enable CAPTCHA for public sign-up/sign-in flows if abuse appears. Keep leaked-password protection enabled when your plan exposes it.
+- In **Authentication > Attack Protection**, configure Cloudflare Turnstile for public email sign-up, password sign-in, and password-reset flows. Review Auth rate limits and keep leaked-password protection enabled when the plan exposes it.
 - In **Authentication > URL Configuration**, set the exact production Site URL and only the required `/account` and `/reset-password` redirect URLs. Remove stale preview origins after launch.
 - In **Storage**, confirm `record-shelf-covers` is the only intentionally public app bucket. Check that its insert/update/delete policies require `public.is_admin()`.
 - Run the Supabase **Security Advisor** after applying the migration and after every schema change. Investigate any table in an exposed schema reported without RLS.
 
-The advisor can flag intentionally callable `SECURITY DEFINER` RPCs. `get_current_poll` is the only intentional anonymous one; it is stable/read-only and hides ballot choices from non-members. The authenticated voting/admin RPCs are also intentional and perform their own member/admin checks. Treat any additional callable definer function as a problem rather than dismissing the category wholesale.
+The advisor can flag intentionally callable `SECURITY DEFINER` RPCs.
+`get_current_poll` is intentionally granted only to `authenticated` and
+`service_role`; the other voting/admin RPCs are authenticated-only and perform
+their own member/admin checks. Treat any additional callable definer function
+as a problem rather than dismissing the category wholesale.
 
 The `service_role` key bypasses RLS by design. These checks cannot make it safe to expose that key to the browser.
 
@@ -83,13 +90,16 @@ order by tablename, policyname;
 
 `votes` and `vote_choices` should only show their read/admin policies; neither should show an `INSERT` policy.
 
-Review client-callable functions. `PUBLIC` should have no app function grants. `anon` should have only `get_current_poll`; `authenticated` should have that function plus the explicitly listed member/admin RPCs in `security-hardening.sql`:
+Review callable functions. `PUBLIC` and `anon` should have no application
+function grants. `authenticated` should have the explicitly listed member/admin
+RPCs in `security-hardening.sql`; `service_role` should only need
+`get_current_poll()` for the managed API:
 
 ```sql
 select routine_name, grantee, privilege_type
 from information_schema.routine_privileges
 where specific_schema = 'public'
-  and grantee in ('PUBLIC', 'anon', 'authenticated')
+  and grantee in ('PUBLIC', 'anon', 'authenticated', 'service_role')
 order by grantee, routine_name;
 ```
 

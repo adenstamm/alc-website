@@ -1,4 +1,8 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
+
+import TurnstileWidget from "./TurnstileWidget";
+
+const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
 
 function AuthPanel({ redirectPath = "/account", supabase }) {
   const [mode, setMode] = useState("sign-in");
@@ -9,14 +13,40 @@ function AuthPanel({ redirectPath = "/account", supabase }) {
   const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOAuthSubmitting, setIsOAuthSubmitting] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState(null);
+  const [captchaError, setCaptchaError] = useState(null);
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
 
   const isSignUp = mode === "sign-up";
   const isReset = mode === "reset";
+  const captchaAction = isReset ? "password_reset" : isSignUp ? "sign_up" : "sign_in";
+
+  const handleCaptchaError = useCallback((message) => {
+    setCaptchaToken(null);
+    setCaptchaError(message);
+  }, []);
+
+  const handleCaptchaExpire = useCallback(() => {
+    setCaptchaToken(null);
+    setCaptchaError("Verification expired. Please complete it again.");
+  }, []);
+
+  const handleCaptchaVerify = useCallback((token) => {
+    setCaptchaToken(token);
+    setCaptchaError(null);
+  }, []);
+
+  function resetCaptcha() {
+    setCaptchaToken(null);
+    setCaptchaResetKey((currentKey) => currentKey + 1);
+  }
 
   function handleModeChange(nextMode) {
     setMode(nextMode);
     setStatus(null);
     setError(null);
+    setCaptchaError(null);
+    resetCaptcha();
   }
 
   async function handleGoogleSignIn() {
@@ -52,6 +82,7 @@ function AuthPanel({ redirectPath = "/account", supabase }) {
     try {
       if (isReset) {
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+          captchaToken,
           redirectTo: `${window.location.origin}/reset-password`,
         });
 
@@ -68,6 +99,7 @@ function AuthPanel({ redirectPath = "/account", supabase }) {
             email: cleanEmail,
             password,
             options: {
+              captchaToken,
               emailRedirectTo: `${window.location.origin}${redirectPath}`,
               data: {
                 display_name: displayName.trim(),
@@ -77,6 +109,9 @@ function AuthPanel({ redirectPath = "/account", supabase }) {
         : await supabase.auth.signInWithPassword({
             email: cleanEmail,
             password,
+            options: {
+              captchaToken,
+            },
           });
 
       if (response.error) {
@@ -92,6 +127,7 @@ function AuthPanel({ redirectPath = "/account", supabase }) {
       setError(authError.message || "Something went wrong. Try again.");
     } finally {
       setIsSubmitting(false);
+      resetCaptcha();
     }
   }
 
@@ -175,10 +211,24 @@ function AuthPanel({ redirectPath = "/account", supabase }) {
           </div>
         ) : null}
 
+        <TurnstileWidget
+          key={`${captchaAction}-${captchaResetKey}`}
+          action={captchaAction}
+          onError={handleCaptchaError}
+          onExpire={handleCaptchaExpire}
+          onVerify={handleCaptchaVerify}
+          siteKey={turnstileSiteKey}
+        />
+
+        {captchaError ? <p className="form-error" role="alert">{captchaError}</p> : null}
         {error ? <p className="form-error" role="alert">{error}</p> : null}
         {status ? <p className="form-success" role="status">{status}</p> : null}
 
-        <button className="button button-primary" type="submit" disabled={isSubmitting}>
+        <button
+          className="button button-primary"
+          type="submit"
+          disabled={isSubmitting || !captchaToken}
+        >
           {isSubmitting
             ? "Working..."
             : isReset
