@@ -54,7 +54,9 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_ENABLE_SITE_EVENTS: ${{ secrets.VITE_ENABLE_SITE_EVENTS }}
-          VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY }}
+          # Turnstile site keys are public browser identifiers; only the
+          # matching secret stays private in Supabase.
+          VITE_TURNSTILE_SITE_KEY: 0x4AAAAAAENg1ONSPf-iwteB
       - name: Deploy production build
         uses: Azure/static-web-apps-deploy@v1
         with:
