@@ -236,14 +236,13 @@ function App() {
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
       loadMembership(nextSession);
-      refreshPoll();
     });
 
     return () => {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [loadMembership, refreshPoll]);
+  }, [loadMembership]);
 
   const navigate = useCallback((nextPath) => {
     const normalizedPath = normalizePath(nextPath);
