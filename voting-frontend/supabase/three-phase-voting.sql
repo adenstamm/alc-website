@@ -432,6 +432,9 @@ as $$
 declare
   candidate_id_value text;
   rank_index integer := 1;
+  available_candidate_count integer;
+  required_finalist_count integer;
+  selected_finalist_count integer := coalesce(cardinality(candidate_ids), 0);
 begin
   if not public.is_admin() then
     raise exception 'ADMIN_REQUIRED: Only admins can choose finalists.' using errcode = 'P0001';
@@ -439,11 +442,22 @@ begin
 
   perform public.assert_poll_phase(target_poll_id, 'primary');
 
-  if coalesce(array_length(candidate_ids, 1), 0) <> 5 then
-    raise exception 'FIVE_FINALISTS_REQUIRED: Select exactly five finalists.' using errcode = 'P0001';
+  select count(*)::integer
+  into available_candidate_count
+  from public.poll_candidates
+  where poll_id = target_poll_id;
+
+  required_finalist_count := least(5, available_candidate_count);
+
+  if required_finalist_count < 1 then
+    raise exception 'NO_FINALISTS_AVAILABLE: Add at least one album before moving to final voting.' using errcode = 'P0001';
   end if;
 
-  if (select count(distinct x) from unnest(candidate_ids) as x) <> 5 then
+  if selected_finalist_count <> required_finalist_count then
+    raise exception 'FINALIST_COUNT_REQUIRED: Select exactly % finalists.', required_finalist_count using errcode = 'P0001';
+  end if;
+
+  if (select count(distinct x) from unnest(candidate_ids) as x) <> selected_finalist_count then
     raise exception 'DUPLICATE_FINALIST: Each finalist can only appear once.' using errcode = 'P0001';
   end if;
 
@@ -484,6 +498,10 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  available_candidate_count integer;
+  required_finalist_count integer;
+  saved_finalist_count integer;
 begin
   if candidate_ids is not null then
     perform public.save_finalists(target_poll_id, candidate_ids);
@@ -495,14 +513,31 @@ begin
 
   perform public.assert_poll_phase(target_poll_id, 'primary');
 
-  if (select count(*) from public.poll_candidates where poll_id = target_poll_id and is_finalist) <> 5 then
-    raise exception 'FIVE_FINALISTS_REQUIRED: Save exactly five finalists before final voting.' using errcode = 'P0001';
+  select count(*)::integer
+  into available_candidate_count
+  from public.poll_candidates
+  where poll_id = target_poll_id;
+
+  required_finalist_count := least(5, available_candidate_count);
+
+  select count(*)::integer
+  into saved_finalist_count
+  from public.poll_candidates
+  where poll_id = target_poll_id
+    and is_finalist;
+
+  if required_finalist_count < 1 or saved_finalist_count <> required_finalist_count then
+    raise exception 'FINALIST_COUNT_REQUIRED: Save exactly % finalists before final voting.', required_finalist_count using errcode = 'P0001';
   end if;
 
   update public.polls
   set phase = 'final',
       status = 'Final IRV voting is open',
-      description = 'Rank all five finalists from favorite to least favorite.'
+      description = format(
+        'Rank all %s %s from favorite to least favorite.',
+        required_finalist_count,
+        case when required_finalist_count = 1 then 'finalist' else 'finalists' end
+      )
   where id = target_poll_id;
 end;
 $$;
@@ -520,6 +555,7 @@ declare
   saved_vote public.votes%rowtype;
   candidate_id_value text;
   rank_index integer := 1;
+  finalist_count integer;
 begin
   if not public.is_approved_member() then
     raise exception 'APPROVED_MEMBER_REQUIRED: Only approved members can vote.' using errcode = 'P0001';
@@ -527,11 +563,17 @@ begin
 
   perform public.assert_poll_phase(target_poll_id, 'final');
 
-  if coalesce(array_length(ranked_candidate_ids, 1), 0) <> 5 then
-    raise exception 'FINAL_RANKING_REQUIRED: Rank all five finalists.' using errcode = 'P0001';
+  select count(*)::integer
+  into finalist_count
+  from public.poll_candidates
+  where poll_id = target_poll_id
+    and is_finalist;
+
+  if finalist_count < 1 or coalesce(cardinality(ranked_candidate_ids), 0) <> finalist_count then
+    raise exception 'FINAL_RANKING_REQUIRED: Rank all % finalists.', finalist_count using errcode = 'P0001';
   end if;
 
-  if (select count(distinct x) from unnest(ranked_candidate_ids) as x) <> 5 then
+  if (select count(distinct x) from unnest(ranked_candidate_ids) as x) <> finalist_count then
     raise exception 'DUPLICATE_RANKING: Each finalist can only appear once.' using errcode = 'P0001';
   end if;
 
@@ -545,7 +587,7 @@ begin
         and pc.is_finalist
     )
   ) then
-    raise exception 'INVALID_FINALIST: Final rankings must use the five finalists.' using errcode = 'P0001';
+    raise exception 'INVALID_FINALIST: Final rankings must use every saved finalist.' using errcode = 'P0001';
   end if;
 
   begin
@@ -591,7 +633,7 @@ begin
   where poll_id = target_poll_id
     and is_finalist;
 
-  if coalesce(array_length(active_candidates, 1), 0) <> 5 then
+  if coalesce(array_length(active_candidates, 1), 0) < 1 then
     return jsonb_build_object('rounds', rounds, 'winnerId', null, 'tie', null);
   end if;
 

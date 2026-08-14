@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 
 import {
   calculateIrvResult,
+  getRequiredFinalistCount,
   moveRankedCandidate,
+  validateFinalistSelection,
   validateFinalRanking,
   validatePrimarySelection,
 } from "./votingLogic.js";
@@ -28,10 +30,23 @@ test("primary rejects empty, duplicate, and over-limit ballots", () => {
   assert.equal(validatePrimarySelection(["a", "b", "c", "d", "e", "f"]).isValid, false);
 });
 
-test("final ranking requires all five finalists exactly once", () => {
+test("finalist selection requires every available album up to five", () => {
+  assert.equal(getRequiredFinalistCount(0), 0);
+  assert.equal(getRequiredFinalistCount(3), 3);
+  assert.equal(getRequiredFinalistCount(8), 5);
+  assert.equal(validateFinalistSelection(["a", "b", "c"], 3).isValid, true);
+  assert.equal(validateFinalistSelection(["a", "b"], 3).isValid, false);
+  assert.equal(validateFinalistSelection(["a", "a", "c"], 3).isValid, false);
+  assert.equal(validateFinalistSelection(["a", "b", "c", "d", "e"], 8).isValid, true);
+});
+
+test("final ranking requires the actual finalist count exactly once", () => {
   assert.equal(validateFinalRanking(["a", "b", "c", "d", "e"]).isValid, true);
   assert.equal(validateFinalRanking(["a", "b", "c", "d"]).isValid, false);
   assert.equal(validateFinalRanking(["a", "b", "c", "d", "d"]).isValid, false);
+  assert.equal(validateFinalRanking(["a", "b", "c"], 3).isValid, true);
+  assert.equal(validateFinalRanking(["a", "b"], 3).isValid, false);
+  assert.equal(validateFinalRanking(["a"], 0).isValid, false);
 });
 
 test("ranked candidates move within bounds", () => {

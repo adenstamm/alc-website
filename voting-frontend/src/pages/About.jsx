@@ -30,7 +30,7 @@ const steps = [
   {
     title: "Vote on what comes next",
     description:
-      "Members nominate albums, vote in the primary, and rank the five finalists in the final round.",
+      "Members nominate albums, vote in the primary, and rank the finalists in the final round.",
   },
 ];
 

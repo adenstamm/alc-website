@@ -97,9 +97,9 @@ export const phaseContent = {
   },
   final: {
     label: "Final IRV Voting",
-    title: "Rank all five finalists",
+    title: "Rank every finalist",
     description:
-      "Order the five finalists from favorite to least favorite. The admin page will show instant-runoff rounds.",
+      "Order every finalist from favorite to least favorite. The admin page will show instant-runoff rounds.",
     buttonLabel: "Submit final ranking",
   },
 };

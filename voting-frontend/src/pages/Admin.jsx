@@ -11,6 +11,7 @@ import {
   eventToUpsertPayload,
   validateEventForm,
 } from "../lib/siteContent";
+import { getRequiredFinalistCount } from "../lib/votingLogic";
 
 function isAdmin(membership) {
   return membership?.status === "approved" && membership?.role === "admin";
@@ -104,7 +105,11 @@ function Admin({
   const irvWinnerId = results?.irv?.winnerId || null;
   const irvWinner = finalRows.find((candidate) => candidate.id === irvWinnerId);
   const selectedCount = selectedFinalistIds.length;
-  const canAdvanceToFinal = poll.phase === "primary" && selectedCount === 5;
+  const requiredFinalistCount = getRequiredFinalistCount(primaryRows.length);
+  const canAdvanceToFinal =
+    poll.phase === "primary" &&
+    requiredFinalistCount > 0 &&
+    selectedCount === requiredFinalistCount;
   const sortedSiteEvents = useMemo(
     () =>
       [...siteEvents].sort((a, b) => {
@@ -420,7 +425,7 @@ function Admin({
         return currentIds.filter((id) => id !== candidateId);
       }
 
-      if (currentIds.length >= 5) {
+      if (currentIds.length >= requiredFinalistCount) {
         return currentIds;
       }
 
@@ -604,7 +609,7 @@ function Admin({
           ? {
               label: "Primary votes",
               value: primaryRows.reduce((total, candidate) => total + (candidate.primaryVotes || 0), 0),
-              detail: `${selectedCount}/5 finalists selected`,
+              detail: `${selectedCount}/${requiredFinalistCount} finalists selected`,
             }
           : {
               label: "Final status",
@@ -1040,7 +1045,12 @@ function Admin({
 
         {poll.phase === "primary" ? (
           <>
-            <p className="helper-note">Select exactly five albums for final voting. Selected {selectedCount}/5.</p>
+            <p className="helper-note">
+              {primaryRows.length < 5
+                ? `All ${requiredFinalistCount} available ${requiredFinalistCount === 1 ? "album" : "albums"} will advance.`
+                : "Select exactly five albums for final voting."}
+              {` Selected ${selectedCount}/${requiredFinalistCount}.`}
+            </p>
             <div className="admin-result-list">
               {sortedPrimaryRows.map((candidate) => {
                 const isSelected = selectedFinalistIds.includes(candidate.id);
@@ -1053,7 +1063,7 @@ function Admin({
                     <input
                       type="checkbox"
                       checked={isSelected}
-                      disabled={!isSelected && selectedCount >= 5}
+                      disabled={!isSelected && selectedCount >= requiredFinalistCount}
                       onChange={() => toggleFinalist(candidate.id)}
                     />
                     <div>
@@ -1069,14 +1079,14 @@ function Admin({
               <button
                 className="button button-secondary"
                 type="button"
-                disabled={isSavingPhase || selectedCount !== 5}
+                disabled={isSavingPhase || !canAdvanceToFinal}
                 onClick={() =>
                   runAdminAction("save_finalists", "Finalists saved.", {
                     candidate_ids: selectedFinalistIds,
                   })
                 }
               >
-                Save five finalists
+                Save finalists
               </button>
               <button
                 className="button button-primary"

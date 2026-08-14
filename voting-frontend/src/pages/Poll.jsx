@@ -346,7 +346,10 @@ function Poll({
       return;
     }
 
-    const finalValidation = validateFinalRanking(formState.rankedCandidateIds);
+    const finalValidation = validateFinalRanking(
+      formState.rankedCandidateIds,
+      candidateOptions.length,
+    );
 
     if (!finalValidation.isValid) {
       setFormError(finalValidation.message);

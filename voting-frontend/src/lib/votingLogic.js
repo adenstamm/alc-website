@@ -35,11 +35,64 @@ export function validatePrimarySelection(candidateIds, maxSelections = 5) {
   };
 }
 
-export function validateFinalRanking(candidateIds, requiredCount = 5) {
+export function getRequiredFinalistCount(availableCandidateCount, maxFinalists = 5) {
+  const normalizedAvailableCount = Number.isFinite(availableCandidateCount)
+    ? Math.max(0, Math.floor(availableCandidateCount))
+    : 0;
+
+  return Math.min(normalizedAvailableCount, maxFinalists);
+}
+
+export function validateFinalistSelection(
+  candidateIds,
+  availableCandidateCount,
+  maxFinalists = 5,
+) {
+  const requiredCount = getRequiredFinalistCount(availableCandidateCount, maxFinalists);
+
+  if (requiredCount < 1) {
+    return {
+      isValid: false,
+      message: "Add at least one album before moving to final voting.",
+      requiredCount,
+    };
+  }
+
   if (!Array.isArray(candidateIds) || candidateIds.length !== requiredCount) {
     return {
       isValid: false,
-      message: `Rank all ${requiredCount} finalists before submitting.`,
+      message: `Select exactly ${requiredCount} ${requiredCount === 1 ? "finalist" : "finalists"}.`,
+      requiredCount,
+    };
+  }
+
+  if (new Set(candidateIds).size !== candidateIds.length) {
+    return {
+      isValid: false,
+      message: "Each finalist can only appear once.",
+      requiredCount,
+    };
+  }
+
+  return {
+    isValid: true,
+    message: null,
+    requiredCount,
+  };
+}
+
+export function validateFinalRanking(candidateIds, requiredCount = 5) {
+  if (requiredCount < 1) {
+    return {
+      isValid: false,
+      message: "This final ballot has no finalists.",
+    };
+  }
+
+  if (!Array.isArray(candidateIds) || candidateIds.length !== requiredCount) {
+    return {
+      isValid: false,
+      message: `Rank all ${requiredCount} ${requiredCount === 1 ? "finalist" : "finalists"} before submitting.`,
     };
   }
 
