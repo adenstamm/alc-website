@@ -1,3 +1,5 @@
+import { Link } from "react-router";
+
 const footerLinks = [
   { label: "Current listen", path: "/current" },
   { label: "Archive", path: "/archive" },
@@ -5,12 +7,7 @@ const footerLinks = [
   { label: "Vote", path: "/vote" },
 ];
 
-function SiteFooter({ clubLinks, navigate }) {
-  function handleNavigate(event, path) {
-    event.preventDefault();
-    navigate(path);
-  }
-
+function SiteFooter({ clubLinks }) {
   return (
     <footer className="site-footer">
       <div className="site-footer-inner">
@@ -25,14 +22,13 @@ function SiteFooter({ clubLinks, navigate }) {
         <nav className="site-footer-links" aria-label="Explore Album Listening Club">
           <p className="site-footer-column-label">Keep listening</p>
           {footerLinks.map((link) => (
-            <a
-              href={link.path}
+            <Link
               key={link.path}
-              onClick={(event) => handleNavigate(event, link.path)}
+              to={link.path}
             >
               <span>{link.label}</span>
               <span className="site-footer-link-arrow" aria-hidden="true">↗</span>
-            </a>
+            </Link>
           ))}
         </nav>
 
@@ -49,7 +45,7 @@ function SiteFooter({ clubLinks, navigate }) {
 
       <div className="site-footer-fineprint">
         <span>Album Listening Club</span>
-        <a href="/privacy" onClick={(event) => handleNavigate(event, "/privacy")}>Privacy</a>
+        <Link to="/privacy">Privacy</Link>
         <span>Student-led at Arizona State University</span>
       </div>
     </footer>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link, NavLink } from "react-router";
 
 import { accountStatusContent, getAccountName, getAccountStatus } from "../lib/accountStatus";
 
@@ -12,10 +13,8 @@ const navItems = [
 ];
 
 function SideBNav({
-  activePath,
   authReady,
   membership,
-  navigate,
   session,
   showAdminLink = false,
 }) {
@@ -30,10 +29,8 @@ function SideBNav({
   const accountName = getAccountName(session, membership);
   const accountLabel = authReady ? (session ? accountName : "Sign in") : "Account";
 
-  function handleNavigate(event, path) {
-    event.preventDefault();
+  function handleNavigate() {
     setIsMenuOpen(false);
-    navigate(path);
   }
 
   function handleSkipToContent(event) {
@@ -97,11 +94,11 @@ function SideBNav({
       </a>
 
       <div className="sideb-nav-inner">
-        <a
+        <Link
           aria-label="Album Listening Club home"
           className="sideb-brand sideb-brand-image-link"
-          href="/"
-          onClick={(event) => handleNavigate(event, "/")}
+          onClick={handleNavigate}
+          to="/"
         >
           <span className="sideb-brand-image-frame" aria-hidden="true">
             <img
@@ -116,7 +113,7 @@ function SideBNav({
             <strong>Album Listening Club</strong>
             <small>Arizona State University</small>
           </span>
-        </a>
+        </Link>
 
         <button
           aria-controls="primary-navigation"
@@ -138,36 +135,31 @@ function SideBNav({
           id="primary-navigation"
           aria-label="Primary navigation"
         >
-          {visibleNavItems.map((item) => {
-            const isActive = item.path === activePath;
-
-            return (
-              <a
-                aria-current={isActive ? "page" : undefined}
-                className={isActive ? "is-active" : ""}
-                href={item.path}
-                key={item.path}
-                onClick={(event) => handleNavigate(event, item.path)}
-              >
-                {item.label}
-              </a>
-            );
-          })}
+          {visibleNavItems.map((item) => (
+            <NavLink
+              className={({ isActive }) => (isActive ? "is-active" : "")}
+              end={item.path === "/"}
+              key={item.path}
+              onClick={handleNavigate}
+              to={item.path}
+            >
+              {item.label}
+            </NavLink>
+          ))}
         </nav>
 
-        <a
-          aria-current={activePath === "/account" ? "page" : undefined}
+        <NavLink
           aria-label={session ? `Open account for ${accountName}` : "Sign in or create an account"}
-          className={`sideb-account-link ${activePath === "/account" ? "is-active" : ""}`}
-          href="/account"
-          onClick={(event) => handleNavigate(event, "/account")}
+          className={({ isActive }) => `sideb-account-link ${isActive ? "is-active" : ""}`}
+          onClick={handleNavigate}
+          to="/account"
         >
           <span className={`sideb-account-dot status-${accountStatus}`} aria-hidden="true" />
           <span className="sideb-account-meta">
             <strong>{accountLabel}</strong>
             <small>{authReady ? accountStatusContent[accountStatus].label : "Checking session"}</small>
           </span>
-        </a>
+        </NavLink>
       </div>
     </header>
   );

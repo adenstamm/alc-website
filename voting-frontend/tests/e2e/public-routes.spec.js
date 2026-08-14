@@ -52,6 +52,25 @@ test("client-side navigation preserves route semantics", async ({ page }) => {
   );
 });
 
+test("legacy routes redirect and preserve URL parameters", async ({ page }) => {
+  await page.goto("/results?source=bookmark#ballot");
+
+  await expect(page).toHaveURL(/\/vote\?source=bookmark#ballot$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    /What .*should the club listen to next/i,
+  );
+});
+
+test("browser history works after client-side navigation", async ({ page }) => {
+  await page.goto("/");
+  await page.locator('a[href="/about"]').first().evaluate((link) => link.click());
+  await expect(page).toHaveURL(/\/about$/);
+
+  await page.goBack();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/Album Listening\s*Club/i);
+});
+
 test("unknown routes preserve the URL and show a recoverable not-found page", async ({ page }) => {
   await page.goto("/missing-record");
 

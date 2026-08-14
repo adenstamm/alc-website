@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { BrowserRouter } from 'react-router'
 import '@fontsource-variable/newsreader/wght.css'
 import '@fontsource-variable/newsreader/wght-italic.css'
 import '@fontsource-variable/work-sans/wght.css'
@@ -10,6 +11,8 @@ import App from './App.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
   </StrictMode>,
 )

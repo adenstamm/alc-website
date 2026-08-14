@@ -1,9 +1,6 @@
-function NotFound({ navigate }) {
-  function handleNavigate(event, path) {
-    event.preventDefault();
-    navigate(path);
-  }
+import { Link } from "react-router";
 
+function NotFound() {
   return (
     <div className="sideb-page sideb-subpage sideb-not-found-page">
       <main className="not-found-main" id="main-content" tabIndex="-1">
@@ -17,20 +14,18 @@ function NotFound({ navigate }) {
             The address may be outdated or mistyped. Return home or browse the club archive.
           </p>
           <div className="not-found-actions">
-            <a
+            <Link
               className="sideb-button sideb-button-primary"
-              href="/"
-              onClick={(event) => handleNavigate(event, "/")}
+              to="/"
             >
               Return home
-            </a>
-            <a
+            </Link>
+            <Link
               className="sideb-button sideb-button-ghost"
-              href="/archive"
-              onClick={(event) => handleNavigate(event, "/archive")}
+              to="/archive"
             >
               Browse archive
-            </a>
+            </Link>
           </div>
         </div>
       </main>

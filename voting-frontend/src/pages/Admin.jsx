@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   getRecentShelfAlbums,
@@ -11,6 +11,10 @@ import {
   eventToUpsertPayload,
   validateEventForm,
 } from "../lib/siteContent";
+import {
+  executeAdminPhaseAction,
+  getAdminActionErrorMessage,
+} from "../lib/adminActions";
 import { getRequiredFinalistCount } from "../lib/votingLogic";
 
 function isAdmin(membership) {
@@ -89,10 +93,13 @@ function Admin({
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [isLoadingResults, setIsLoadingResults] = useState(false);
   const [isSavingPhase, setIsSavingPhase] = useState(false);
+  const [activePhaseAction, setActivePhaseAction] = useState(null);
   const [isSavingContent, setIsSavingContent] = useState(false);
   const [message, setMessage] = useState(null);
   const [memberMessage, setMemberMessage] = useState(null);
   const [error, setError] = useState(null);
+  const [phaseFeedback, setPhaseFeedback] = useState(null);
+  const phaseActionRef = useRef(null);
 
   const canManage = hasSupabaseConfig && isAdmin(membership);
   const shelfAlbums = useMemo(() => getRecentShelfAlbums(), []);
@@ -433,26 +440,67 @@ function Admin({
     });
   }
 
-  async function runAdminAction(action, successMessage, params = {}) {
-    setError(null);
-    setMessage(null);
-    setIsSavingPhase(true);
-
-    const { error: actionError } = await supabase.rpc(action, {
-      target_poll_id: poll.id,
-      ...params,
-    });
-
-    setIsSavingPhase(false);
-
-    if (actionError) {
-      setError(actionError.message);
+  async function runAdminAction(
+    action,
+    successMessage,
+    params = {},
+    { alreadyMessage, expectedPhase } = {},
+  ) {
+    if (phaseActionRef.current) {
       return;
     }
 
-    setMessage(successMessage);
-    await refreshPoll();
-    await loadResults();
+    phaseActionRef.current = action;
+    setActivePhaseAction(action);
+    setError(null);
+    setMessage(null);
+    setPhaseFeedback(null);
+    setIsSavingPhase(true);
+
+    try {
+      const outcome = await executeAdminPhaseAction({
+        action,
+        expectedPhase,
+        params,
+        pollId: poll.id,
+        refreshPoll,
+        rpc: (actionName, payload) => supabase.rpc(actionName, payload),
+      });
+
+      if (!outcome.isSuccess) {
+        setPhaseFeedback({
+          message: getAdminActionErrorMessage(outcome.error),
+          type: "error",
+        });
+        return;
+      }
+
+      const confirmationMessage = outcome.recovered
+        ? alreadyMessage || successMessage
+        : successMessage;
+      setPhaseFeedback({ message: confirmationMessage, type: "success" });
+
+      try {
+        if (!outcome.recovered) {
+          await refreshPoll();
+        }
+        await loadResults();
+      } catch {
+        setPhaseFeedback({
+          message: `${confirmationMessage} Refresh the page to load the latest results.`,
+          type: "success",
+        });
+      }
+    } catch (actionError) {
+      setPhaseFeedback({
+        message: getAdminActionErrorMessage(actionError),
+        type: "error",
+      });
+    } finally {
+      phaseActionRef.current = null;
+      setActivePhaseAction(null);
+      setIsSavingPhase(false);
+    }
   }
 
   function scrollToAdminPanel(panelId) {
@@ -1017,6 +1065,14 @@ function Admin({
         </div>
 
         {pollError ? <p className="form-error" role="alert">{pollError}</p> : null}
+        {phaseFeedback ? (
+          <p
+            className={phaseFeedback.type === "error" ? "form-error" : "form-success"}
+            role={phaseFeedback.type === "error" ? "alert" : "status"}
+          >
+            {phaseFeedback.message}
+          </p>
+        ) : null}
         {isLoadingResults ? <p className="helper-note">Loading live results...</p> : null}
 
         {poll.phase === "nominations" ? (
@@ -1036,9 +1092,19 @@ function Admin({
               className="button button-primary"
               type="button"
               disabled={isSavingPhase || nominationRows.length === 0}
-              onClick={() => runAdminAction("advance_to_primary", "Poll moved to primary.")}
+              onClick={() => runAdminAction(
+                "advance_to_primary",
+                "Poll moved to primary.",
+                {},
+                {
+                  alreadyMessage: "The poll is already in primary voting.",
+                  expectedPhase: "primary",
+                },
+              )}
             >
-              Move to primary
+              {activePhaseAction === "advance_to_primary"
+                ? "Moving to primary..."
+                : "Move to primary"}
             </button>
           </>
         ) : null}
@@ -1046,10 +1112,14 @@ function Admin({
         {poll.phase === "primary" ? (
           <>
             <p className="helper-note">
-              {primaryRows.length < 5
-                ? `All ${requiredFinalistCount} available ${requiredFinalistCount === 1 ? "album" : "albums"} will advance.`
+              {requiredFinalistCount < 1
+                ? "Add at least one album before moving to final voting."
+                : primaryRows.length < 5
+                  ? `Select all ${requiredFinalistCount} available ${requiredFinalistCount === 1 ? "album" : "albums"} to enable final voting.`
                 : "Select exactly five albums for final voting."}
-              {` Selected ${selectedCount}/${requiredFinalistCount}.`}
+              {requiredFinalistCount > 0
+                ? ` Selected ${selectedCount}/${requiredFinalistCount}.`
+                : ""}
             </p>
             <div className="admin-result-list">
               {sortedPrimaryRows.map((candidate) => {
@@ -1086,7 +1156,9 @@ function Admin({
                   })
                 }
               >
-                Save finalists
+                {activePhaseAction === "save_finalists"
+                  ? "Saving finalists..."
+                  : "Save finalists"}
               </button>
               <button
                 className="button button-primary"
@@ -1095,10 +1167,15 @@ function Admin({
                 onClick={() =>
                   runAdminAction("advance_to_final", "Poll moved to final voting.", {
                     candidate_ids: selectedFinalistIds,
+                  }, {
+                    alreadyMessage: "The poll is already in final voting.",
+                    expectedPhase: "final",
                   })
                 }
               >
-                Move to final
+                {activePhaseAction === "advance_to_final"
+                  ? "Moving to final..."
+                  : "Move to final"}
               </button>
             </div>
           </>
