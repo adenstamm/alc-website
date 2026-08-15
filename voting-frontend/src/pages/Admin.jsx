@@ -6,6 +6,11 @@ import {
   RECORD_SHELF_BUCKET,
 } from "../lib/recordShelf";
 import {
+  ALBUM_COVER_ACCEPT,
+  saveCurrentAlbumWithCover,
+  validateAlbumCoverFile,
+} from "../lib/albumCoverUpload";
+import {
   createEventId,
   emptyEventForm,
   eventToUpsertPayload,
@@ -70,6 +75,10 @@ function Admin({
     note: poll.albumOfWeek.note || "Current club listen",
     coverUrl: poll.albumOfWeek.coverUrl || "",
   });
+  const [currentAlbumCoverFile, setCurrentAlbumCoverFile] = useState(null);
+  const [currentAlbumCoverPreviewUrl, setCurrentAlbumCoverPreviewUrl] = useState("");
+  const [currentAlbumError, setCurrentAlbumError] = useState(null);
+  const [currentAlbumMessage, setCurrentAlbumMessage] = useState(null);
   const [eventForm, setEventForm] = useState(emptyEventForm);
   const [editingEventId, setEditingEventId] = useState(null);
   const [newPoll, setNewPoll] = useState({
@@ -100,6 +109,7 @@ function Admin({
   const [error, setError] = useState(null);
   const [phaseFeedback, setPhaseFeedback] = useState(null);
   const phaseActionRef = useRef(null);
+  const currentAlbumCoverInputRef = useRef(null);
 
   const canManage = hasSupabaseConfig && isAdmin(membership);
   const shelfAlbums = useMemo(() => getRecentShelfAlbums(), []);
@@ -299,6 +309,18 @@ function Admin({
       coverUrl: poll.albumOfWeek.coverUrl || "",
     });
   }, [poll.albumOfWeek]);
+
+  useEffect(() => {
+    if (!currentAlbumCoverFile) {
+      setCurrentAlbumCoverPreviewUrl("");
+      return undefined;
+    }
+
+    const previewUrl = URL.createObjectURL(currentAlbumCoverFile);
+    setCurrentAlbumCoverPreviewUrl(previewUrl);
+
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [currentAlbumCoverFile]);
 
   function handleNewPollChange(event) {
     const { name, value } = event.target;
@@ -519,34 +541,92 @@ function Admin({
     }));
   }
 
+  function handleCurrentAlbumCoverChange(event) {
+    const file = event.target.files?.[0] || null;
+    const validationError = file ? validateAlbumCoverFile(file) : null;
+
+    setCurrentAlbumError(validationError);
+    setCurrentAlbumMessage(null);
+
+    if (validationError) {
+      event.target.value = "";
+      setCurrentAlbumCoverFile(null);
+      return;
+    }
+
+    setCurrentAlbumCoverFile(file);
+  }
+
+  function handleCurrentAlbumCoverClear() {
+    if (currentAlbumCoverInputRef.current) {
+      currentAlbumCoverInputRef.current.value = "";
+    }
+
+    setCurrentAlbumCoverFile(null);
+    setCurrentAlbumForm((currentForm) => ({
+      ...currentForm,
+      coverUrl: "",
+    }));
+    setCurrentAlbumError(null);
+    setCurrentAlbumMessage(null);
+  }
+
   async function handleCurrentAlbumSave(event) {
     event.preventDefault();
-    setError(null);
-    setMessage(null);
+    setCurrentAlbumError(null);
+    setCurrentAlbumMessage(null);
 
     if (!currentAlbumForm.title.trim() || !currentAlbumForm.artist.trim()) {
-      setError("Add a current album title and artist before saving.");
+      setCurrentAlbumError("Add a current album title and artist before saving.");
+      return;
+    }
+
+    const validationError = currentAlbumCoverFile
+      ? validateAlbumCoverFile(currentAlbumCoverFile)
+      : null;
+
+    if (validationError) {
+      setCurrentAlbumError(validationError);
       return;
     }
 
     setIsSavingContent(true);
 
-    const { error: updateError } = await supabase.rpc("update_current_album", {
-      album_title: currentAlbumForm.title.trim(),
-      album_artist: currentAlbumForm.artist.trim(),
-      album_note: currentAlbumForm.note.trim() || "Current club listen",
-      cover_url: currentAlbumForm.coverUrl.trim() || null,
-    });
+    try {
+      const { coverUrl: nextCoverUrl, uploaded } = await saveCurrentAlbumWithCover({
+        album: currentAlbumForm,
+        bucket: RECORD_SHELF_BUCKET,
+        coverFile: currentAlbumCoverFile,
+        currentCoverUrl: currentAlbumForm.coverUrl,
+        pollId: poll.id,
+        supabase,
+      });
 
-    setIsSavingContent(false);
-
-    if (updateError) {
-      setError(updateError.message);
-      return;
+      setCurrentAlbumForm((currentForm) => ({
+        ...currentForm,
+        coverUrl: nextCoverUrl || "",
+      }));
+      setCurrentAlbumCoverFile(null);
+      if (currentAlbumCoverInputRef.current) {
+        currentAlbumCoverInputRef.current.value = "";
+      }
+      setCurrentAlbumMessage(
+        uploaded ? "Current album and cover updated." : "Current album updated.",
+      );
+      try {
+        await refreshPoll();
+      } catch {
+        setCurrentAlbumError(
+          "The album was saved, but the page could not refresh. Reload to see the latest version.",
+        );
+      }
+    } catch (saveError) {
+      setCurrentAlbumError(
+        saveError.message || "The current album could not be updated. Try again.",
+      );
+    } finally {
+      setIsSavingContent(false);
     }
-
-    setMessage("Current album updated.");
-    await refreshPoll();
   }
 
   function handleEventChange(event) {
@@ -845,6 +925,9 @@ function Admin({
           <p>This controls the album card on the home page without creating a new voting cycle.</p>
         </div>
 
+        {currentAlbumError ? <p className="form-error" role="alert">{currentAlbumError}</p> : null}
+        {currentAlbumMessage ? <p className="form-success" role="status">{currentAlbumMessage}</p> : null}
+
         <form className="vote-form" onSubmit={handleCurrentAlbumSave}>
           <div className="admin-create-grid">
             <div className="field-group">
@@ -870,16 +953,52 @@ function Admin({
             </div>
           </div>
 
-          <div className="field-group">
-            <label htmlFor="currentAlbumCoverUrl">Cover image URL</label>
-            <input
-              id="currentAlbumCoverUrl"
-              name="coverUrl"
-              type="url"
-              placeholder="Optional. Leave blank to use automatic cover lookup."
-              value={currentAlbumForm.coverUrl}
-              onChange={handleCurrentAlbumChange}
-            />
+          <div className="admin-current-cover-grid">
+            <div className="field-group">
+              <label htmlFor="currentAlbumCover">Album cover image</label>
+              <input
+                ref={currentAlbumCoverInputRef}
+                id="currentAlbumCover"
+                type="file"
+                accept={ALBUM_COVER_ACCEPT}
+                aria-describedby="currentAlbumCoverHelp"
+                disabled={isSavingContent}
+                onChange={handleCurrentAlbumCoverChange}
+              />
+              <small className="helper-note" id="currentAlbumCoverHelp">
+                JPG, PNG, or WebP. Maximum 5 MB. Leave empty to keep the current image.
+              </small>
+              {(currentAlbumCoverFile || currentAlbumForm.coverUrl) ? (
+                <button
+                  className="button button-secondary admin-current-cover-clear"
+                  type="button"
+                  disabled={isSavingContent}
+                  onClick={handleCurrentAlbumCoverClear}
+                >
+                  Use automatic cover
+                </button>
+              ) : null}
+            </div>
+
+            <figure className="admin-current-cover-preview">
+              {(currentAlbumCoverPreviewUrl || currentAlbumForm.coverUrl) ? (
+                <img
+                  src={currentAlbumCoverPreviewUrl || currentAlbumForm.coverUrl}
+                  alt={`${currentAlbumForm.title || "Current album"} cover preview`}
+                />
+              ) : (
+                <span className="cozy-album-cover cozy-generated-cover" aria-hidden="true">
+                  <span>{(currentAlbumForm.title || "AL").slice(0, 2)}</span>
+                </span>
+              )}
+              <figcaption>
+                {currentAlbumCoverFile
+                  ? `Ready to upload: ${currentAlbumCoverFile.name}`
+                  : currentAlbumForm.coverUrl
+                    ? "Current uploaded cover"
+                    : "Automatic artwork will be used"}
+              </figcaption>
+            </figure>
           </div>
 
           <div className="field-group">

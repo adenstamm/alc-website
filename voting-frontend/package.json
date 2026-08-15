@@ -8,7 +8,7 @@
     "build": "vite build && node scripts/prerender.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "node src/lib/votingLogic.test.js && node src/lib/adminActions.test.js && node src/lib/siteContent.test.js && node src/lib/albumArchive.test.js && node src/lib/archiveCatalog.test.js && node src/lib/accountStatus.test.js && node src/lib/pollApi.test.js && npm --prefix api test",
+    "test": "node src/lib/votingLogic.test.js && node src/lib/adminActions.test.js && node src/lib/albumCoverUpload.test.js && node src/lib/siteContent.test.js && node src/lib/albumArchive.test.js && node src/lib/archiveCatalog.test.js && node src/lib/accountStatus.test.js && node src/lib/pollApi.test.js && npm --prefix api test",
     "test:e2e": "playwright test",
     "check": "npm run lint && npm run test && npm run build && npm run test:e2e"
   },

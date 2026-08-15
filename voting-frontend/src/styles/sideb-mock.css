@@ -2860,6 +2860,46 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.admin-current-cover-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.65fr);
+  gap: 24px;
+  align-items: center;
+}
+
+.admin-current-cover-clear {
+  width: fit-content;
+  margin-top: 4px;
+}
+
+.admin-current-cover-preview {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+}
+
+.admin-current-cover-preview > img,
+.admin-current-cover-preview > .cozy-album-cover {
+  width: 96px;
+  aspect-ratio: 1;
+  border-radius: 2px;
+  object-fit: cover;
+}
+
+.admin-current-cover-preview .cozy-generated-cover > span {
+  font-size: 2rem;
+}
+
+.admin-current-cover-preview figcaption {
+  overflow-wrap: anywhere;
+  color: var(--color-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
 .admin-events-layout {
   grid-template-columns: minmax(0, 0.9fr) minmax(320px, 1.1fr);
   align-items: start;
@@ -3419,6 +3459,10 @@
 
   .admin-shelf-upload,
   .member-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-current-cover-grid {
     grid-template-columns: 1fr;
   }
 
