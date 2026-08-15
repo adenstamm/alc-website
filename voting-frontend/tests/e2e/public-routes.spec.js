@@ -6,6 +6,7 @@ const publicRoutes = [
   ["/archive", /Every record already pulled/i],
   ["/current", /Heaven or Las Vegas|Masterpiece/i],
   ["/events", /Club plans beyond/i],
+  ["/genres", /This year sounded like this/i],
   ["/privacy", /What the club account stores/i],
   ["/vote", /What .*should the club listen to next/i],
 ];
@@ -25,6 +26,28 @@ for (const [path, heading] of publicRoutes) {
     await expect(page.locator("body")).not.toContainText("That page slipped off the turntable");
   });
 }
+
+test("the homepage genre feature leads into the dedicated poster page", async ({ page }) => {
+  await page.goto("/");
+
+  const teaser = page.locator(".sideb-genres-teaser");
+  const utilityGrid = page.locator(".sideb-link-grid");
+  const genreLink = page.getByRole("link", { name: /View the genres this year/i });
+
+  await expect(teaser).toBeVisible();
+  await expect(genreLink).toHaveAttribute("href", "/genres");
+  const teaserPrecedesUtilityGrid = await teaser.evaluate((element) => (
+    element.compareDocumentPosition(document.querySelector(".sideb-link-grid"))
+    & Node.DOCUMENT_POSITION_FOLLOWING
+  ));
+  expect(teaserPrecedesUtilityGrid).toBeTruthy();
+  await expect(utilityGrid).toBeVisible();
+
+  await genreLink.click();
+  await expect(page).toHaveURL(/\/genres$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("This year sounded like this.");
+  await expect(page.getByRole("link", { name: /Open the year in genres poster at full size/i })).toBeVisible();
+});
 
 test("keyboard navigation exposes and uses the skip link", async ({ page }) => {
   await page.goto("/");

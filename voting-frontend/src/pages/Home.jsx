@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import genresPoster from "../assets/genres-this-year.png";
 import {
   fetchAlbumMetadata,
   getRecentShelfAlbums,
@@ -319,6 +320,38 @@ function Home({
               </span>
             </a>
           </aside>
+        </section>
+
+        <section className="sideb-genres-teaser" aria-labelledby="genres-teaser-title">
+          <a
+            className="sideb-genres-teaser-link"
+            href="/genres"
+            onClick={(event) => handleRouteLink(event, "/genres")}
+          >
+            <span className="sideb-genres-teaser-copy">
+              <span className="sideb-genres-teaser-status">
+                <i aria-hidden="true" /> Temporary feature
+              </span>
+              <h2 id="genres-teaser-title">See where this year took us.</h2>
+              <span className="sideb-genres-teaser-description">
+                A date-by-date map of the sounds that moved through the room.
+              </span>
+              <span className="sideb-genres-teaser-action">
+                View the genres this year <span aria-hidden="true">→</span>
+              </span>
+            </span>
+
+            <span className="sideb-genres-teaser-art" aria-hidden="true">
+              <img
+                alt=""
+                decoding="async"
+                height="1350"
+                loading="lazy"
+                src={genresPoster}
+                width="1080"
+              />
+            </span>
+          </a>
         </section>
 
         <section className="sideb-link-grid" aria-label="Club links">

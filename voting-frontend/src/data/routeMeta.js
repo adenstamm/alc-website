@@ -44,6 +44,12 @@ export const ROUTE_META = {
     description: "Find upcoming Album Listening Club sessions, record-store trips, concerts, and recent events.",
     heading: "Club plans beyond the weekly vote.",
   },
+  "/genres": {
+    title: "This Year in Genres | Album Listening Club",
+    description: "Explore the dates and genres that shaped Album Listening Club's year of listening.",
+    heading: "This year sounded like this.",
+    noIndex: true,
+  },
   "/privacy": {
     title: "Privacy | Album Listening Club",
     description: "Read how Album Listening Club uses account and membership information.",

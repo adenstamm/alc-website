@@ -36,6 +36,7 @@ const Admin = lazy(() => import("./pages/Admin"));
 const Archive = lazy(() => import("./pages/Archive"));
 const CurrentAlbum = lazy(() => import("./pages/CurrentAlbum"));
 const Events = lazy(() => import("./pages/Events"));
+const Genres = lazy(() => import("./pages/Genres"));
 const ConfirmSignup = lazy(() => import("./pages/ConfirmSignup"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Poll = lazy(() => import("./pages/Poll"));
@@ -369,6 +370,7 @@ function App() {
                   { events: true },
                 )}
               />
+              <Route path="/genres" element={<Genres navigate={navigate} />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route
                 path="/reset-password"
