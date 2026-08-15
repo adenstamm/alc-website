@@ -6,7 +6,7 @@ const publicRoutes = [
   ["/archive", /Every record already pulled/i],
   ["/current", /Heaven or Las Vegas|Masterpiece/i],
   ["/events", /Club plans beyond/i],
-  ["/genres", /This year sounded like this/i],
+  ["/genres", /This is what this year will sound like/i],
   ["/privacy", /What the club account stores/i],
   ["/vote", /What .*should the club listen to next/i],
 ];
@@ -45,7 +45,7 @@ test("the homepage genre feature leads into the dedicated poster page", async ({
 
   await genreLink.click();
   await expect(page).toHaveURL(/\/genres$/);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("This year sounded like this.");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("This is what this year will sound like.");
   await expect(page.getByRole("link", { name: /Open the year in genres poster at full size/i })).toBeVisible();
 });
 

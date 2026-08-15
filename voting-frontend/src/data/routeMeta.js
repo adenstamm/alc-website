@@ -46,8 +46,8 @@ export const ROUTE_META = {
   },
   "/genres": {
     title: "This Year in Genres | Album Listening Club",
-    description: "Explore the dates and genres that shaped Album Listening Club's year of listening.",
-    heading: "This year sounded like this.",
+    description: "Explore the upcoming genres shaping Album Listening Club's year of listening.",
+    heading: "This is what this year will sound like.",
     noIndex: true,
   },
   "/privacy": {

@@ -12,11 +12,10 @@ function Genres({ navigate }) {
         <section className="genres-showcase" aria-labelledby="genres-title">
           <div className="genres-showcase-copy">
             <p className="sideb-kicker">This year in genres</p>
-            <h1 id="genres-title">This year sounded like this.</h1>
+            <h1 id="genres-title">This is what this year will sound like.</h1>
             <p>
-              Every meeting added another corner to the club&apos;s listening map.
-              Open the poster at full size to explore the dates and genres that
-              shaped the year.
+              Every meeting will add another corner to the club&apos;s listening map.
+              Open the poster at full size to explore the genres ahead.
             </p>
             <a
               className="sideb-button sideb-button-ghost"

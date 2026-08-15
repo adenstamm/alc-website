@@ -329,13 +329,7 @@ function Home({
             onClick={(event) => handleRouteLink(event, "/genres")}
           >
             <span className="sideb-genres-teaser-copy">
-              <span className="sideb-genres-teaser-status">
-                <i aria-hidden="true" /> Temporary feature
-              </span>
-              <h2 id="genres-teaser-title">See where this year took us.</h2>
-              <span className="sideb-genres-teaser-description">
-                A date-by-date map of the sounds that moved through the room.
-              </span>
+              <h2 id="genres-teaser-title">Take a look at our upcoming genres!</h2>
               <span className="sideb-genres-teaser-action">
                 View the genres this year <span aria-hidden="true">→</span>
               </span>
