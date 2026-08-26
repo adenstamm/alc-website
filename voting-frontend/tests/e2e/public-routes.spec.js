@@ -109,6 +109,28 @@ test("unknown routes preserve the URL and show a recoverable not-found page", as
   await expect(page.getByRole("link", { name: "Return home" })).toBeVisible();
 });
 
+test("the unlisted Sidney letter opens from its sealed envelope", async ({ page }) => {
+  await page.goto("/for-sidney-7x4m9q");
+
+  await expect(page).toHaveTitle("For Sidney, With Love");
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+    "content",
+    "noindex, nofollow",
+  );
+  await expect(page.locator(".sideb-nav")).toHaveCount(0);
+  await expect(page.locator(".site-footer")).toHaveCount(0);
+
+  const envelope = page.getByRole("button", { name: "Open Sidney's birthday letter" });
+  await expect(envelope).toBeVisible();
+  await envelope.click();
+
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "To the Wonderful Sidney —",
+  );
+  await expect(page.locator(".sidney-letter-page")).toHaveClass(/is-open/);
+  await expect(page.locator(".sidney-letter-sheet")).toHaveAttribute("aria-hidden", "false");
+});
+
 test("signup confirmation only accepts the AlbumASU Supabase verification URL", async ({ page }) => {
   const confirmationUrl = new URL(
     "https://lbcjxqxzsmsmndapvluz.supabase.co/auth/v1/verify",

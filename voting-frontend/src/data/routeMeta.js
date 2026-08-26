@@ -1,4 +1,5 @@
 export const SITE_ORIGIN = "https://albumasu.com";
+export const SIDNEY_LETTER_ROUTE = "/for-sidney-7x4m9q";
 
 export const ROUTE_META = {
   "/": {
@@ -59,6 +60,12 @@ export const ROUTE_META = {
     title: "Reset Password | Album Listening Club",
     description: "Reset your Album Listening Club account password.",
     heading: "Reset your password.",
+    noIndex: true,
+  },
+  [SIDNEY_LETTER_ROUTE]: {
+    title: "For Sidney, With Love",
+    description: "A private birthday letter for one wonderful person.",
+    heading: "To the Wonderful Sidney",
     noIndex: true,
   },
   "/vote": {

@@ -22,6 +22,7 @@ import {
   NO_INDEX_ROUTES,
   ROUTE_META,
   ROUTES,
+  SIDNEY_LETTER_ROUTE,
   SITE_ORIGIN,
 } from "./data/routeMeta";
 import { hasSiteEventsConfig, hasSupabaseConfig, supabase } from "./lib/supabaseClient";
@@ -42,6 +43,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const Poll = lazy(() => import("./pages/Poll"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const SidneyLetter = lazy(() => import("./pages/SidneyLetter"));
 
 const ROUTE_REDIRECTS = new Map([
   ["/results", "/vote"],
@@ -97,6 +99,7 @@ function App() {
   const routerNavigate = useNavigate();
   const navigationType = useNavigationType();
   const currentPath = normalizePath(location.pathname);
+  const isPersonalLetter = currentPath === SIDNEY_LETTER_ROUTE;
   const previousPath = useRef(currentPath);
   const [authReady, setAuthReady] = useState(!hasSupabaseConfig);
   const [session, setSession] = useState(null);
@@ -280,13 +283,15 @@ function App() {
   }
 
   return (
-    <div className="page">
-      <SideBNav
-        authReady={authReady}
-        membership={membership}
-        session={session}
-        showAdminLink={showAdminLink}
-      />
+    <div className={`page ${isPersonalLetter ? "page--personal-letter" : ""}`}>
+      {!isPersonalLetter && (
+        <SideBNav
+          authReady={authReady}
+          membership={membership}
+          session={session}
+          showAdminLink={showAdminLink}
+        />
+      )}
       <RouteErrorBoundary resetKey={currentPath}>
         <Suspense
           fallback={(
@@ -386,6 +391,7 @@ function App() {
                 path="/results"
                 element={<Navigate replace to={`/vote${location.search}${location.hash}`} />}
               />
+              <Route path={SIDNEY_LETTER_ROUTE} element={<SidneyLetter />} />
               <Route
                 path="/vote"
                 element={withRouteData(
@@ -406,7 +412,7 @@ function App() {
               />
               <Route path="*" element={<NotFound />} />
             </Routes>
-            <SiteFooter clubLinks={clubLinks} />
+            {!isPersonalLetter && <SiteFooter clubLinks={clubLinks} />}
           </>
         </Suspense>
       </RouteErrorBoundary>

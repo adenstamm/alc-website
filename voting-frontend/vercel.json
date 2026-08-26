@@ -92,6 +92,10 @@
       "destination": "/privacy/index.html"
     },
     {
+      "source": "/for-sidney-7x4m9q",
+      "destination": "/for-sidney-7x4m9q/index.html"
+    },
+    {
       "source": "/vote",
       "destination": "/vote/index.html"
     }

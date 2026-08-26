@@ -60,6 +60,14 @@
       "rewrite": "/privacy/index.html"
     },
     {
+      "route": "/for-sidney-7x4m9q",
+      "rewrite": "/for-sidney-7x4m9q/index.html",
+      "headers": {
+        "Cache-Control": "no-store, no-transform",
+        "X-Robots-Tag": "noindex, nofollow, noarchive"
+      }
+    },
+    {
       "route": "/vote",
       "rewrite": "/vote/index.html"
     }
