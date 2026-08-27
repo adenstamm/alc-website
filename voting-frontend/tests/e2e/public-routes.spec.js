@@ -15,6 +15,27 @@ test.beforeEach(async ({ page }) => {
   // Keep the suite deterministic when third-party album metadata is unavailable.
   await page.route("https://musicbrainz.org/**", (route) => route.abort());
   await page.route("https://coverartarchive.org/**", (route) => route.abort());
+  await page.route("https://playwright.supabase.co/rest/v1/album_archive_entries**", (route) => (
+    route.fulfill({ body: "[]", contentType: "application/json", status: 200 })
+  ));
+  await page.route("**/api/current-poll", (route) => route.fulfill({
+    body: JSON.stringify({
+      album_of_week: {
+        artist: "Cocteau Twins",
+        title: "Heaven or Las Vegas",
+      },
+      candidates: [],
+      cycle_label: "Test Week",
+      description: "Submit one album for the next club session.",
+      finalists: [],
+      id: "test-poll",
+      phase: "nominations",
+      question: "What should the club listen to next?",
+      status: "Nominations are open",
+    }),
+    contentType: "application/json",
+    status: 200,
+  }));
 });
 
 for (const [path, heading] of publicRoutes) {
@@ -173,7 +194,7 @@ test("approved members can rate the current album separately from their nominati
       "test-signature",
     ].join(".");
 
-    localStorage.setItem("sb-lbcjxqxzsmsmndapvluz-auth-token", JSON.stringify({
+    localStorage.setItem("sb-playwright-auth-token", JSON.stringify({
       access_token: accessToken,
       expires_at: sessionExpiresAt,
       expires_in: 3_600,
