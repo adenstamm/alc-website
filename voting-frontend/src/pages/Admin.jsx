@@ -110,6 +110,7 @@ function Admin({
   const [error, setError] = useState(null);
   const [phaseFeedback, setPhaseFeedback] = useState(null);
   const phaseActionRef = useRef(null);
+  const resultsRequestRef = useRef(0);
   const currentAlbumCoverInputRef = useRef(null);
 
   const canManage = hasSupabaseConfig && isAdmin(membership);
@@ -201,12 +202,18 @@ function Admin({
       return;
     }
 
+    const requestId = resultsRequestRef.current + 1;
+    resultsRequestRef.current = requestId;
     setIsLoadingResults(true);
     setError(null);
 
     const { data, error: loadError } = await supabase.rpc("get_admin_poll_results", {
       target_poll_id: poll.id,
     });
+
+    if (requestId !== resultsRequestRef.current) {
+      return;
+    }
 
     if (loadError) {
       setError(loadError.message);
@@ -267,6 +274,24 @@ function Admin({
       isMounted = false;
     };
   }, [canManage, supabase]);
+
+  useEffect(() => {
+    resultsRequestRef.current += 1;
+    setResults(null);
+    setSelectedFinalistIds([]);
+    setCurrentAlbumForm({
+      title: poll.albumOfWeek.title || "",
+      artist: poll.albumOfWeek.artist || "",
+      note: poll.albumOfWeek.note || "Current club listen",
+      coverUrl: poll.albumOfWeek.coverUrl || "",
+    });
+  }, [
+    poll.id,
+    poll.albumOfWeek.artist,
+    poll.albumOfWeek.coverUrl,
+    poll.albumOfWeek.note,
+    poll.albumOfWeek.title,
+  ]);
 
   useEffect(() => {
     loadResults();
@@ -384,7 +409,6 @@ function Admin({
     setResults(null);
     setSelectedFinalistIds([]);
     await refreshPoll();
-    await loadResults();
   }
 
   function handleMemberTabChange(nextTab) {

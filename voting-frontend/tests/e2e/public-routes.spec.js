@@ -11,6 +11,61 @@ const publicRoutes = [
   ["/vote", /What .*should the club listen to next/i],
 ];
 
+async function installMockSession(page, {
+  displayName,
+  email,
+  userId,
+}) {
+  const expiresAt = Math.floor(Date.now() / 1000) + 3_600;
+
+  await page.addInitScript(({
+    activeDisplayName,
+    activeEmail,
+    activeUserId,
+    sessionExpiresAt,
+  }) => {
+    const encodeJwtPart = (value) => btoa(JSON.stringify(value))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
+    const accessToken = [
+      encodeJwtPart({ alg: "HS256", typ: "JWT" }),
+      encodeJwtPart({
+        aud: "authenticated",
+        email: activeEmail,
+        exp: sessionExpiresAt,
+        role: "authenticated",
+        sub: activeUserId,
+      }),
+      "test-signature",
+    ].join(".");
+
+    localStorage.setItem("sb-playwright-auth-token", JSON.stringify({
+      access_token: accessToken,
+      expires_at: sessionExpiresAt,
+      expires_in: 3_600,
+      refresh_token: "test-refresh-token",
+      token_type: "bearer",
+      user: {
+        app_metadata: { provider: "email", providers: ["email"] },
+        aud: "authenticated",
+        created_at: "2026-08-27T12:00:00.000Z",
+        email: activeEmail,
+        email_confirmed_at: "2026-08-27T12:00:00.000Z",
+        id: activeUserId,
+        role: "authenticated",
+        updated_at: "2026-08-27T12:00:00.000Z",
+        user_metadata: { display_name: activeDisplayName },
+      },
+    }));
+  }, {
+    activeDisplayName: displayName,
+    activeEmail: email,
+    activeUserId: userId,
+    sessionExpiresAt: expiresAt,
+  });
+}
+
 test.beforeEach(async ({ page }) => {
   // Keep the suite deterministic when third-party album metadata is unavailable.
   await page.route("https://musicbrainz.org/**", (route) => route.abort());
@@ -174,45 +229,11 @@ test("temporary ballot failures offer a working reload action", async ({ page })
 
 test("approved members can rate the current album separately from their nomination", async ({ page }) => {
   const userId = "11111111-1111-4111-8111-111111111111";
-  const expiresAt = Math.floor(Date.now() / 1000) + 3_600;
-
-  await page.addInitScript(({ activeUserId, sessionExpiresAt }) => {
-    const encodeJwtPart = (value) => btoa(JSON.stringify(value))
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/g, "");
-    const email = "rating-test@albumasu.com";
-    const accessToken = [
-      encodeJwtPart({ alg: "HS256", typ: "JWT" }),
-      encodeJwtPart({
-        aud: "authenticated",
-        email,
-        exp: sessionExpiresAt,
-        role: "authenticated",
-        sub: activeUserId,
-      }),
-      "test-signature",
-    ].join(".");
-
-    localStorage.setItem("sb-playwright-auth-token", JSON.stringify({
-      access_token: accessToken,
-      expires_at: sessionExpiresAt,
-      expires_in: 3_600,
-      refresh_token: "test-refresh-token",
-      token_type: "bearer",
-      user: {
-        app_metadata: { provider: "email", providers: ["email"] },
-        aud: "authenticated",
-        created_at: "2026-08-27T12:00:00.000Z",
-        email,
-        email_confirmed_at: "2026-08-27T12:00:00.000Z",
-        id: activeUserId,
-        role: "authenticated",
-        updated_at: "2026-08-27T12:00:00.000Z",
-        user_metadata: { display_name: "Rating Tester" },
-      },
-    }));
-  }, { activeUserId: userId, sessionExpiresAt: expiresAt });
+  await installMockSession(page, {
+    displayName: "Rating Tester",
+    email: "rating-test@albumasu.com",
+    userId,
+  });
 
   await page.route("**/rest/v1/memberships**", (route) => route.fulfill({
     body: JSON.stringify([{
@@ -282,6 +303,123 @@ test("approved members can rate the current album separately from their nominati
   await expect(page.getByText("Your rating", { exact: true })).toBeVisible();
   await expect(page.getByText("8/10", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Album title")).toBeVisible();
+});
+
+test("creating a poll never reloads the archived poll results", async ({ page }) => {
+  const userId = "22222222-2222-4222-8222-222222222222";
+  let pollCreated = false;
+  const resultRequests = [];
+
+  await installMockSession(page, {
+    displayName: "Admin Tester",
+    email: "admin-test@albumasu.com",
+    userId,
+  });
+
+  await page.route("**/rest/v1/memberships**", (route) => route.fulfill({
+    body: JSON.stringify([{
+      created_at: "2026-08-27T12:00:00.000Z",
+      display_name: "Admin Tester",
+      email: "admin-test@albumasu.com",
+      role: "admin",
+      status: "approved",
+      updated_at: "2026-08-27T12:00:00.000Z",
+      user_id: userId,
+    }]),
+    contentType: "application/json",
+    status: 200,
+  }));
+  await page.route("**/rest/v1/record_shelf_covers**", (route) => route.fulfill({
+    body: "[]",
+    contentType: "application/json",
+    status: 200,
+  }));
+  await page.route("**/rest/v1/rpc/get_admin_poll_results", async (route) => {
+    const { target_poll_id: targetPollId } = route.request().postDataJSON();
+    resultRequests.push({ afterCreate: pollCreated, pollId: targetPollId });
+    const nominations = targetPollId === "finished-poll"
+      ? [{
+          artist: "Previous Artist",
+          id: "previous-candidate",
+          nominationCount: 1,
+          title: "Old nomination that must disappear",
+        }]
+      : [];
+
+    await route.fulfill({
+      body: JSON.stringify({
+        currentAlbumRating: { averageRating: null, ratingCount: 0 },
+        finalists: [],
+        irv: { rounds: [], tie: null, winnerId: null },
+        nominations,
+        primaryResults: [],
+      }),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
+  await page.route("**/rest/v1/rpc/create_poll", async (route) => {
+    const requestBody = route.request().postDataJSON();
+    expect(requestBody.new_poll_id).toBe("poll-week-3-jazz");
+    pollCreated = true;
+    await route.fulfill({
+      body: JSON.stringify({ id: requestBody.new_poll_id }),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
+  await page.route("**/api/current-poll", (route) => route.fulfill({
+    body: JSON.stringify(pollCreated ? {
+      album_of_week: { artist: "Tame Impala", title: "Currents" },
+      candidates: [],
+      cycle_label: "Week 3 - Jazz",
+      description: "Nominate a jazz album for next week.",
+      finalists: [],
+      id: "poll-week-3-jazz",
+      phase: "nominations",
+      question: "What jazz album should the club listen to next?",
+      status: "Nominations are open",
+    } : {
+      album_of_week: { artist: "Fleetwood Mac", title: "Rumours" },
+      candidates: [{
+        artist: "Previous Artist",
+        id: "previous-candidate",
+        title: "Old nomination that must disappear",
+      }],
+      cycle_label: "Finished Week",
+      description: "The finished poll.",
+      finalists: [{
+        artist: "Previous Artist",
+        id: "previous-candidate",
+        title: "Old nomination that must disappear",
+      }],
+      id: "finished-poll",
+      phase: "final",
+      question: "Final ranking",
+      status: "Final voting is complete",
+    }),
+    contentType: "application/json",
+    status: 200,
+  }));
+
+  await page.goto("/admin");
+  await expect(page.locator(".admin-rating-summary")).toBeVisible();
+  const requestCountBeforeCreate = resultRequests.length;
+
+  await page.getByLabel("Cycle label").fill("Week 3 - Jazz");
+  await page.getByLabel("Current album title").fill("Currents");
+  await page.getByLabel("Current album artist").fill("Tame Impala");
+  await page.getByRole("button", { name: "Create active poll" }).click();
+
+  await expect(page.getByText("New poll created and set active.")).toBeVisible();
+  await expect.poll(() => resultRequests.length).toBeGreaterThan(requestCountBeforeCreate);
+  expect(
+    resultRequests
+      .slice(requestCountBeforeCreate)
+      .every(({ pollId }) => pollId === "poll-week-3-jazz"),
+  ).toBeTruthy();
+  await expect(page.getByText("Old nomination that must disappear", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("No nominations have been submitted yet.")).toBeVisible();
 });
 
 test("the unlisted Sidney letter opens from its sealed envelope", async ({ page }) => {
