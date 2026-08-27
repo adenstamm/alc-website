@@ -1,5 +1,5 @@
 import bannedAlbumsText from "../bannedAlbums.txt?raw";
-import { parseAlbumArchiveText } from "./albumArchive";
+import { mergeAlbumArchiveEntries, parseAlbumArchiveText } from "./albumArchive";
 
 export const RECORD_SHELF_BUCKET = "record-shelf-covers";
 
@@ -46,10 +46,17 @@ export function getRecentShelfAlbums() {
   }));
 }
 
-export function getAlbumArchive() {
-  return parseAlbumArchiveText(bannedAlbumsText).map((album, index, albums) => ({
+export function getAlbumArchive(dynamicEntries = []) {
+  const archiveAlbums = mergeAlbumArchiveEntries(
+    parseAlbumArchiveText(bannedAlbumsText),
+    dynamicEntries,
+  );
+
+  return archiveAlbums.map((album, index, albums) => ({
     ...album,
-    id: `${slugify(album.title) || "archive-album"}-${index}`,
+    id: album.pollId
+      ? `archive-${slugify(album.pollId) || index}`
+      : `${slugify(album.title) || "archive-album"}-${index}`,
     sessionNumber: index + 1,
     reverseSessionNumber: albums.length - index,
   }));

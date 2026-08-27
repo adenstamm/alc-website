@@ -21,6 +21,7 @@ import {
   getAdminActionErrorMessage,
 } from "../lib/adminActions";
 import { getRequiredFinalistCount } from "../lib/votingLogic";
+import { formatAverageRating } from "../lib/currentAlbumRating";
 
 function isAdmin(membership) {
   return membership?.status === "approved" && membership?.role === "admin";
@@ -121,6 +122,10 @@ function Admin({
   const irvTie = results?.irv?.tie || null;
   const irvWinnerId = results?.irv?.winnerId || null;
   const irvWinner = finalRows.find((candidate) => candidate.id === irvWinnerId);
+  const currentAlbumRatingAverage = formatAverageRating(
+    results?.currentAlbumRating?.averageRating,
+  );
+  const currentAlbumRatingCount = results?.currentAlbumRating?.ratingCount || 0;
   const selectedCount = selectedFinalistIds.length;
   const requiredFinalistCount = getRequiredFinalistCount(primaryRows.length);
   const canAdvanceToFinal =
@@ -1193,6 +1198,34 @@ function Admin({
           </p>
         ) : null}
         {isLoadingResults ? <p className="helper-note">Loading live results...</p> : null}
+
+        {results ? (
+          <section className="admin-rating-summary" aria-labelledby="admin-rating-summary-title">
+            <div>
+              <span>Current album rating</span>
+              <h3 id="admin-rating-summary-title">
+                {poll.albumOfWeek?.title || "Current album"}
+              </h3>
+              <p>
+                {currentAlbumRatingCount
+                  ? formatCount(currentAlbumRatingCount, "member rating")
+                  : "No member ratings yet."}
+              </p>
+            </div>
+            <strong>
+              {currentAlbumRatingAverage || "—"}
+              <small>/10</small>
+            </strong>
+            <button
+              className="button button-secondary"
+              type="button"
+              disabled={isLoadingResults}
+              onClick={loadResults}
+            >
+              {isLoadingResults ? "Refreshing…" : "Refresh rating"}
+            </button>
+          </section>
+        ) : null}
 
         {poll.phase === "nominations" ? (
           <>

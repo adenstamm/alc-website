@@ -7,7 +7,11 @@ export function getAccountStatus(session, membership) {
     return "unverified";
   }
 
-  if (!membership || membership.status === "pending") {
+  if (
+    !membership ||
+    membership.user_id !== session.user.id ||
+    membership.status === "pending"
+  ) {
     return "pending";
   }
 

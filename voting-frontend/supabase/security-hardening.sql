@@ -26,6 +26,8 @@ alter table public.banned_artists enable row level security;
 alter table public.polls enable row level security;
 alter table public.poll_candidates enable row level security;
 alter table public.vote_choices enable row level security;
+alter table public.album_ratings enable row level security;
+alter table public.album_archive_entries enable row level security;
 alter table public.record_shelf_covers enable row level security;
 alter table public.site_events enable row level security;
 
@@ -168,6 +170,23 @@ to authenticated
 using ((select app_private.is_admin()))
 with check ((select app_private.is_admin()));
 
+drop policy if exists "members can read own album rating" on public.album_ratings;
+create policy "members can read own album rating"
+on public.album_ratings
+for select
+to authenticated
+using (
+  user_id = (select auth.uid())
+  or (select app_private.is_admin())
+);
+
+drop policy if exists "anyone can read album archive entries" on public.album_archive_entries;
+create policy "anyone can read album archive entries"
+on public.album_archive_entries
+for select
+to anon, authenticated
+using (true);
+
 drop policy if exists "Admins can manage record shelf covers" on public.record_shelf_covers;
 create policy "Admins can manage record shelf covers"
 on public.record_shelf_covers
@@ -225,6 +244,8 @@ revoke all privileges on table
   public.polls,
   public.poll_candidates,
   public.vote_choices,
+  public.album_ratings,
+  public.album_archive_entries,
   public.record_shelf_covers,
   public.site_events
 from public, anon, authenticated;
@@ -234,6 +255,9 @@ grant update on table public.memberships to authenticated;
 
 grant select on table public.votes to authenticated;
 grant select on table public.vote_choices to authenticated;
+grant select on table public.album_ratings to authenticated;
+
+grant select on table public.album_archive_entries to anon, authenticated;
 
 -- These two tables drive public, non-sensitive site content. Their RLS
 -- policies still restrict writes to approved admins.
@@ -343,6 +367,7 @@ begin
         'save_finalists',
         'advance_to_final',
         'submit_final_ballot',
+        'submit_current_album_rating',
         'calculate_irv_result',
         'get_admin_poll_results',
         'create_poll',
@@ -371,6 +396,7 @@ grant execute on function public.update_own_display_name(text) to authenticated;
 grant execute on function public.submit_nomination(text, text, text) to authenticated;
 grant execute on function public.submit_primary_ballot(text, text[]) to authenticated;
 grant execute on function public.submit_final_ballot(text, text[]) to authenticated;
+grant execute on function public.submit_current_album_rating(text, integer) to authenticated;
 
 -- Admin RPCs. Each function also checks public.is_admin() internally.
 grant execute on function public.get_admin_poll_results(text) to authenticated;

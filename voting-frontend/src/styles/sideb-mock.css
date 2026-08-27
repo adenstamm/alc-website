@@ -2534,6 +2534,17 @@
   margin-bottom: 0;
 }
 
+.ballot-recovery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.ballot-recovery-actions .button {
+  width: auto;
+}
+
 .auth-panel {
   margin-top: 24px;
 }
@@ -3793,6 +3804,294 @@
   .site-footer-links a,
   .site-footer-external a {
     transform: none;
+  }
+}
+
+/* Current-listen ratings: one member score during nominations, one durable archive average. */
+.current-album-rating {
+  display: grid;
+  gap: 22px;
+  margin-bottom: 32px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--border-console);
+}
+
+.current-album-rating-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.current-album-rating-heading .eyebrow {
+  margin: 0 0 10px;
+}
+
+.current-album-rating-heading h3 {
+  margin: 0;
+  color: var(--color-cream-strong);
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 3vw, 2.45rem);
+  font-weight: 350;
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+}
+
+.current-album-rating-heading p:not(.eyebrow) {
+  margin: 8px 0 0;
+  color: var(--color-muted);
+}
+
+.current-album-rating-heading > span {
+  flex: 0 0 auto;
+  color: var(--color-signal-soft);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.current-album-rating-form {
+  display: grid;
+  gap: 16px;
+}
+
+.current-album-rating-form fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.current-album-rating-form legend {
+  margin-bottom: 11px;
+  color: var(--color-muted-strong);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rating-scale {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(42px, 1fr));
+  gap: 6px;
+}
+
+.rating-scale-option {
+  position: relative;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.rating-scale-option input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.rating-scale-option > span {
+  display: grid;
+  pointer-events: none;
+  min-height: 46px;
+  place-items: center;
+  border: 1px solid var(--border-console);
+  border-radius: 2px;
+  background: rgba(8, 5, 3, 0.28);
+  color: var(--color-muted-strong);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  transition:
+    border-color 150ms ease-out,
+    background-color 150ms ease-out,
+    color 150ms ease-out,
+    transform 150ms ease-out;
+}
+
+.rating-scale-option:hover > span {
+  border-color: rgba(201, 123, 60, 0.55);
+  color: var(--color-cream-strong);
+  transform: translateY(-1px);
+}
+
+.rating-scale-option:focus-within > span {
+  outline: 2px solid var(--color-signal-soft);
+  outline-offset: 2px;
+}
+
+.rating-scale-option.is-selected > span {
+  border-color: var(--color-signal);
+  background: rgba(201, 123, 60, 0.18);
+  color: var(--color-cream-strong);
+}
+
+.current-album-rating-form fieldset:disabled .rating-scale-option {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.current-album-rating-saved {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 6px 20px;
+  padding-block: 4px;
+}
+
+.current-album-rating-saved > span {
+  color: var(--color-signal-soft);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.current-album-rating-saved > strong {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  color: var(--color-cream-strong);
+  font-family: var(--font-display);
+  font-size: clamp(2.8rem, 5vw, 4.2rem);
+  font-weight: 350;
+  line-height: 0.85;
+}
+
+.current-album-rating-saved small,
+.admin-rating-summary small,
+.archive-catalog-rating small {
+  color: currentColor;
+  font-family: var(--font-mono);
+  font-size: 0.34em;
+  font-weight: 400;
+}
+
+.current-album-rating-saved > p {
+  margin: 0;
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+
+.admin-rating-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 18px 28px;
+  margin-bottom: 24px;
+  padding-block: 22px;
+  border-block: 1px solid var(--border-console);
+}
+
+.admin-rating-summary span {
+  color: var(--color-signal);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.admin-rating-summary h3 {
+  margin: 6px 0 0;
+  color: var(--color-cream-strong);
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  font-weight: 350;
+  line-height: 1.1;
+}
+
+.admin-rating-summary p {
+  margin: 7px 0 0;
+  color: var(--color-muted);
+  font-size: 0.86rem;
+}
+
+.admin-rating-summary > strong {
+  min-width: 108px;
+  color: var(--color-cream-strong);
+  font-family: var(--font-display);
+  font-size: 3.3rem;
+  font-weight: 350;
+  line-height: 0.9;
+  text-align: right;
+}
+
+.archive-sync-message {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 24px;
+  padding: 14px 16px;
+  border: 1px solid rgba(228, 127, 115, 0.3);
+  color: #f0aaa1;
+}
+
+.archive-catalog-row {
+  grid-template-columns: 88px minmax(0, 1fr) auto;
+}
+
+.archive-catalog-rating {
+  display: grid;
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  align-self: center;
+  justify-items: end;
+  min-width: 64px;
+  padding-left: 10px;
+  color: #3f2a1d;
+}
+
+.archive-catalog-rating > strong {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.archive-catalog-rating > span {
+  margin-top: 5px;
+  color: #694a35;
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 760px) {
+  .rating-scale {
+    grid-template-columns: repeat(5, minmax(44px, 1fr));
+  }
+
+  .admin-rating-summary {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .admin-rating-summary .button {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
+@media (max-width: 540px) {
+  .current-album-rating-heading,
+  .archive-sync-message {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .current-album-rating-heading > span {
+    align-self: flex-start;
+  }
+
+  .archive-catalog-row {
+    grid-template-columns: 76px minmax(0, 1fr) auto;
+  }
+
+  .archive-catalog-rating {
+    min-width: 56px;
   }
 }
 

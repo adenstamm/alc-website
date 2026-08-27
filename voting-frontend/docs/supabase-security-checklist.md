@@ -8,7 +8,7 @@ The browser uses the publishable/anon key, so the `public` schema remains expose
 
 Anonymous visitors should only have:
 
-- `SELECT` on `site_events` and `record_shelf_covers`, which are public website content.
+- `SELECT` on `site_events`, `record_shelf_covers`, and `album_archive_entries`, which are public website content.
 - Public reads from the `record-shelf-covers` Storage bucket. Its files are intentionally public; only admins may upload, replace, or delete them.
 
 Signed-in users additionally get the member/admin RPCs used by the app and these direct table operations:
@@ -17,6 +17,8 @@ Signed-in users additionally get the member/admin RPCs used by the app and these
 | --- | --- | --- |
 | `memberships` | `SELECT`, `UPDATE` | Own row can be read; only admins can update rows. A member changes their own display name through the RPC. |
 | `votes`, `vote_choices` | `SELECT` only | Members see their own ballot; admins can read all. Inserts only work through ballot RPCs. |
+| `album_ratings` | `SELECT` only | Members see their own current-album rating; admins can read all. Inserts only work through the rating RPC. |
+| `album_archive_entries` | `SELECT` | Everyone can read archived album averages; writes only occur inside the admin poll-creation RPC. |
 | `site_events` | `SELECT`, `INSERT`, `UPDATE`, `DELETE` | Everyone can read; only admins can write. |
 | `record_shelf_covers` | `SELECT`, `INSERT`, `UPDATE`, `DELETE` | Everyone can read; only admins can write. |
 
@@ -30,7 +32,7 @@ their bearer token.
 
 ## Dashboard checks before launch
 
-- In **Database > Tables**, confirm RLS is enabled for every app table: `memberships`, `votes`, `vote_choices`, `polls`, `poll_candidates`, `banned_albums`, `banned_artists`, `site_events`, and `record_shelf_covers`.
+- In **Database > Tables**, confirm RLS is enabled for every app table: `memberships`, `votes`, `vote_choices`, `album_ratings`, `album_archive_entries`, `polls`, `poll_candidates`, `banned_albums`, `banned_artists`, `site_events`, and `record_shelf_covers`.
 - In **Project Settings > Data API**, keep the exposed schemas list minimal. `public` is required by this frontend; do not add a private/admin schema.
 - In **Project Settings > Data API**, turn off **Automatically expose new tables and functions** (if shown) and keep the RLS-on-by-default option enabled. The migration also revokes default grants so new objects fail closed.
 - In **Project Settings > API Keys**, use only the publishable/anon key in `VITE_SUPABASE_ANON_KEY`. Never put `service_role`, secret, or database credentials in a `VITE_` variable. Rotate any secret that has ever been committed or shipped to a browser.
@@ -62,13 +64,15 @@ from pg_catalog.pg_class c
 join pg_catalog.pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'public'
   and c.relname = any (array[
-    'memberships', 'votes', 'vote_choices', 'polls', 'poll_candidates',
-    'banned_albums', 'banned_artists', 'site_events', 'record_shelf_covers'
+    'memberships', 'votes', 'vote_choices', 'album_ratings',
+    'album_archive_entries', 'polls', 'poll_candidates', 'banned_albums',
+    'banned_artists', 'site_events', 'record_shelf_covers'
   ])
 order by c.relname;
 ```
 
-Review the effective table grants. They should match the table above; in particular, neither ballot table should show `INSERT`:
+Review the effective table grants. They should match the table above; in
+particular, the ballot and rating tables should not show `INSERT`:
 
 ```sql
 select grantee, table_name, privilege_type
@@ -78,17 +82,18 @@ where table_schema = 'public'
 order by grantee, table_name, privilege_type;
 ```
 
-Confirm that the unsafe ballot insert policies are absent:
+Confirm that the unsafe ballot and rating insert policies are absent:
 
 ```sql
 select tablename, policyname, cmd, roles
 from pg_catalog.pg_policies
 where schemaname = 'public'
-  and tablename in ('votes', 'vote_choices')
+  and tablename in ('votes', 'vote_choices', 'album_ratings')
 order by tablename, policyname;
 ```
 
-`votes` and `vote_choices` should only show their read/admin policies; neither should show an `INSERT` policy.
+`votes`, `vote_choices`, and `album_ratings` should only show their read/admin
+policies; none should show an `INSERT` policy.
 
 Review callable functions. `PUBLIC` and `anon` should have no application
 function grants. `authenticated` should have the explicitly listed member/admin

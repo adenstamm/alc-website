@@ -14,6 +14,7 @@ function test(name, fn) {
 
 const confirmedSession = {
   user: {
+    id: "member-1",
     email_confirmed_at: "2026-07-10T12:00:00.000Z",
     user_metadata: { display_name: "Sleeve Note" },
   },
@@ -23,9 +24,10 @@ test("account status follows session verification and membership approval", () =
   assert.equal(getAccountStatus(null, null), "signed-out");
   assert.equal(getAccountStatus({ user: { email_confirmed_at: null } }, null), "unverified");
   assert.equal(getAccountStatus(confirmedSession, null), "pending");
-  assert.equal(getAccountStatus(confirmedSession, { status: "pending" }), "pending");
-  assert.equal(getAccountStatus(confirmedSession, { status: "rejected" }), "blocked");
-  assert.equal(getAccountStatus(confirmedSession, { status: "approved" }), "approved");
+  assert.equal(getAccountStatus(confirmedSession, { user_id: "member-1", status: "pending" }), "pending");
+  assert.equal(getAccountStatus(confirmedSession, { user_id: "member-1", status: "rejected" }), "blocked");
+  assert.equal(getAccountStatus(confirmedSession, { user_id: "member-1", status: "approved" }), "approved");
+  assert.equal(getAccountStatus(confirmedSession, { user_id: "member-2", status: "approved" }), "pending");
 });
 
 test("account name prefers the approved profile and falls back to auth metadata", () => {

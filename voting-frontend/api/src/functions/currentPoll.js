@@ -1,7 +1,7 @@
 import { app } from "@azure/functions";
 
 import {
-  checkRateLimit,
+  checkPollRateLimit,
   getClientAddress,
   hasUserAccessToken,
   loadCurrentPoll,
@@ -17,7 +17,15 @@ app.http("current-poll", {
   authLevel: "anonymous",
   route: "current-poll",
   handler: async (request, context) => {
-    const rateLimit = checkRateLimit(getClientAddress(request));
+    // Azure Static Web Apps may populate Authorization with its own platform
+    // token. Only trust the application-specific session value set by our
+    // same-origin client and rebuild the Supabase bearer header server-side.
+    const sessionToken = request.headers.get("x-albumasu-session");
+    const authorizationHeader = sessionToken ? `Bearer ${sessionToken}` : null;
+    const rateLimit = checkPollRateLimit({
+      clientAddress: getClientAddress(request),
+      sessionToken,
+    });
 
     if (!rateLimit.allowed) {
       return {
@@ -27,16 +35,13 @@ app.http("current-poll", {
           ...SECURITY_HEADERS,
           "Cache-Control": "no-store",
           "Retry-After": String(rateLimit.retryAfter),
+          "Vary": "X-AlbumASU-Session",
+          "X-RateLimit-Limit": String(rateLimit.limit),
           "X-RateLimit-Remaining": "0",
+          "X-RateLimit-Scope": rateLimit.scope,
         },
       };
     }
-
-    // Azure Static Web Apps may populate Authorization with its own platform
-    // token. Only trust the application-specific session value set by our
-    // same-origin client and rebuild the Supabase bearer header server-side.
-    const sessionToken = request.headers.get("x-albumasu-session");
-    const authorizationHeader = sessionToken ? `Bearer ${sessionToken}` : null;
 
     try {
       const poll = await loadCurrentPoll(authorizationHeader);
@@ -47,10 +52,12 @@ app.http("current-poll", {
         jsonBody: poll,
         headers: {
           ...SECURITY_HEADERS,
-          "Cache-Control": isAuthenticated
-            ? "private, no-store"
-            : "public, max-age=15, s-maxage=30, stale-while-revalidate=120",
+          "Cache-Control": "no-store",
+          "Vary": "X-AlbumASU-Session",
+          "X-AlbumASU-Poll-Scope": isAuthenticated ? "member" : "public",
+          "X-RateLimit-Limit": String(rateLimit.limit),
           "X-RateLimit-Remaining": String(rateLimit.remaining),
+          "X-RateLimit-Scope": rateLimit.scope,
         },
       };
     } catch (error) {
@@ -69,6 +76,7 @@ app.http("current-poll", {
         headers: {
           ...SECURITY_HEADERS,
           "Cache-Control": "no-store",
+          "Vary": "X-AlbumASU-Session",
         },
       };
     }

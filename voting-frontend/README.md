@@ -90,7 +90,8 @@ Apply the SQL files in this order:
 2. `supabase/nomination-validation.sql`
 3. `supabase/three-phase-voting.sql`
 4. `supabase/site-content.sql`
-5. `supabase/security-hardening.sql` **last**
+5. `supabase/current-album-ratings.sql`
+6. `supabase/security-hardening.sql` **last**
 
 Create the first account through `/account`, then promote its `memberships` row
 to `status = 'approved'` and `role = 'admin'`. Future accounts can be reviewed

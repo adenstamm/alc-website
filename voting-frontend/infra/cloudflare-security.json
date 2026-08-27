@@ -17,13 +17,13 @@
   ],
   "rateLimitingRules": [
     {
-      "name": "Limit abusive request bursts",
+      "name": "Limit abusive API request bursts",
       "action": "block",
-      "expression": "http.host eq \"albumasu.com\" or http.host eq \"www.albumasu.com\"",
+      "expression": "(http.host eq \"albumasu.com\" or http.host eq \"www.albumasu.com\") and starts_with(http.request.uri.path, \"/api/\")",
       "characteristics": [
         "ip.src"
       ],
-      "requestsPerPeriod": 200,
+      "requestsPerPeriod": 500,
       "periodSeconds": 10,
       "mitigationTimeoutSeconds": 10
     }

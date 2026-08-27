@@ -1,5 +1,9 @@
-const MAX_REQUESTS_PER_WINDOW = 60;
+import { createHash } from "node:crypto";
+
 const RATE_LIMIT_WINDOW_MS = 60_000;
+const AUTHENTICATED_REQUESTS_PER_WINDOW = 30;
+const ANONYMOUS_REQUESTS_PER_WINDOW = 300;
+const NETWORK_REQUESTS_PER_WINDOW = 1_000;
 const MAX_TRACKED_CLIENTS = 10_000;
 const requestBuckets = new Map();
 
@@ -26,13 +30,20 @@ export function getClientAddress(request) {
   );
 }
 
-export function checkRateLimit(clientAddress, now = Date.now()) {
-  const currentBucket = requestBuckets.get(clientAddress);
+export function checkRateLimit(
+  identifier,
+  {
+    maxRequests = ANONYMOUS_REQUESTS_PER_WINDOW,
+    now = Date.now(),
+    windowMs = RATE_LIMIT_WINDOW_MS,
+  } = {},
+) {
+  const currentBucket = requestBuckets.get(identifier);
 
-  if (!currentBucket || now - currentBucket.startedAt >= RATE_LIMIT_WINDOW_MS) {
+  if (!currentBucket || now - currentBucket.startedAt >= windowMs) {
     if (!currentBucket && requestBuckets.size >= MAX_TRACKED_CLIENTS) {
       for (const [address, bucket] of requestBuckets) {
-        if (now - bucket.startedAt >= RATE_LIMIT_WINDOW_MS) {
+        if (now - bucket.startedAt >= windowMs) {
           requestBuckets.delete(address);
         }
       }
@@ -43,21 +54,64 @@ export function checkRateLimit(clientAddress, now = Date.now()) {
       }
     }
 
-    requestBuckets.set(clientAddress, { count: 1, startedAt: now });
-    return { allowed: true, remaining: MAX_REQUESTS_PER_WINDOW - 1, retryAfter: 0 };
+    requestBuckets.set(identifier, { count: 1, startedAt: now });
+    return {
+      allowed: true,
+      limit: maxRequests,
+      remaining: maxRequests - 1,
+      retryAfter: 0,
+    };
   }
 
   currentBucket.count += 1;
 
   const retryAfter = Math.max(
     1,
-    Math.ceil((RATE_LIMIT_WINDOW_MS - (now - currentBucket.startedAt)) / 1000),
+    Math.ceil((windowMs - (now - currentBucket.startedAt)) / 1000),
   );
 
   return {
-    allowed: currentBucket.count <= MAX_REQUESTS_PER_WINDOW,
-    remaining: Math.max(0, MAX_REQUESTS_PER_WINDOW - currentBucket.count),
+    allowed: currentBucket.count <= maxRequests,
+    limit: maxRequests,
+    remaining: Math.max(0, maxRequests - currentBucket.count),
     retryAfter,
+  };
+}
+
+function fingerprintSessionToken(sessionToken) {
+  return createHash("sha256").update(sessionToken).digest("base64url");
+}
+
+export function checkPollRateLimit(
+  { clientAddress, sessionToken },
+  now = Date.now(),
+) {
+  const networkLimit = checkRateLimit(`network:${clientAddress}`, {
+    maxRequests: NETWORK_REQUESTS_PER_WINDOW,
+    now,
+  });
+
+  if (!networkLimit.allowed) {
+    return { ...networkLimit, scope: "network" };
+  }
+
+  const isAuthenticatedRequest = hasUserAccessToken(
+    sessionToken ? `Bearer ${sessionToken}` : null,
+  );
+  const requestLimit = isAuthenticatedRequest
+    ? checkRateLimit(`session:${fingerprintSessionToken(sessionToken)}`, {
+        maxRequests: AUTHENTICATED_REQUESTS_PER_WINDOW,
+        now,
+      })
+    : checkRateLimit(`anonymous:${clientAddress}`, {
+        maxRequests: ANONYMOUS_REQUESTS_PER_WINDOW,
+        now,
+      });
+
+  return {
+    ...requestLimit,
+    remaining: Math.min(networkLimit.remaining, requestLimit.remaining),
+    scope: isAuthenticatedRequest ? "session" : "anonymous-network",
   };
 }
 

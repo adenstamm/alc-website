@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { formatAverageRating } from "../lib/currentAlbumRating";
 import { getVisibleArchiveAlbums } from "../lib/archiveCatalog";
 import { getAlbumArchive } from "../lib/recordShelf";
+import { hasSupabaseConfig, supabase } from "../lib/supabaseClient";
 
 const archiveSortLabels = {
   newest: "Newest first",
@@ -14,8 +16,14 @@ function Archive() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortMode, setSortMode] = useState("newest");
   const [visibleCount, setVisibleCount] = useState(ARCHIVE_PAGE_SIZE);
+  const [dynamicArchiveEntries, setDynamicArchiveEntries] = useState([]);
+  const [archiveSyncError, setArchiveSyncError] = useState(null);
+  const [isLoadingArchiveEntries, setIsLoadingArchiveEntries] = useState(false);
   const searchInputRef = useRef(null);
-  const archiveAlbums = useMemo(() => getAlbumArchive(), []);
+  const archiveAlbums = useMemo(
+    () => getAlbumArchive(dynamicArchiveEntries),
+    [dynamicArchiveEntries],
+  );
   const visibleAlbums = useMemo(
     () => getVisibleArchiveAlbums(archiveAlbums, searchTerm, sortMode),
     [archiveAlbums, searchTerm, sortMode],
@@ -27,6 +35,32 @@ function Archive() {
   useEffect(() => {
     setVisibleCount(ARCHIVE_PAGE_SIZE);
   }, [searchTerm, sortMode]);
+
+  const loadDynamicArchiveEntries = useCallback(async () => {
+    if (!hasSupabaseConfig || !supabase) {
+      return;
+    }
+
+    setIsLoadingArchiveEntries(true);
+    setArchiveSyncError(null);
+
+    const { data, error } = await supabase
+      .from("album_archive_entries")
+      .select("poll_id, album_title, artist_name, average_rating, rating_count, archived_at")
+      .order("archived_at", { ascending: true });
+
+    if (error) {
+      setArchiveSyncError("Recent club ratings could not be loaded.");
+    } else {
+      setDynamicArchiveEntries(data || []);
+    }
+
+    setIsLoadingArchiveEntries(false);
+  }, []);
+
+  useEffect(() => {
+    loadDynamicArchiveEntries();
+  }, [loadDynamicArchiveEntries]);
 
   function handleClearSearch() {
     setSearchTerm("");
@@ -104,6 +138,20 @@ function Archive() {
           </p>
         </form>
 
+        {archiveSyncError ? (
+          <div className="archive-sync-message" role="alert">
+            <span>{archiveSyncError} The historical archive is still available.</span>
+            <button
+              className="button button-secondary"
+              type="button"
+              disabled={isLoadingArchiveEntries}
+              onClick={loadDynamicArchiveEntries}
+            >
+              {isLoadingArchiveEntries ? "Retrying…" : "Retry recent ratings"}
+            </button>
+          </div>
+        ) : null}
+
         <div id="archive-results">
           {visibleAlbums.length ? (
             <section className="archive-catalog-section" aria-labelledby="archive-results-heading">
@@ -130,6 +178,12 @@ function Archive() {
                     >
                       {album.artist || "Artist not listed"}
                     </span>
+                    {album.ratingCount > 0 && formatAverageRating(album.averageRating) ? (
+                      <span className="archive-catalog-rating">
+                        <strong>{formatAverageRating(album.averageRating)}<small>/10</small></strong>
+                        <span>{album.ratingCount} {album.ratingCount === 1 ? "rating" : "ratings"}</span>
+                      </span>
+                    ) : null}
                   </li>
                 ))}
               </ul>

@@ -3,6 +3,11 @@ import { useEffect, useMemo, useState } from "react";
 import { phaseContent } from "../data/clubContent";
 import { getAccountStatus } from "../lib/accountStatus";
 import {
+  getCurrentAlbumRatingError,
+  normalizeCurrentAlbumRating,
+  validateCurrentAlbumRating,
+} from "../lib/currentAlbumRating";
+import {
   getNominationSubmissionError,
   validateNominationInput,
 } from "../lib/nominationValidation";
@@ -128,13 +133,20 @@ function Poll({
   navigate,
   poll,
   pollError,
+  pollErrorStatus,
   refreshPoll,
   session,
   supabase,
 }) {
   const [formState, setFormState] = useState(() => createDefaultFormState(poll));
   const [storedBallot, setStoredBallot] = useState(null);
+  const [storedCurrentAlbumRating, setStoredCurrentAlbumRating] = useState(null);
+  const [currentAlbumRating, setCurrentAlbumRating] = useState("");
+  const [currentAlbumRatingError, setCurrentAlbumRatingError] = useState(null);
+  const [isLoadingCurrentAlbumRating, setIsLoadingCurrentAlbumRating] = useState(false);
+  const [isSubmittingCurrentAlbumRating, setIsSubmittingCurrentAlbumRating] = useState(false);
   const [isLoadingVote, setIsLoadingVote] = useState(false);
+  const [isRefreshingBallot, setIsRefreshingBallot] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
 
@@ -157,6 +169,8 @@ function Poll({
         .filter(Boolean),
     [candidateOptions, formState.rankedCandidateIds],
   );
+  const ballotNeedsCandidates =
+    poll.phase !== "nominations" && candidateOptions.length === 0;
 
   useEffect(() => {
     setFormState(createDefaultFormState(poll));
@@ -208,6 +222,56 @@ function Poll({
     }
 
     loadStoredVote();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [accountStatus, poll.id, poll.phase, supabase, userId]);
+
+  useEffect(() => {
+    if (
+      !supabase ||
+      !userId ||
+      accountStatus !== "approved" ||
+      poll.phase !== "nominations"
+    ) {
+      setStoredCurrentAlbumRating(null);
+      setCurrentAlbumRating("");
+      setCurrentAlbumRatingError(null);
+      setIsLoadingCurrentAlbumRating(false);
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    async function loadCurrentAlbumRating() {
+      setIsLoadingCurrentAlbumRating(true);
+      setCurrentAlbumRatingError(null);
+
+      const { data, error } = await supabase
+        .from("album_ratings")
+        .select("poll_id, rating, created_at")
+        .eq("poll_id", poll.id)
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (error) {
+        setStoredCurrentAlbumRating(null);
+        setCurrentAlbumRatingError(
+          "Your saved album rating could not be checked. You can retry by reloading this page.",
+        );
+      } else {
+        setStoredCurrentAlbumRating(normalizeCurrentAlbumRating(data, userId));
+      }
+
+      setIsLoadingCurrentAlbumRating(false);
+    }
+
+    loadCurrentAlbumRating();
 
     return () => {
       isMounted = false;
@@ -386,6 +450,62 @@ function Poll({
     await refreshPoll();
   }
 
+  async function handleCurrentAlbumRatingSubmit(event) {
+    event.preventDefault();
+    setCurrentAlbumRatingError(null);
+
+    const validation = validateCurrentAlbumRating(currentAlbumRating);
+
+    if (!validation.isValid) {
+      setCurrentAlbumRatingError(validation.message);
+      return;
+    }
+
+    if (!window.confirm(
+      `Submit ${validation.rating}/10 for ${poll.albumOfWeek?.title || "the current album"}? Your rating cannot be changed.`,
+    )) {
+      return;
+    }
+
+    setIsSubmittingCurrentAlbumRating(true);
+    const { data, error } = await supabase.rpc("submit_current_album_rating", {
+      target_poll_id: poll.id,
+      rating_input: validation.rating,
+    });
+    setIsSubmittingCurrentAlbumRating(false);
+
+    if (error) {
+      setCurrentAlbumRatingError(getCurrentAlbumRatingError(error));
+      return;
+    }
+
+    const savedRating = normalizeCurrentAlbumRating(data, userId);
+
+    if (!savedRating) {
+      setCurrentAlbumRatingError(
+        "Your rating was saved, but its confirmation could not be loaded. Reload this page to check it.",
+      );
+      return;
+    }
+
+    setStoredCurrentAlbumRating(savedRating);
+  }
+
+  async function handleBallotReload() {
+    if (isRefreshingBallot) {
+      return;
+    }
+
+    setIsRefreshingBallot(true);
+    setFormError(null);
+
+    try {
+      await refreshPoll({ force: true });
+    } finally {
+      setIsRefreshingBallot(false);
+    }
+  }
+
   function renderAccountGate() {
     if (!hasSupabaseConfig) {
       return (
@@ -400,12 +520,41 @@ function Poll({
       );
     }
 
-    if (pollError) {
+    if (pollError && !hasSubmitted) {
+      const errorTitle = pollErrorStatus === 401
+        ? "Your sign-in needs attention."
+        : pollErrorStatus === 429
+          ? "Too many ballot refreshes."
+          : "The ballot didn’t load.";
+
       return (
-        <div className="confirmation-card">
-          <p className="eyebrow">Database setup needed</p>
-          <h3>The live poll could not be loaded.</h3>
+        <div className="confirmation-card ballot-recovery" role="alert">
+          <p className="eyebrow">Ballot temporarily unavailable</p>
+          <h3>{errorTitle}</h3>
           <p>{pollError}</p>
+          <div className="ballot-recovery-actions">
+            {pollErrorStatus === 401 ? (
+              <a
+                className="button button-secondary"
+                href="/account"
+                onClick={(event) => {
+                  event.preventDefault();
+                  navigate("/account");
+                }}
+              >
+                Open account
+              </a>
+            ) : (
+              <button
+                className="button button-secondary"
+                type="button"
+                disabled={isRefreshingBallot}
+                onClick={handleBallotReload}
+              >
+                {isRefreshingBallot ? "Reloading ballot…" : "Reload ballot"}
+              </button>
+            )}
+          </div>
         </div>
       );
     }
@@ -519,10 +668,20 @@ function Poll({
 
     if (candidateOptions.length === 0) {
       return (
-        <div className="confirmation-card">
-          <p className="eyebrow">Ballot unavailable</p>
-          <h3>This phase needs candidates first.</h3>
-          <p>Ask an admin to advance the poll when the previous phase is ready.</p>
+        <div className="confirmation-card ballot-recovery" role="status">
+          <p className="eyebrow">Ballot didn’t finish loading</p>
+          <h3>Your album choices are temporarily missing.</h3>
+          <p>Your account is still signed in. Reload the ballot to request the choices again.</p>
+          <div className="ballot-recovery-actions">
+            <button
+              className="button button-secondary"
+              type="button"
+              disabled={isRefreshingBallot}
+              onClick={handleBallotReload}
+            >
+              {isRefreshingBallot ? "Reloading ballot…" : "Reload ballot"}
+            </button>
+          </div>
         </div>
       );
     }
@@ -594,6 +753,77 @@ function Poll({
     );
   }
 
+  function renderCurrentAlbumRating() {
+    if (poll.phase !== "nominations" || !canVote || pollError) {
+      return null;
+    }
+
+    const albumTitle = poll.albumOfWeek?.title || "Current album";
+    const albumArtist = poll.albumOfWeek?.artist || "Artist not listed";
+
+    return (
+      <section className="current-album-rating" aria-labelledby="current-album-rating-title">
+        <div className="current-album-rating-heading">
+          <div>
+            <p className="eyebrow">The album we just heard</p>
+            <h3 id="current-album-rating-title">Rate {albumTitle}</h3>
+            <p>{albumArtist}</p>
+          </div>
+          <span>1–10</span>
+        </div>
+
+        {isLoadingCurrentAlbumRating ? (
+          <p className="helper-note" role="status">Checking for your saved rating…</p>
+        ) : storedCurrentAlbumRating ? (
+          <div className="current-album-rating-saved" role="status">
+            <span>Your rating</span>
+            <strong>{storedCurrentAlbumRating.rating}<small>/10</small></strong>
+            <p>Saved for this week. Ratings lock after submission.</p>
+          </div>
+        ) : (
+          <form className="current-album-rating-form" onSubmit={handleCurrentAlbumRatingSubmit}>
+            <fieldset disabled={isSubmittingCurrentAlbumRating}>
+              <legend>Choose one whole-number rating</legend>
+              <div className="rating-scale">
+                {Array.from({ length: 10 }, (_, index) => index + 1).map((rating) => (
+                  <label
+                    className={`rating-scale-option ${currentAlbumRating === rating ? "is-selected" : ""}`}
+                    key={rating}
+                  >
+                    <input
+                      name="currentAlbumRating"
+                      type="radio"
+                      value={rating}
+                      checked={currentAlbumRating === rating}
+                      onChange={() => {
+                        setCurrentAlbumRating(rating);
+                        setCurrentAlbumRatingError(null);
+                      }}
+                    />
+                    <span>{rating}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <p className="helper-note">
+              This is separate from the album you nominate next.
+            </p>
+            {currentAlbumRatingError ? (
+              <p className="form-error" role="alert">{currentAlbumRatingError}</p>
+            ) : null}
+            <button
+              className="button button-secondary"
+              type="submit"
+              disabled={isSubmittingCurrentAlbumRating}
+            >
+              {isSubmittingCurrentAlbumRating ? "Saving rating…" : "Submit album rating"}
+            </button>
+          </form>
+        )}
+      </section>
+    );
+  }
+
   function renderConfirmation() {
     if (!storedBallot) {
       return null;
@@ -657,6 +887,8 @@ function Poll({
               <p>{phaseDetails.description}</p>
             </div>
 
+            {renderCurrentAlbumRating()}
+
             {renderAccountGate() ||
             (isLoadingVote ? (
               <div className="confirmation-card">
@@ -669,25 +901,29 @@ function Poll({
               <form className="vote-form" onSubmit={handleSubmit}>
                 {renderFormBody()}
 
-                <p className="helper-note">
-                  One verified, approved account gets one submission per phase.
-                </p>
+                {!ballotNeedsCandidates ? (
+                  <>
+                    <p className="helper-note">
+                      One verified, approved account gets one submission per phase.
+                    </p>
 
-                {poll.phase === "primary" ? (
-                  <p className="helper-note">
-                    Selected {formState.selectedCandidateIds.length}. You can submit any number from 1 to 5.
-                  </p>
+                    {poll.phase === "primary" ? (
+                      <p className="helper-note">
+                        Selected {formState.selectedCandidateIds.length}. You can submit any number from 1 to 5.
+                      </p>
+                    ) : null}
+
+                    {formError ? <p className="form-error" role="alert">{formError}</p> : null}
+
+                    <button
+                      className="button button-primary"
+                      type="submit"
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? "Saving..." : phaseDetails.buttonLabel}
+                    </button>
+                  </>
                 ) : null}
-
-                {formError ? <p className="form-error" role="alert">{formError}</p> : null}
-
-                <button
-                  className="button button-primary"
-                  type="submit"
-                  disabled={isSubmitting || (poll.phase !== "nominations" && candidateOptions.length === 0)}
-                >
-                  {isSubmitting ? "Saving..." : phaseDetails.buttonLabel}
-                </button>
               </form>
             ))}
           </article>

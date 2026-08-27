@@ -27,7 +27,8 @@ import {
 } from "./data/routeMeta";
 import { hasSiteEventsConfig, hasSupabaseConfig, supabase } from "./lib/supabaseClient";
 import Home from "./pages/Home";
-import { fetchCurrentPoll } from "./lib/pollApi";
+import { createLatestRequestCoordinator } from "./lib/latestRequestCoordinator";
+import { fetchReliableCurrentPoll } from "./lib/pollApi";
 import { normalizeSiteEvent } from "./lib/siteContent";
 import "./styles/sideb-mock.css";
 
@@ -94,6 +95,18 @@ function normalizeLivePoll(data) {
   };
 }
 
+function getPollRequestScope(session) {
+  if (!session?.access_token) {
+    return "public";
+  }
+
+  return `member:${session.user?.id || "unknown"}:${session.expires_at || "active"}`;
+}
+
+function isAbortedRequest(error) {
+  return error?.name === "AbortError";
+}
+
 function App() {
   const location = useLocation();
   const routerNavigate = useNavigate();
@@ -101,6 +114,13 @@ function App() {
   const currentPath = normalizePath(location.pathname);
   const isPersonalLetter = currentPath === SIDNEY_LETTER_ROUTE;
   const previousPath = useRef(currentPath);
+  const pollRequestCoordinator = useRef(null);
+  const settledPollScope = useRef(null);
+
+  if (pollRequestCoordinator.current == null) {
+    pollRequestCoordinator.current = createLatestRequestCoordinator();
+  }
+
   const [authReady, setAuthReady] = useState(!hasSupabaseConfig);
   const [session, setSession] = useState(null);
   const [membership, setMembership] = useState(null);
@@ -109,28 +129,75 @@ function App() {
   const [pollReady, setPollReady] = useState(!hasSupabaseConfig);
   const [eventsReady, setEventsReady] = useState(!hasSiteEventsConfig);
   const [pollError, setPollError] = useState(null);
+  const [pollErrorStatus, setPollErrorStatus] = useState(0);
 
-  const refreshPoll = useCallback(async () => {
+  const refreshPoll = useCallback(({ force = true } = {}) => {
     if (!hasSupabaseConfig) {
       setLivePoll(currentPoll);
       setPollReady(true);
-      return currentPoll;
+      setPollError(null);
+      setPollErrorStatus(0);
+      return Promise.resolve(currentPoll);
     }
 
-    try {
-      const data = await fetchCurrentPoll(session);
-      const nextPoll = normalizeLivePoll(data);
-      setPollError(null);
-      setLivePoll(nextPoll);
-      return nextPoll;
-    } catch (error) {
-      setPollError(error.message || "Could not load the current poll.");
-      setLivePoll(currentPoll);
-      return currentPoll;
-    } finally {
-      setPollReady(true);
+    if (!authReady) {
+      return Promise.resolve(null);
     }
-  }, [session]);
+
+    const requireCandidates =
+      membership?.status === "approved" &&
+      membership?.user_id === session?.user?.id;
+    const requestScope = getPollRequestScope(session);
+    const requestKey = `${requestScope}:${requireCandidates ? "ballot" : "metadata"}`;
+    const isScopeChange = settledPollScope.current !== requestKey;
+
+    if (isScopeChange) {
+      setPollReady(false);
+    }
+
+    setPollError(null);
+    setPollErrorStatus(0);
+
+    return pollRequestCoordinator.current.run(
+      requestKey,
+      async ({ isLatest, signal }) => {
+        try {
+          const data = await fetchReliableCurrentPoll(session, {
+            requireCandidates,
+            signal,
+          });
+
+          if (!isLatest()) {
+            return null;
+          }
+
+          const nextPoll = normalizeLivePoll(data);
+          settledPollScope.current = requestKey;
+          setLivePoll(nextPoll);
+          return nextPoll;
+        } catch (error) {
+          if (isAbortedRequest(error) || !isLatest()) {
+            return null;
+          }
+
+          settledPollScope.current = requestKey;
+          setPollError(error.message || "Could not load the current ballot.");
+          setPollErrorStatus(error.status || 0);
+
+          if (isScopeChange) {
+            setLivePoll(currentPoll);
+          }
+
+          return null;
+        } finally {
+          if (isLatest()) {
+            setPollReady(true);
+          }
+        }
+      },
+      { force },
+    );
+  }, [authReady, membership, session]);
 
   const refreshEvents = useCallback(async () => {
     if (!hasSiteEventsConfig) {
@@ -188,14 +255,18 @@ function App() {
   }, [currentPath, location.hash, location.pathname, location.search, routerNavigate]);
 
   useEffect(() => {
-    if (POLL_ROUTES.has(currentPath)) {
-      refreshPoll();
+    if (POLL_ROUTES.has(currentPath) && authReady) {
+      refreshPoll({ force: false });
     }
 
     if (EVENT_ROUTES.has(currentPath)) {
       refreshEvents();
     }
-  }, [currentPath, refreshEvents, refreshPoll]);
+  }, [authReady, currentPath, refreshEvents, refreshPoll]);
+
+  useEffect(() => () => {
+    pollRequestCoordinator.current?.cancel();
+  }, []);
 
   useEffect(() => {
     const isKnownRoute = ROUTES.has(currentPath);
@@ -253,8 +324,13 @@ function App() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setAuthReady(false);
       setSession(nextSession);
-      loadMembership(nextSession);
+      loadMembership(nextSession).finally(() => {
+        if (isMounted) {
+          setAuthReady(true);
+        }
+      });
     });
 
     return () => {
@@ -403,6 +479,7 @@ function App() {
                     navigate={navigate}
                     poll={livePoll}
                     pollError={pollError}
+                    pollErrorStatus={pollErrorStatus}
                     refreshPoll={refreshPoll}
                     session={session}
                     supabase={supabase}

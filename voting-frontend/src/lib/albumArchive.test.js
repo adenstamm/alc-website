@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 
-import { parseAlbumArchiveText, parseArchiveLine } from "./albumArchive.js";
+import {
+  mergeAlbumArchiveEntries,
+  parseAlbumArchiveText,
+  parseArchiveLine,
+} from "./albumArchive.js";
 
 function test(name, fn) {
   try {
@@ -53,4 +57,49 @@ test("archive parser ignores heading lines and artist missing placeholders", () 
       artist: "",
     },
   ]);
+});
+
+test("dynamic archive entries append chronologically with rating summaries", () => {
+  const merged = mergeAlbumArchiveEntries(
+    [{ title: "Blue", artist: "Joni Mitchell" }],
+    [
+      {
+        poll_id: "week-2",
+        album_title: "Dummy",
+        artist_name: "Portishead",
+        average_rating: "8.25",
+        rating_count: 12,
+        archived_at: "2026-08-27T12:00:00.000Z",
+      },
+      {
+        poll_id: "week-1",
+        album_title: "Pink Moon",
+        artist_name: "Nick Drake",
+        average_rating: "9",
+        rating_count: 10,
+        archived_at: "2026-08-20T12:00:00.000Z",
+      },
+    ],
+  );
+
+  assert.deepEqual(merged.map((album) => album.title), ["Blue", "Pink Moon", "Dummy"]);
+  assert.equal(merged[2].averageRating, 8.25);
+  assert.equal(merged[2].ratingCount, 12);
+});
+
+test("dynamic archive entries enrich matching static albums instead of duplicating them", () => {
+  const merged = mergeAlbumArchiveEntries(
+    [{ title: "Dummy", artist: "Portishead" }],
+    [{
+      poll_id: "week-2",
+      album_title: "Dummy",
+      artist_name: "Portishead",
+      average_rating: 8.5,
+      rating_count: 20,
+    }],
+  );
+
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].averageRating, 8.5);
+  assert.equal(merged[0].pollId, "week-2");
 });

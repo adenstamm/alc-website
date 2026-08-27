@@ -16,6 +16,8 @@ You need:
   2. `supabase/nomination-validation.sql`
   3. `supabase/three-phase-voting.sql`
   4. `supabase/site-content.sql`, required for current album editing and optional for event editing
+  5. `supabase/current-album-ratings.sql`, required for phase-one album ratings and rated archive entries
+  6. `supabase/security-hardening.sql` **last**
 
 The five member accounts are useful because the app intentionally allows one nomination per approved account per poll. Five nominations gives you enough candidates to test the final phase properly.
 
@@ -41,9 +43,15 @@ Expected:
 For each approved member test account:
 
 1. Sign in on `/account`, then open `/vote`.
-2. Submit a unique album and artist.
-3. Confirm the page locks the submission for that phase.
-4. Return to `/account` and sign out.
+2. Rate the current album with one integer from 1 to 10.
+3. Confirm the rating is saved and locked for that album.
+4. Submit a unique album and artist for the next listen.
+5. Confirm the nomination locks for that phase without hiding the saved album rating.
+
+As the admin, open `/admin`, refresh the rating summary, and confirm it shows
+the correct average and member-rating count. When the next poll is created,
+confirm the finished current album appears in `/archive` with the same average.
+6. Return to `/account` and sign out.
 
 Suggested safe test nominations:
 

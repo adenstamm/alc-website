@@ -17,11 +17,13 @@ flowchart LR
 ```
 
 Cloudflare supplies strict TLS, HTTPS enforcement, DDoS and bot protection,
-custom exploit-probe blocking, and a per-IP API limit for the public domain.
-Azure Static Web Apps Free leaves its generated hostname reachable, so the API
-also enforces its own per-IP limit and Supabase remains the authorization
-boundary. Production links, monitors, and load tests must use the Cloudflare
-domain rather than advertising or targeting the Azure hostname.
+custom exploit-probe blocking, and a broad per-IP API burst limit for the
+public domain. Static assets are excluded so a room full of phones can load the
+site together. Azure Static Web Apps Free leaves its generated hostname
+reachable, so the API also enforces a session-aware limiter with a larger
+shared-network ceiling. Supabase remains the authorization boundary.
+Production links, monitors, and load tests must use the Cloudflare domain
+rather than advertising or targeting the Azure hostname.
 
 ## Files
 
@@ -38,9 +40,12 @@ changes must be checked against it during every production release.
 
 ## Application security boundary
 
-The public poll read goes through `/api/current-poll`, which has an application
-rate limiter and returns candidate/finalist arrays only to approved members.
-Direct anonymous execution of `get_current_poll()` is revoked in Supabase.
+The public poll read goes through `/api/current-poll`. Signed-in traffic is
+limited by a one-way session fingerprint, anonymous traffic has a larger
+shared-IP allowance, and all traffic has an emergency shared-network ceiling.
+Raw session tokens are never stored in limiter buckets. Candidate/finalist
+arrays are returned only to approved members. Direct anonymous execution of
+`get_current_poll()` is revoked in Supabase.
 
 Email signup, password login, and password reset include Cloudflare Turnstile
 tokens that Supabase verifies. The Turnstile secret and Supabase service-role
