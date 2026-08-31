@@ -10,6 +10,9 @@ import { fetchMembershipWithRetry, MembershipLookupError } from "./membershipApi
 import {
   getPollFocusRefreshDelay,
   getPollRefreshDelay,
+  getPublishedAlbumRefreshDelay,
+  PUBLISHED_ALBUM_REFRESH_MAX_MS,
+  PUBLISHED_ALBUM_REFRESH_MIN_MS,
   POLL_FOCUS_REFRESH_MAX_MS,
   POLL_FOCUS_REFRESH_MIN_MS,
   POLL_REFRESH_MAX_MS,
@@ -104,6 +107,8 @@ test("poll refresh jitter stays inside the event-safe windows", () => {
   assert.equal(getPollRefreshDelay(() => 1), POLL_REFRESH_MAX_MS);
   assert.equal(getPollFocusRefreshDelay(() => 0), POLL_FOCUS_REFRESH_MIN_MS);
   assert.equal(getPollFocusRefreshDelay(() => 1), POLL_FOCUS_REFRESH_MAX_MS);
+  assert.equal(getPublishedAlbumRefreshDelay(() => 0), PUBLISHED_ALBUM_REFRESH_MIN_MS);
+  assert.equal(getPublishedAlbumRefreshDelay(() => 1), PUBLISHED_ALBUM_REFRESH_MAX_MS);
 });
 
 test("Retry-After supports seconds and HTTP dates", () => {

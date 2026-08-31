@@ -661,6 +661,54 @@ test("creating a poll never reloads the archived poll results", async ({ page })
   await expect(page.getByText("No nominations have been submitted yet.")).toBeVisible();
 });
 
+test("a published winner is current while the next poll waits for its genre", async ({ page }) => {
+  const publishedWinner = {
+    artist: "Olivia Rodrigo",
+    note: "Selected by the club",
+    title: "You Seem Pretty Sad for A Girl So In Love",
+  };
+
+  await page.unroute("**/api/current-poll");
+  await installAdminPollFixture(page, {
+    poll: {
+      album_of_week: publishedWinner,
+      candidates: [{ ...publishedWinner, id: "olivia-winner" }],
+      cycle_label: "Pop Week",
+      description: "Rank the finalists.",
+      finalClosedAt: "2026-08-30T18:00:00.000Z",
+      finalClosesAt: "2026-08-30T18:00:00.000Z",
+      finalIsClosed: true,
+      finalOpenedAt: "2026-08-30T00:00:00.000Z",
+      finalists: [{ ...publishedWinner, id: "olivia-winner" }],
+      id: "pop-week",
+      phase: "final",
+      publishedWinner,
+      question: "Rank the finalists.",
+      ratingAlbumOfWeek: { artist: "Fleetwood Mac", title: "Rumours" },
+      status: "Winner published — next nominations have not opened",
+      winnerCandidateId: "olivia-winner",
+      winnerPublishedAt: "2026-08-30T18:00:30.000Z",
+    },
+    results: {
+      ballotCounts: { final: 24, nominations: 20, primary: 18 },
+      currentAlbumRating: { averageRating: 8.4, ratingCount: 20 },
+      finalists: [],
+      irv: { rounds: [], tie: null, winnerId: "olivia-winner" },
+      nominations: [],
+      primaryResults: [],
+    },
+  });
+
+  await page.goto("/admin");
+
+  await expect(page.locator(".admin-rating-summary")).toContainText("Rumours");
+  await page.getByRole("button", { name: "Create new weekly poll" }).click();
+  await expect(page.getByLabel("Current album title")).toHaveValue(publishedWinner.title);
+  await expect(page.getByLabel("Current album artist")).toHaveValue(publishedWinner.artist);
+  await expect(page.getByText("The official winner is filled in automatically.")).toBeVisible();
+  await expect(page.getByLabel("Cycle label")).toHaveValue("");
+});
+
 test("admin phase changes require an in-app confirmation", async ({ page }) => {
   let advanceCalls = 0;
   const poll = {

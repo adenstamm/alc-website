@@ -30,7 +30,11 @@ import Home from "./pages/Home";
 import { createLatestRequestCoordinator } from "./lib/latestRequestCoordinator";
 import { fetchMembershipWithRetry } from "./lib/membershipApi";
 import { fetchReliableCurrentPoll } from "./lib/pollApi";
-import { getPollFocusRefreshDelay, getPollRefreshDelay } from "./lib/pollRefresh";
+import {
+  getPollFocusRefreshDelay,
+  getPollRefreshDelay,
+  getPublishedAlbumRefreshDelay,
+} from "./lib/pollRefresh";
 import { normalizeSiteEvent } from "./lib/siteContent";
 import "./styles/sideb-mock.css";
 
@@ -52,6 +56,7 @@ const ROUTE_REDIRECTS = new Map([
   ["/results", "/vote"],
 ]);
 const POLL_ROUTES = new Set(["/", "/admin", "/current", "/vote"]);
+const PUBLISHED_ALBUM_REFRESH_ROUTES = new Set(["/", "/current"]);
 const EVENT_ROUTES = new Set(["/", "/admin", "/current", "/events"]);
 
 function normalizePath(pathname) {
@@ -92,6 +97,11 @@ function normalizeLivePoll(data) {
     ...data,
     cycleLabel: data.cycle_label || data.cycleLabel || currentPoll.cycleLabel,
     albumOfWeek: data.album_of_week || data.albumOfWeek || currentPoll.albumOfWeek,
+    ratingAlbumOfWeek:
+      data.ratingAlbumOfWeek || data.rating_album_of_week || data.album_of_week || data.albumOfWeek,
+    publishedWinner: data.publishedWinner || data.published_winner || null,
+    winnerCandidateId: data.winnerCandidateId || data.winner_candidate_id || null,
+    winnerPublishedAt: data.winnerPublishedAt || data.winner_published_at || null,
     candidates: data.candidates || [],
     finalists: data.finalists || [],
   };
@@ -340,7 +350,37 @@ function App() {
   }, [authReady, currentPath, refreshPoll]);
 
   useEffect(() => {
-    if (currentPath !== "/vote" || !authReady) {
+    if (!PUBLISHED_ALBUM_REFRESH_ROUTES.has(currentPath) || !authReady) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let refreshTimer;
+
+    const scheduleRefresh = () => {
+      if (cancelled) {
+        return;
+      }
+
+      refreshTimer = window.setTimeout(async () => {
+        if (!cancelled && document.visibilityState === "visible") {
+          await refreshPoll({ background: true, force: false });
+        }
+
+        scheduleRefresh();
+      }, getPublishedAlbumRefreshDelay());
+    };
+
+    scheduleRefresh();
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(refreshTimer);
+    };
+  }, [authReady, currentPath, refreshPoll]);
+
+  useEffect(() => {
+    if (!POLL_ROUTES.has(currentPath) || !authReady) {
       return undefined;
     }
 

@@ -39,6 +39,10 @@ required_functions(function_name, signature) as (
     ('get_admin_poll_results', 'public.get_admin_poll_results(text)'),
     ('create_poll', 'public.create_poll(text,text,text,text,text,text)'),
     ('update_current_album', 'public.update_current_album(text,text,text,text)'),
+    ('finalize_poll_winner', 'public.finalize_poll_winner(text)'),
+    ('finalize_due_polls', 'public.finalize_due_polls()'),
+    ('sync_archived_album_to_banned', 'public.sync_archived_album_to_banned()'),
+    ('inherit_published_album_metadata', 'public.inherit_published_album_metadata()'),
     ('save_record_shelf_order', 'public.save_record_shelf_order(jsonb)'),
     ('enqueue_archived_album_on_shelf', 'public.enqueue_archived_album_on_shelf()')
 ),
@@ -59,6 +63,21 @@ checks(area, check_name, passed, details) as (
       ', ' order by column_name
     )
   from column_inventory
+
+  union all
+
+  select
+    'schema',
+    'winner publication columns exist',
+    count(*) = 3
+      and count(*) filter (where column_name = 'winner_candidate_id' and data_type = 'text') = 1
+      and count(*) filter (where column_name = 'winner_published_at' and data_type = 'timestamp with time zone') = 1
+      and count(*) filter (where column_name = 'published_album' and data_type = 'jsonb') = 1,
+    coalesce(string_agg(format('%s=%s', column_name, data_type), ', ' order by column_name), 'MISSING')
+  from information_schema.columns
+  where table_schema = 'public'
+    and table_name = 'polls'
+    and column_name in ('winner_candidate_id', 'winner_published_at', 'published_album')
 
   union all
 
@@ -340,6 +359,28 @@ checks(area, check_name, passed, details) as (
   union all
 
   select
+    'trigger',
+    'archive changes automatically synchronize the banned list',
+    exists (
+      select 1
+      from pg_catalog.pg_trigger t
+      where t.tgrelid = pg_catalog.to_regclass('public.album_archive_entries')
+        and t.tgname = 'sync_album_archive_entry_to_banned'
+        and not t.tgisinternal
+        and t.tgenabled <> 'D'
+        and t.tgfoid = pg_catalog.to_regprocedure('public.sync_archived_album_to_banned()')
+    ),
+    coalesce((
+      select format('enabled=%s, function=%s', t.tgenabled, t.tgfoid::regprocedure)
+      from pg_catalog.pg_trigger t
+      where t.tgrelid = pg_catalog.to_regclass('public.album_archive_entries')
+        and t.tgname = 'sync_album_archive_entry_to_banned'
+        and not t.tgisinternal
+    ), 'MISSING')
+
+  union all
+
+  select
     'deadline',
     'final opening creates an 18-hour window',
     coalesce(
@@ -509,6 +550,33 @@ checks(area, check_name, passed, details) as (
       'EXECUTE'
     ), false),
     'authenticated=true, service_role=true, anon=false'
+
+  union all
+
+  select
+    'grants',
+    'winner finalization is service-only',
+    coalesce(pg_catalog.has_function_privilege(
+      'service_role',
+      pg_catalog.to_regprocedure('public.finalize_poll_winner(text)'),
+      'EXECUTE'
+    ), false)
+    and coalesce(pg_catalog.has_function_privilege(
+      'service_role',
+      pg_catalog.to_regprocedure('public.finalize_due_polls()'),
+      'EXECUTE'
+    ), false)
+    and not coalesce(pg_catalog.has_function_privilege(
+      'authenticated',
+      pg_catalog.to_regprocedure('public.finalize_poll_winner(text)'),
+      'EXECUTE'
+    ), false)
+    and not coalesce(pg_catalog.has_function_privilege(
+      'anon',
+      pg_catalog.to_regprocedure('public.finalize_due_polls()'),
+      'EXECUTE'
+    ), false),
+    'service_role=true; authenticated/anon=false'
 
   union all
 
@@ -688,6 +756,33 @@ checks(area, check_name, passed, details) as (
       coalesce(string_agg(position::text, ',' order by position), 'empty')
     )
   from public.record_shelf_items
+
+  union all
+
+  select
+    'live state',
+    'every archived album is also banned',
+    not exists (
+      select 1
+      from public.album_archive_entries archive
+      where not exists (
+        select 1
+        from public.banned_albums banned
+        where banned.normalized_name = public.normalize_music_name(archive.album_title)
+      )
+    ),
+    format(
+      'missing=%s',
+      (
+        select count(*)
+        from public.album_archive_entries archive
+        where not exists (
+          select 1
+          from public.banned_albums banned
+          where banned.normalized_name = public.normalize_music_name(archive.album_title)
+        )
+      )
+    )
 )
 select
   case when passed then 'PASS' else 'FAIL' end as status,

@@ -352,6 +352,8 @@ function Admin({
   const irvTieSignature = irvTieCandidateIds.join("|");
   const irvWinnerId = results?.irv?.winnerId || null;
   const irvWinner = finalRows.find((candidate) => candidate.id === irvWinnerId);
+  const ratingAlbum = poll.ratingAlbumOfWeek || poll.albumOfWeek;
+  const publishedWinner = poll.publishedWinner || null;
   const currentAlbumRatingAverage = formatAverageRating(
     results?.currentAlbumRating?.averageRating,
   );
@@ -670,6 +672,18 @@ function Admin({
   }, [poll.albumOfWeek]);
 
   useEffect(() => {
+    if (!poll.winnerPublishedAt || !publishedWinner?.title || !publishedWinner?.artist) {
+      return;
+    }
+
+    setNewPoll((currentForm) => ({
+      ...currentForm,
+      albumTitle: currentForm.albumTitle || publishedWinner.title,
+      albumArtist: currentForm.albumArtist || publishedWinner.artist,
+    }));
+  }, [poll.winnerPublishedAt, publishedWinner?.artist, publishedWinner?.title]);
+
+  useEffect(() => {
     if (!currentAlbumCoverFile) {
       setCurrentAlbumCoverPreviewUrl("");
       return undefined;
@@ -776,8 +790,9 @@ function Admin({
     setIsSavingPhase(false);
 
     if (createError) {
-      setError(createError.message);
-      showFailure(createError.message);
+      const displayError = getAdminActionErrorMessage(createError);
+      setError(displayError);
+      showFailure(displayError);
       return;
     }
 
@@ -1499,6 +1514,12 @@ function Admin({
             </div>
           </div>
 
+          {poll.winnerPublishedAt ? (
+            <p className="helper-note" role="status">
+              The official winner is filled in automatically. Add this cycle&apos;s genre and poll id when you are ready to open nominations.
+            </p>
+          ) : null}
+
           <div className="field-group">
             <label htmlFor="question">Voting question</label>
             <input
@@ -1883,7 +1904,7 @@ function Admin({
             <div>
               <span>Current album rating</span>
               <h3 id="admin-rating-summary-title">
-                {poll.albumOfWeek?.title || "Current album"}
+                {ratingAlbum?.title || "Current album"}
               </h3>
               <p>
                 {currentAlbumRatingCount
