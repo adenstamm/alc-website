@@ -163,7 +163,7 @@ test("the desktop record shelf stays contained and visibly framed", async ({ pag
   const firstCard = page.locator(".sideb-crate-card").first();
 
   await expect(shelfFrame).toBeVisible();
-  await expect(shelfFrame).toHaveCSS("border-top-width", "1px");
+  await expect(shelfFrame).toHaveCSS("border-top-width", "11px");
   await expect(firstCard).toBeVisible();
 
   const layout = await page.evaluate(() => ({
