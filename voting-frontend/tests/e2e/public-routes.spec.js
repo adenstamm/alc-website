@@ -146,26 +146,48 @@ for (const [path, heading] of publicRoutes) {
   });
 }
 
-test("the homepage genre feature leads into the dedicated poster page", async ({ page }) => {
+test("the homepage omits the year-in-genres campaign", async ({ page }) => {
   await page.goto("/");
 
-  const teaser = page.locator(".sideb-genres-teaser");
   const utilityGrid = page.locator(".sideb-link-grid");
-  const genreLink = page.getByRole("link", { name: /View the genres this year/i });
-
-  await expect(teaser).toBeVisible();
-  await expect(genreLink).toHaveAttribute("href", "/genres");
-  const teaserPrecedesUtilityGrid = await teaser.evaluate((element) => (
-    element.compareDocumentPosition(document.querySelector(".sideb-link-grid"))
-    & Node.DOCUMENT_POSITION_FOLLOWING
-  ));
-  expect(teaserPrecedesUtilityGrid).toBeTruthy();
   await expect(utilityGrid).toBeVisible();
+  await expect(page.locator(".sideb-genres-teaser")).toHaveCount(0);
+  await expect(page.locator('a[href="/genres"]')).toHaveCount(0);
+});
 
-  await genreLink.click();
-  await expect(page).toHaveURL(/\/genres$/);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("This is what this year will sound like.");
-  await expect(page.getByRole("link", { name: /Open the year in genres poster at full size/i })).toBeVisible();
+test("the homepage shelf refreshes on focus when the queue changes", async ({ page }) => {
+  let shelfRows = [];
+
+  await page.route("**/rest/v1/record_shelf_items**", (route) => route.fulfill({
+    body: JSON.stringify(shelfRows),
+    contentType: "application/json",
+    status: 200,
+  }));
+  await page.route("**/rest/v1/record_shelf_covers**", (route) => route.fulfill({
+    body: "[]",
+    contentType: "application/json",
+    status: 200,
+  }));
+  await page.route("https://itunes.apple.com/**", (route) => route.abort());
+
+  await page.goto("/");
+
+  const shelfCards = page.locator("#recent-albums-track > li");
+  await expect(shelfCards).toHaveCount(5);
+  await expect(shelfCards.first()).toContainText("Flying Beagle");
+
+  shelfRows = [{
+    album_id: "poll-week-1",
+    album_title: "You Seem Pretty Sad for A Girl So In Love",
+    archived_at: "2026-08-30T12:00:00.000Z",
+    artist_name: "Olivia Rodrigo",
+    position: 1,
+  }];
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+
+  await expect(shelfCards).toHaveCount(5);
+  await expect(shelfCards.first()).toContainText("Olivia Rodrigo");
+  await expect(shelfCards.nth(1)).toContainText("Flying Beagle");
 });
 
 test("keyboard navigation exposes and uses the skip link", async ({ page }) => {

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import genresPoster from "../assets/genres-this-year.png";
 import {
   fetchAlbumMetadata,
   getRecentShelfAlbums,
@@ -54,15 +53,44 @@ function Home({
 
   useEffect(() => {
     let isMounted = true;
+    let isLoading = false;
 
-    loadRecordShelfAlbums(supabase, hasSupabaseConfig, fallbackShelfAlbums).then((albums) => {
-      if (isMounted) {
-        setShelfAlbums(albums);
+    async function refreshShelf() {
+      if (isLoading) {
+        return;
       }
-    });
+
+      isLoading = true;
+
+      try {
+        const albums = await loadRecordShelfAlbums(
+          supabase,
+          hasSupabaseConfig,
+          fallbackShelfAlbums,
+        );
+
+        if (isMounted) {
+          setShelfAlbums(albums);
+        }
+      } finally {
+        isLoading = false;
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        refreshShelf();
+      }
+    }
+
+    refreshShelf();
+    window.addEventListener("focus", refreshShelf);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       isMounted = false;
+      window.removeEventListener("focus", refreshShelf);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [fallbackShelfAlbums, hasSupabaseConfig, supabase]);
 
@@ -336,32 +364,6 @@ function Home({
               </span>
             </a>
           </aside>
-        </section>
-
-        <section className="sideb-genres-teaser" aria-labelledby="genres-teaser-title">
-          <a
-            className="sideb-genres-teaser-link"
-            href="/genres"
-            onClick={(event) => handleRouteLink(event, "/genres")}
-          >
-            <span className="sideb-genres-teaser-copy">
-              <h2 id="genres-teaser-title">Take a look at our upcoming genres!</h2>
-              <span className="sideb-genres-teaser-action">
-                View the genres this year <span aria-hidden="true">→</span>
-              </span>
-            </span>
-
-            <span className="sideb-genres-teaser-art" aria-hidden="true">
-              <img
-                alt=""
-                decoding="async"
-                height="1350"
-                loading="lazy"
-                src={genresPoster}
-                width="1080"
-              />
-            </span>
-          </a>
         </section>
 
         <section className="sideb-link-grid" aria-label="Club links">
