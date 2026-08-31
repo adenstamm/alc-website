@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   getRecentShelfAlbums,
+  loadRecordShelfAlbums,
   loadRecordShelfCoverOverrides,
   RECORD_SHELF_BUCKET,
+  saveRecordShelfAlbums,
 } from "../lib/recordShelf";
 import {
   ALBUM_COVER_ACCEPT,
@@ -29,12 +31,215 @@ function isAdmin(membership) {
 
 const MEMBERS_PER_PAGE = 10;
 
+const ADMIN_PANELS = [
+  { id: "poll", label: "Poll", target: "admin-poll" },
+  { id: "album", label: "Current album", target: "admin-current-album-panel" },
+  { id: "events", label: "Events", target: "admin-events-panel" },
+  { id: "shelf", label: "Record shelf", target: "admin-shelf-panel" },
+  { id: "members", label: "Members", target: "admin-members-panel" },
+];
+
+function ChevronIcon({ isOpen }) {
+  return (
+    <svg aria-hidden="true" className={isOpen ? "is-open" : ""} viewBox="0 0 20 20">
+      <path d="m5 7.5 5 5 5-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+function AdminPanel({ children, eyebrow, id, isOpen, onToggle, summary, title }) {
+  const bodyId = `${id}-body`;
+
+  return (
+    <section className={`admin-workspace-panel ${isOpen ? "is-open" : ""}`} id={id}>
+      <button
+        aria-controls={bodyId}
+        aria-expanded={isOpen}
+        className="admin-panel-trigger"
+        type="button"
+        onClick={onToggle}
+      >
+        <span className="admin-panel-index">{eyebrow}</span>
+        <span className="admin-panel-heading">
+          <strong>{title}</strong>
+          <small>{summary}</small>
+        </span>
+        <ChevronIcon isOpen={isOpen} />
+      </button>
+      <div aria-hidden={!isOpen} className="admin-panel-reveal" id={bodyId}>
+        <div className="admin-panel-reveal-inner" inert={!isOpen ? true : undefined}>
+          {children}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function formatCount(count, noun) {
   return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
 function formatPhaseLabel(phase) {
   return phase.charAt(0).toUpperCase() + phase.slice(1);
+}
+
+function getFirstDefined(...values) {
+  return values.find((value) => value !== undefined && value !== null);
+}
+
+function getNonNegativeInteger(value) {
+  const parsedValue = Number(value);
+
+  return Number.isFinite(parsedValue) && parsedValue >= 0
+    ? Math.trunc(parsedValue)
+    : null;
+}
+
+function getCurrentBallotCount(results, poll, phase) {
+  const resultCounts = results?.ballotCounts || results?.ballot_counts;
+  const pollCounts = poll?.ballotCounts || poll?.ballot_counts;
+  const camelPhase = `${phase}BallotCount`;
+  const snakePhase = `${phase}_ballot_count`;
+
+  return getNonNegativeInteger(getFirstDefined(
+    resultCounts?.[phase],
+    resultCounts?.[camelPhase],
+    resultCounts?.[snakePhase],
+    results?.[camelPhase],
+    results?.[snakePhase],
+    results?.currentBallotCount,
+    results?.current_ballot_count,
+    pollCounts?.[phase],
+    poll?.[camelPhase],
+    poll?.[snakePhase],
+  ));
+}
+
+function getFinalVotingState(results, poll, now) {
+  const resultState = results?.finalVoting || results?.final_voting || {};
+  const pollState = poll?.finalVoting || poll?.final_voting || {};
+  const openedAt = getFirstDefined(
+    resultState.openedAt,
+    resultState.opened_at,
+    results?.finalOpenedAt,
+    results?.final_opened_at,
+    pollState.openedAt,
+    pollState.opened_at,
+    poll?.finalOpenedAt,
+    poll?.final_opened_at,
+  );
+  const closesAt = getFirstDefined(
+    resultState.closesAt,
+    resultState.closes_at,
+    results?.finalClosesAt,
+    results?.final_closes_at,
+    pollState.closesAt,
+    pollState.closes_at,
+    poll?.finalClosesAt,
+    poll?.final_closes_at,
+  );
+  const closedAt = getFirstDefined(
+    resultState.closedAt,
+    resultState.closed_at,
+    results?.finalClosedAt,
+    results?.final_closed_at,
+    pollState.closedAt,
+    pollState.closed_at,
+    poll?.finalClosedAt,
+    poll?.final_closed_at,
+  );
+  const explicitClosed = getFirstDefined(
+    resultState.isClosed,
+    resultState.is_closed,
+    results?.finalIsClosed,
+    results?.final_is_closed,
+    results?.isFinalClosed,
+    results?.is_final_closed,
+    pollState.isClosed,
+    pollState.is_closed,
+    poll?.finalIsClosed,
+    poll?.final_is_closed,
+    poll?.isFinalClosed,
+    poll?.is_final_closed,
+  );
+  const closesAtTime = closesAt ? Date.parse(closesAt) : Number.NaN;
+  const hasExplicitClosedValue = explicitClosed !== undefined && explicitClosed !== null;
+  const explicitClosedValue = explicitClosed === true || explicitClosed === "true";
+
+  return {
+    closedAt,
+    closesAt,
+    isAvailable: Boolean(
+      openedAt || closesAt || closedAt || explicitClosed !== undefined,
+    ),
+    isClosed: hasExplicitClosedValue
+      ? explicitClosedValue
+      : Boolean(closedAt) || (
+          Number.isFinite(closesAtTime) && closesAtTime <= now
+        ),
+    openedAt,
+  };
+}
+
+function formatAdminTimestamp(value, { includeDate = false } = {}) {
+  if (!value) {
+    return "Not available";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Not available";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    ...(includeDate ? { day: "numeric", month: "short" } : {}),
+    hour: "numeric",
+    minute: "2-digit",
+    second: includeDate ? undefined : "2-digit",
+  }).format(date);
+}
+
+function formatFinalCountdown(closesAt, now) {
+  const closesAtTime = closesAt ? Date.parse(closesAt) : Number.NaN;
+
+  if (!Number.isFinite(closesAtTime)) {
+    return "Schedule unavailable";
+  }
+
+  const remainingMinutes = Math.max(0, Math.ceil((closesAtTime - now) / 60_000));
+
+  if (remainingMinutes === 0) {
+    return "Deadline reached";
+  }
+
+  const hours = Math.floor(remainingMinutes / 60);
+  const minutes = remainingMinutes % 60;
+
+  return hours > 0
+    ? `${hours}h ${minutes}m remaining`
+    : `${minutes}m remaining`;
+}
+
+function getAdminActionDisplayError(action, actionError) {
+  const message = `${actionError?.code || ""} ${actionError?.message || ""}`.toLowerCase();
+  const isMissingFunction = actionError?.code === "PGRST202" || (
+    message.includes("function") && (
+      message.includes("could not find") ||
+      message.includes("does not exist") ||
+      message.includes("schema cache")
+    )
+  );
+
+  if (isMissingFunction && action === "resolve_irv_tie") {
+    return "Tie-break controls need the latest Supabase event migration. No result was changed.";
+  }
+
+  if (isMissingFunction && action === "close_final_voting") {
+    return "Final close controls need the latest Supabase event migration. Voting is still open.";
+  }
+
+  return getAdminActionErrorMessage(actionError);
 }
 
 function getMemberName(member) {
@@ -70,6 +275,9 @@ function Admin({
   const [memberships, setMemberships] = useState([]);
   const [results, setResults] = useState(null);
   const [selectedFinalistIds, setSelectedFinalistIds] = useState([]);
+  const [selectedTieCandidateId, setSelectedTieCandidateId] = useState("");
+  const [lastResultsRefreshedAt, setLastResultsRefreshedAt] = useState(null);
+  const [clockNow, setClockNow] = useState(() => Date.now());
   const [currentAlbumForm, setCurrentAlbumForm] = useState({
     title: poll.albumOfWeek.title || "",
     artist: poll.albumOfWeek.artist || "",
@@ -94,6 +302,15 @@ function Admin({
   const [accountFilter, setAccountFilter] = useState("active");
   const [memberSearch, setMemberSearch] = useState("");
   const [memberPage, setMemberPage] = useState(1);
+  const [activePanel, setActivePanel] = useState("poll");
+  const [isCreatePollOpen, setIsCreatePollOpen] = useState(false);
+  const [isShelfCurating, setIsShelfCurating] = useState(false);
+  const [selectedMemberIds, setSelectedMemberIds] = useState([]);
+  const [busyMemberIds, setBusyMemberIds] = useState([]);
+  const [successfulAction, setSuccessfulAction] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [confirmation, setConfirmation] = useState(null);
+  const [isConfirming, setIsConfirming] = useState(false);
   const [selectedShelfAlbumId, setSelectedShelfAlbumId] = useState("");
   const [shelfArtistDrafts, setShelfArtistDrafts] = useState({});
   const [shelfCoverFile, setShelfCoverFile] = useState(null);
@@ -109,24 +326,38 @@ function Admin({
   const [memberMessage, setMemberMessage] = useState(null);
   const [error, setError] = useState(null);
   const [phaseFeedback, setPhaseFeedback] = useState(null);
+  const fallbackShelfAlbums = useMemo(() => getRecentShelfAlbums(), []);
+  const [shelfAlbums, setShelfAlbums] = useState(fallbackShelfAlbums);
   const phaseActionRef = useRef(null);
   const resultsRequestRef = useRef(0);
+  const adminMainRef = useRef(null);
+  const confirmationDialogRef = useRef(null);
+  const confirmationTriggerRef = useRef(null);
+  const isConfirmingRef = useRef(false);
   const currentAlbumCoverInputRef = useRef(null);
+  const shelfCoverInputRef = useRef(null);
+  const successTimerRef = useRef(null);
 
   const canManage = hasSupabaseConfig && isAdmin(membership);
-  const shelfAlbums = useMemo(() => getRecentShelfAlbums(), []);
   const selectedShelfAlbum = shelfAlbums.find((album) => album.id === selectedShelfAlbumId) || shelfAlbums[0];
   const primaryRows = useMemo(() => results?.primaryResults || [], [results?.primaryResults]);
   const nominationRows = results?.nominations || [];
   const finalRows = results?.finalists || [];
   const irvRounds = results?.irv?.rounds || [];
   const irvTie = results?.irv?.tie || null;
+  const irvTieCandidateIds = useMemo(
+    () => irvTie?.candidateIds || irvTie?.candidate_ids || [],
+    [irvTie],
+  );
+  const irvTieSignature = irvTieCandidateIds.join("|");
   const irvWinnerId = results?.irv?.winnerId || null;
   const irvWinner = finalRows.find((candidate) => candidate.id === irvWinnerId);
   const currentAlbumRatingAverage = formatAverageRating(
     results?.currentAlbumRating?.averageRating,
   );
   const currentAlbumRatingCount = results?.currentAlbumRating?.ratingCount || 0;
+  const currentBallotCount = getCurrentBallotCount(results, poll, poll.phase);
+  const finalVotingState = getFinalVotingState(results, poll, clockNow);
   const selectedCount = selectedFinalistIds.length;
   const requiredFinalistCount = getRequiredFinalistCount(primaryRows.length);
   const canAdvanceToFinal =
@@ -220,6 +451,7 @@ function Admin({
       setResults(null);
     } else {
       setResults(data);
+      setLastResultsRefreshedAt(Date.now());
       const finalistIds = (data?.finalists || []).map((candidate) => candidate.id);
       setSelectedFinalistIds(finalistIds);
     }
@@ -297,6 +529,89 @@ function Admin({
     loadResults();
   }, [loadResults]);
 
+  useEffect(() => {
+    if (poll.phase !== "final") {
+      return undefined;
+    }
+
+    setClockNow(Date.now());
+    const intervalId = window.setInterval(() => setClockNow(Date.now()), 30_000);
+
+    return () => window.clearInterval(intervalId);
+  }, [poll.phase]);
+
+  useEffect(() => {
+    setSelectedTieCandidateId("");
+  }, [poll.id, irvTie?.round, irvTieSignature]);
+
+  useEffect(() => {
+    isConfirmingRef.current = isConfirming;
+  }, [isConfirming]);
+
+  useEffect(() => {
+    if (!confirmation) {
+      return undefined;
+    }
+
+    function handleConfirmationKeyDown(event) {
+      if (event.key === "Escape" && !isConfirmingRef.current) {
+        setConfirmation(null);
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const focusableElements = [...(confirmationDialogRef.current?.querySelectorAll(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ) || [])];
+
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    }
+
+    const backgroundElements = [
+      adminMainRef.current,
+      document.querySelector(".sideb-nav"),
+      document.querySelector(".site-footer"),
+    ].filter(Boolean);
+    const previousInertStates = backgroundElements.map((element) => element.inert);
+
+    backgroundElements.forEach((element) => {
+      element.inert = true;
+    });
+    window.addEventListener("keydown", handleConfirmationKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleConfirmationKeyDown);
+      backgroundElements.forEach((element, index) => {
+        element.inert = previousInertStates[index];
+      });
+
+      const trigger = confirmationTriggerRef.current;
+      confirmationTriggerRef.current = null;
+      window.requestAnimationFrame(() => {
+        if (trigger?.isConnected) {
+          trigger.focus();
+        }
+      });
+    };
+  }, [confirmation]);
+
   const loadShelfCovers = useCallback(async () => {
     if (!canManage) {
       return;
@@ -316,6 +631,20 @@ function Admin({
     );
     setIsLoadingShelfCovers(false);
   }, [canManage, hasSupabaseConfig, shelfAlbums, supabase]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    loadRecordShelfAlbums(supabase, hasSupabaseConfig, fallbackShelfAlbums).then((albums) => {
+      if (isMounted) {
+        setShelfAlbums(albums);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [fallbackShelfAlbums, hasSupabaseConfig, supabase]);
 
   useEffect(() => {
     if (!selectedShelfAlbumId && shelfAlbums.length) {
@@ -351,6 +680,60 @@ function Admin({
 
     return () => URL.revokeObjectURL(previewUrl);
   }, [currentAlbumCoverFile]);
+
+  useEffect(() => {
+    if (!toast) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => setToast(null), 4200);
+    return () => window.clearTimeout(timeoutId);
+  }, [toast]);
+
+  useEffect(() => () => {
+    if (successTimerRef.current) {
+      window.clearTimeout(successTimerRef.current);
+    }
+  }, []);
+
+  function showConfirmation(messageText, actionKey = "saved") {
+    setToast({ message: messageText, type: "success" });
+    setSuccessfulAction(actionKey);
+
+    if (successTimerRef.current) {
+      window.clearTimeout(successTimerRef.current);
+    }
+
+    successTimerRef.current = window.setTimeout(() => {
+      setSuccessfulAction(null);
+    }, 1100);
+  }
+
+  function showFailure(messageText) {
+    setToast({ message: messageText, type: "error" });
+  }
+
+  function getSubmitLabel(actionKey, idleLabel, busyLabel, isBusy) {
+    if (successfulAction === actionKey) {
+      return "Saved";
+    }
+
+    return isBusy ? busyLabel : idleLabel;
+  }
+
+  function toggleAdminPanel(panelId) {
+    setActivePanel((currentPanel) => (currentPanel === panelId ? "" : panelId));
+  }
+
+  function openAdminPanel(panelId, targetId) {
+    setActivePanel(panelId);
+    window.requestAnimationFrame(() => {
+      document.getElementById(targetId)?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "start",
+      });
+    });
+  }
 
   function handleNewPollChange(event) {
     const { name, value } = event.target;
@@ -394,10 +777,13 @@ function Admin({
 
     if (createError) {
       setError(createError.message);
+      showFailure(createError.message);
       return;
     }
 
     setMessage("New poll created and set active.");
+    showConfirmation("New weekly poll created and nominations are open.", "create-poll");
+    setIsCreatePollOpen(false);
     setNewPoll({
       cycleLabel: "",
       pollId: "",
@@ -443,17 +829,20 @@ function Admin({
     return "Membership updated.";
   }
 
-  async function updateMembership(userId, updates) {
+  async function updateMembership(userId, updates, { quiet = false } = {}) {
     setError(null);
     setMessage(null);
     setMemberMessage(null);
+    setBusyMemberIds((currentIds) => [...new Set([...currentIds, userId])]);
 
     if (updates.role === "member") {
       const targetMember = memberships.find((member) => member.user_id === userId);
 
       if (targetMember?.role === "admin" && adminCount <= 1) {
         setError("You cannot remove the last admin.");
-        return;
+        showFailure("You cannot remove the last admin.");
+        setBusyMemberIds((currentIds) => currentIds.filter((id) => id !== userId));
+        return false;
       }
     }
 
@@ -466,7 +855,9 @@ function Admin({
 
     if (updateError) {
       setError(updateError.message);
-      return;
+      showFailure(updateError.message);
+      setBusyMemberIds((currentIds) => currentIds.filter((id) => id !== userId));
+      return false;
     }
 
     setMemberships((currentMemberships) =>
@@ -474,7 +865,112 @@ function Admin({
         currentMembership.user_id === userId ? data : currentMembership,
       ),
     );
-    setMemberMessage(getMembershipActionLabel(updates));
+    const actionMessage = getMembershipActionLabel(updates);
+    if (!quiet) {
+      setMemberMessage(actionMessage);
+      showConfirmation(actionMessage, `member-${userId}`);
+    }
+    setBusyMemberIds((currentIds) => currentIds.filter((id) => id !== userId));
+    setSelectedMemberIds((currentIds) => currentIds.filter((id) => id !== userId));
+    return true;
+  }
+
+  function toggleMemberSelection(userId) {
+    setSelectedMemberIds((currentIds) =>
+      currentIds.includes(userId)
+        ? currentIds.filter((id) => id !== userId)
+        : [...currentIds, userId],
+    );
+  }
+
+  function toggleAllVisibleMembers() {
+    const visibleIds = pagedMembers.map((member) => member.user_id);
+    const allSelected = visibleIds.every((id) => selectedMemberIds.includes(id));
+
+    setSelectedMemberIds((currentIds) => {
+      if (allSelected) {
+        return currentIds.filter((id) => !visibleIds.includes(id));
+      }
+
+      return [...new Set([...currentIds, ...visibleIds])];
+    });
+  }
+
+  async function runBulkMemberStatus(status) {
+    const targetIds = selectedMemberIds.filter((id) =>
+      memberships.some((member) => member.user_id === id && member.status !== status),
+    );
+
+    if (!targetIds.length) {
+      return;
+    }
+
+    setBusyMemberIds((currentIds) => [...new Set([...currentIds, ...targetIds])]);
+    const { data, error: updateError } = await supabase
+      .from("memberships")
+      .update({ status })
+      .in("user_id", targetIds)
+      .select("user_id, email, display_name, status, role, created_at, updated_at");
+
+    setBusyMemberIds((currentIds) => currentIds.filter((id) => !targetIds.includes(id)));
+
+    if (updateError) {
+      setError(updateError.message);
+      showFailure(updateError.message);
+      return;
+    }
+
+    const updatesById = new Map(data.map((member) => [member.user_id, member]));
+    setMemberships((currentMemberships) =>
+      currentMemberships.map((member) => updatesById.get(member.user_id) || member),
+    );
+    setSelectedMemberIds([]);
+    const successMessage = `${formatCount(targetIds.length, "account")} ${status === "approved" ? "approved" : "rejected"}.`;
+    setMemberMessage(successMessage);
+    showConfirmation(successMessage, `bulk-${status}`);
+  }
+
+  function openConfirmation(nextConfirmation) {
+    confirmationTriggerRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    setConfirmation(nextConfirmation);
+  }
+
+  function dismissConfirmation() {
+    if (!isConfirmingRef.current) {
+      setConfirmation(null);
+    }
+  }
+
+  function requestBulkReject() {
+    openConfirmation({
+      confirmLabel: `Reject ${selectedMemberIds.length}`,
+      description: "These accounts will lose club access. You can restore them to pending later.",
+      onConfirm: () => runBulkMemberStatus("rejected"),
+      title: `Reject ${formatCount(selectedMemberIds.length, "selected account")}?`,
+    });
+  }
+
+  async function confirmPendingAction() {
+    if (!confirmation?.onConfirm) {
+      return;
+    }
+
+    isConfirmingRef.current = true;
+    setIsConfirming(true);
+
+    try {
+      await confirmation.onConfirm();
+    } catch (actionError) {
+      const actionErrorMessage = actionError?.message || "The action could not be completed.";
+      setError(actionErrorMessage);
+      showFailure(actionErrorMessage);
+    } finally {
+      isConfirmingRef.current = false;
+      setIsConfirming(false);
+      setConfirmation(null);
+    }
   }
 
   function toggleFinalist(candidateId) {
@@ -519,10 +1015,12 @@ function Admin({
       });
 
       if (!outcome.isSuccess) {
+        const actionErrorMessage = getAdminActionDisplayError(action, outcome.error);
         setPhaseFeedback({
-          message: getAdminActionErrorMessage(outcome.error),
+          message: actionErrorMessage,
           type: "error",
         });
+        showFailure(actionErrorMessage);
         return;
       }
 
@@ -530,6 +1028,7 @@ function Admin({
         ? alreadyMessage || successMessage
         : successMessage;
       setPhaseFeedback({ message: confirmationMessage, type: "success" });
+      showConfirmation(confirmationMessage, action);
 
       try {
         if (!outcome.recovered) {
@@ -543,10 +1042,12 @@ function Admin({
         });
       }
     } catch (actionError) {
+      const actionErrorMessage = getAdminActionDisplayError(action, actionError);
       setPhaseFeedback({
-        message: getAdminActionErrorMessage(actionError),
+        message: actionErrorMessage,
         type: "error",
       });
+      showFailure(actionErrorMessage);
     } finally {
       phaseActionRef.current = null;
       setActivePhaseAction(null);
@@ -554,10 +1055,79 @@ function Admin({
     }
   }
 
-  function scrollToAdminPanel(panelId) {
-    document.getElementById(panelId)?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
+  function requestAdvanceToPrimary() {
+    openConfirmation({
+      confirmLabel: "Open primary voting",
+      description: `This closes nominations with ${formatCount(nominationRows.length, "album")} in the pool. Members will no longer be able to nominate, and every open ballot will move to primary voting.`,
+      eyebrow: "Advance poll · Nominations → Primary",
+      intent: "primary",
+      onConfirm: () => runAdminAction(
+        "advance_to_primary",
+        "Poll moved to primary.",
+        {},
+        {
+          alreadyMessage: "The poll is already in primary voting.",
+          expectedPhase: "primary",
+        },
+      ),
+      title: "Are you ready?",
+    });
+  }
+
+  function requestAdvanceToFinal() {
+    openConfirmation({
+      confirmLabel: "Open final voting",
+      description: `This locks the ${formatCount(selectedCount, "selected finalist")} and ends primary voting. Ranked-choice final voting will open immediately and automatically close 18 hours later.`,
+      eyebrow: "Advance poll · Primary → Final",
+      intent: "primary",
+      onConfirm: () => runAdminAction(
+        "advance_to_final",
+        "Poll moved to final voting.",
+        { candidate_ids: selectedFinalistIds },
+        {
+          alreadyMessage: "The poll is already in final voting.",
+          expectedPhase: "final",
+        },
+      ),
+      title: "Are you ready?",
+    });
+  }
+
+  function requestResolveIrvTie() {
+    const candidate = finalRows.find((row) => row.id === selectedTieCandidateId);
+
+    if (!candidate || !irvTie) {
+      return;
+    }
+
+    openConfirmation({
+      confirmLabel: `Eliminate ${candidate.title}`,
+      description: `${candidate.title} by ${candidate.artist} will be permanently recorded as the manual elimination for round ${irvTie.round}. The ranked-choice count will then continue and may produce another tie.`,
+      eyebrow: "Manual IRV tie-break",
+      intent: "danger",
+      onConfirm: () => runAdminAction(
+        "resolve_irv_tie",
+        `${candidate.title} was eliminated from round ${irvTie.round}.`,
+        {
+          eliminated_candidate_id_input: candidate.id,
+          target_round: irvTie.round,
+        },
+      ),
+      title: "Are you ready?",
+    });
+  }
+
+  function requestCloseFinalVoting() {
+    openConfirmation({
+      confirmLabel: "Close final voting now",
+      description: `This immediately stops every new final ballot, before the automatic deadline${finalVotingState.closesAt ? ` at ${formatAdminTimestamp(finalVotingState.closesAt, { includeDate: true })}` : ""}. Existing ballots stay counted, and the poll cannot be reopened from this page.`,
+      eyebrow: "Permanent voting cutoff",
+      intent: "danger",
+      onConfirm: () => runAdminAction(
+        "close_final_voting",
+        "Final voting is closed. Results are now official.",
+      ),
+      title: "Close final voting now?",
     });
   }
 
@@ -642,6 +1212,10 @@ function Admin({
       setCurrentAlbumMessage(
         uploaded ? "Current album and cover updated." : "Current album updated.",
       );
+      showConfirmation(
+        uploaded ? "Current album and cover updated." : "Current album updated.",
+        "current-album",
+      );
       try {
         await refreshPoll();
       } catch {
@@ -650,9 +1224,9 @@ function Admin({
         );
       }
     } catch (saveError) {
-      setCurrentAlbumError(
-        saveError.message || "The current album could not be updated. Try again.",
-      );
+      const saveErrorMessage = saveError.message || "The current album could not be updated. Try again.";
+      setCurrentAlbumError(saveErrorMessage);
+      showFailure(saveErrorMessage);
     } finally {
       setIsSavingContent(false);
     }
@@ -717,10 +1291,13 @@ function Admin({
 
     if (saveError) {
       setError(saveError.message);
+      showFailure(saveError.message);
       return;
     }
 
-    setMessage(editingEventId ? "Event updated." : "Event added.");
+    const successMessage = editingEventId ? "Event updated." : "Event added.";
+    setMessage(successMessage);
+    showConfirmation(successMessage, "event-save");
     resetEventForm();
     await refreshEvents();
   }
@@ -739,6 +1316,7 @@ function Admin({
 
     if (deleteError) {
       setError(deleteError.message);
+      showFailure(deleteError.message);
       return;
     }
 
@@ -747,7 +1325,17 @@ function Admin({
     }
 
     setMessage("Event deleted.");
+    showConfirmation("Event deleted.", "event-delete");
     await refreshEvents();
+  }
+
+  function requestEventDelete(eventItem) {
+    openConfirmation({
+      confirmLabel: "Delete event",
+      description: `${eventItem.title} will be removed from the home page and events page.`,
+      onConfirm: () => handleEventDelete(eventItem.id),
+      title: "Delete this event?",
+    });
   }
 
   function renderAdminSnapshot() {
@@ -755,24 +1343,13 @@ function Admin({
       return null;
     }
 
-    const phaseMetric =
-      poll.phase === "nominations"
-        ? {
-            label: "Nominations",
-            value: nominationRows.length,
-            detail: "unique albums in the pool",
-          }
-        : poll.phase === "primary"
-          ? {
-              label: "Primary votes",
-              value: primaryRows.reduce((total, candidate) => total + (candidate.primaryVotes || 0), 0),
-              detail: `${selectedCount}/${requiredFinalistCount} finalists selected`,
-            }
-          : {
-              label: "Final status",
-              value: irvWinner ? "Winner" : irvTie ? "Tie" : irvRounds.length || 0,
-              detail: irvWinner?.title || (irvTie ? "manual decision needed" : "IRV rounds ready"),
-            };
+    const phaseMetric = {
+      label: `${formatPhaseLabel(poll.phase)} ballots`,
+      value: currentBallotCount ?? "—",
+      detail: currentBallotCount === null
+        ? "authoritative count unavailable"
+        : "unique submitted ballots",
+    };
 
     const snapshotItems = [
       {
@@ -824,18 +1401,21 @@ function Admin({
         </div>
 
         <div className="admin-action-row admin-snapshot-actions">
-          <button className="button button-secondary" type="button" onClick={() => scrollToAdminPanel("admin-members")}>
+          <button className="button button-secondary" type="button" onClick={() => openAdminPanel("members", "admin-members-panel")}>
             Review members
           </button>
           {hasSiteEventsConfig ? (
-            <button className="button button-secondary" type="button" onClick={() => scrollToAdminPanel("admin-events")}>
+            <button className="button button-secondary" type="button" onClick={() => openAdminPanel("events", "admin-events-panel")}>
               Manage events
             </button>
           ) : null}
-          <button className="button button-secondary" type="button" onClick={() => scrollToAdminPanel("admin-results")}>
+          <button className="button button-secondary" type="button" onClick={() => openAdminPanel("poll", "admin-poll")}>
             View results
           </button>
-          <button className="button button-primary" type="button" onClick={() => scrollToAdminPanel("admin-create-poll")}>
+          <button className="button button-primary" type="button" onClick={() => {
+            setIsCreatePollOpen(true);
+            openAdminPanel("poll", "admin-create-poll");
+          }}>
             Create poll
           </button>
         </div>
@@ -850,15 +1430,25 @@ function Admin({
 
     return (
       <article className="surface-card vote-form-card admin-create-poll" id="admin-create-poll">
-        <div className="form-header">
+        <div className="admin-create-poll-intro">
           <div>
-            <span className="phase-pill phase-nominations">New poll</span>
-            <h2>Create the next weekly poll</h2>
+            <span className="admin-terminal-label">New cycle</span>
+            <h3>Create the next weekly poll</h3>
+            <p>This archives the active poll and opens fresh nominations.</p>
           </div>
-          <p>This archives the current active poll and opens a fresh nominations phase.</p>
+          <button
+            aria-expanded={isCreatePollOpen}
+            className="button button-primary admin-create-toggle"
+            type="button"
+            onClick={() => setIsCreatePollOpen((isOpen) => !isOpen)}
+          >
+            {isCreatePollOpen ? "Close setup" : "Create new weekly poll"}
+            <ChevronIcon isOpen={isCreatePollOpen} />
+          </button>
         </div>
 
-        <form className="vote-form" onSubmit={handleCreatePoll}>
+        <div className={`admin-inline-reveal ${isCreatePollOpen ? "is-open" : ""}`}>
+          <form className="vote-form admin-inline-reveal-inner" inert={!isCreatePollOpen ? true : undefined} onSubmit={handleCreatePoll}>
           <div className="admin-create-grid">
             <div className="field-group">
               <label htmlFor="cycleLabel">Cycle label</label>
@@ -931,10 +1521,11 @@ function Admin({
             />
           </div>
 
-          <button className="button button-primary" type="submit" disabled={isSavingPhase}>
-            {isSavingPhase ? "Creating..." : "Create active poll"}
+          <button className={`button button-primary ${successfulAction === "create-poll" ? "is-success" : ""}`} type="submit" disabled={isSavingPhase}>
+            {getSubmitLabel("create-poll", "Create active poll", "Creating...", isSavingPhase)}
           </button>
-        </form>
+          </form>
+        </div>
       </article>
     );
   }
@@ -984,9 +1575,10 @@ function Admin({
 
           <div className="admin-current-cover-grid">
             <div className="field-group">
-              <label htmlFor="currentAlbumCover">Album cover image</label>
+              <span className="admin-field-label">Album cover image</span>
               <input
                 ref={currentAlbumCoverInputRef}
+                className="admin-file-input"
                 id="currentAlbumCover"
                 type="file"
                 accept={ALBUM_COVER_ACCEPT}
@@ -994,6 +1586,10 @@ function Admin({
                 disabled={isSavingContent}
                 onChange={handleCurrentAlbumCoverChange}
               />
+              <label className="admin-file-trigger" htmlFor="currentAlbumCover">
+                <span>Upload cover</span>
+                <small>{currentAlbumCoverFile?.name || "JPG, PNG or WebP"}</small>
+              </label>
               <small className="helper-note" id="currentAlbumCoverHelp">
                 JPG, PNG, or WebP. Maximum 5 MB. Leave empty to keep the current image.
               </small>
@@ -1041,8 +1637,8 @@ function Admin({
             />
           </div>
 
-          <button className="button button-primary" type="submit" disabled={isSavingContent}>
-            {isSavingContent ? "Saving..." : "Save current album"}
+          <button className={`button button-primary ${successfulAction === "current-album" ? "is-success" : ""}`} type="submit" disabled={isSavingContent}>
+            {getSubmitLabel("current-album", "Save current album", "Saving...", isSavingContent)}
           </button>
         </form>
       </article>
@@ -1088,7 +1684,7 @@ function Admin({
                     className="button button-secondary"
                     type="button"
                     disabled={isSavingContent}
-                    onClick={() => handleEventDelete(eventItem.id)}
+                    onClick={() => requestEventDelete(eventItem)}
                   >
                     Delete
                   </button>
@@ -1184,8 +1780,13 @@ function Admin({
             </div>
 
             <div className="admin-action-row">
-              <button className="button button-primary" type="submit" disabled={isSavingContent}>
-                {isSavingContent ? "Saving..." : editingEventId ? "Update event" : "Add event"}
+              <button className={`button button-primary ${successfulAction === "event-save" ? "is-success" : ""}`} type="submit" disabled={isSavingContent}>
+                {getSubmitLabel(
+                  "event-save",
+                  editingEventId ? "Update event" : "Add event",
+                  "Saving...",
+                  isSavingContent,
+                )}
               </button>
               <button className="button button-secondary" type="button" onClick={resetEventForm}>
                 Clear form
@@ -1211,6 +1812,60 @@ function Admin({
           </div>
           <p>{poll.status}</p>
         </div>
+
+        <section aria-label="Live poll health" className="admin-poll-health">
+          <div className="admin-poll-health-metrics">
+            <div>
+              <span>{formatPhaseLabel(poll.phase)} ballots</span>
+              <strong>{currentBallotCount ?? "—"}</strong>
+              <small>
+                {currentBallotCount === null
+                  ? "Server count not reported"
+                  : "Unique members submitted"}
+              </small>
+            </div>
+            <div>
+              <span>Results freshness</span>
+              <strong>{lastResultsRefreshedAt ? formatAdminTimestamp(lastResultsRefreshedAt) : "Not loaded"}</strong>
+              <small>Last successful server refresh</small>
+            </div>
+            {poll.phase === "final" ? (
+              <div className={finalVotingState.isClosed ? "is-closed" : ""}>
+                <span>Final cutoff</span>
+                <strong>
+                  {finalVotingState.isClosed
+                    ? "Closed"
+                    : formatFinalCountdown(finalVotingState.closesAt, clockNow)}
+                </strong>
+                <small>
+                  {finalVotingState.isAvailable
+                    ? `${finalVotingState.isClosed ? "Closed" : "Closes"} ${formatAdminTimestamp(finalVotingState.closedAt || finalVotingState.closesAt, { includeDate: true })}`
+                    : "Timing fields are not installed"}
+                </small>
+              </div>
+            ) : null}
+          </div>
+          <div className="admin-poll-health-actions">
+            <button
+              className="button button-secondary"
+              type="button"
+              disabled={isLoadingResults}
+              onClick={loadResults}
+            >
+              {isLoadingResults ? "Refreshing…" : "Refresh live results"}
+            </button>
+            {poll.phase === "final" && finalVotingState.isAvailable && !finalVotingState.isClosed ? (
+              <button
+                className="button button-danger"
+                type="button"
+                disabled={isSavingPhase}
+                onClick={requestCloseFinalVoting}
+              >
+                Close final now
+              </button>
+            ) : null}
+          </div>
+        </section>
 
         {pollError ? <p className="form-error" role="alert">{pollError}</p> : null}
         {phaseFeedback ? (
@@ -1240,14 +1895,6 @@ function Admin({
               {currentAlbumRatingAverage || "—"}
               <small>/10</small>
             </strong>
-            <button
-              className="button button-secondary"
-              type="button"
-              disabled={isLoadingResults}
-              onClick={loadResults}
-            >
-              {isLoadingResults ? "Refreshing…" : "Refresh rating"}
-            </button>
           </section>
         ) : null}
 
@@ -1268,19 +1915,14 @@ function Admin({
               className="button button-primary"
               type="button"
               disabled={isSavingPhase || nominationRows.length === 0}
-              onClick={() => runAdminAction(
-                "advance_to_primary",
-                "Poll moved to primary.",
-                {},
-                {
-                  alreadyMessage: "The poll is already in primary voting.",
-                  expectedPhase: "primary",
-                },
-              )}
+              onClick={requestAdvanceToPrimary}
             >
-              {activePhaseAction === "advance_to_primary"
-                ? "Moving to primary..."
-                : "Move to primary"}
+              {getSubmitLabel(
+                "advance_to_primary",
+                "Move to primary",
+                "Moving to primary...",
+                activePhaseAction === "advance_to_primary",
+              )}
             </button>
           </>
         ) : null}
@@ -1332,26 +1974,25 @@ function Admin({
                   })
                 }
               >
-                {activePhaseAction === "save_finalists"
-                  ? "Saving finalists..."
-                  : "Save finalists"}
+                {getSubmitLabel(
+                  "save_finalists",
+                  "Save finalists",
+                  "Saving finalists...",
+                  activePhaseAction === "save_finalists",
+                )}
               </button>
               <button
                 className="button button-primary"
                 type="button"
                 disabled={isSavingPhase || !canAdvanceToFinal}
-                onClick={() =>
-                  runAdminAction("advance_to_final", "Poll moved to final voting.", {
-                    candidate_ids: selectedFinalistIds,
-                  }, {
-                    alreadyMessage: "The poll is already in final voting.",
-                    expectedPhase: "final",
-                  })
-                }
+                onClick={requestAdvanceToFinal}
               >
-                {activePhaseAction === "advance_to_final"
-                  ? "Moving to final..."
-                  : "Move to final"}
+                {getSubmitLabel(
+                  "advance_to_final",
+                  "Move to final",
+                  "Moving to final...",
+                  activePhaseAction === "advance_to_final",
+                )}
               </button>
             </div>
           </>
@@ -1361,15 +2002,63 @@ function Admin({
           <>
             {irvWinner ? (
               <div className="confirmation-card">
-                <p className="eyebrow">IRV winner</p>
+                <p className="eyebrow">
+                  {finalVotingState.isClosed ? "IRV winner" : "Current IRV leader"}
+                </p>
                 <h3>{irvWinner.title}</h3>
                 <p>{irvWinner.artist}</p>
+                {!finalVotingState.isClosed ? (
+                  <p>Provisional until final voting closes.</p>
+                ) : null}
               </div>
             ) : null}
             {irvTie ? (
-              <p className="form-error" role="alert">
-                Manual decision needed in round {irvTie.round}: {irvTie.candidateIds.length} candidates tied for elimination.
-              </p>
+              <section aria-labelledby="admin-tie-break-title" className="admin-tie-break">
+                <div>
+                  <span className="admin-terminal-label">Manual IRV tie-break</span>
+                  <h3 id="admin-tie-break-title">Choose one album to eliminate</h3>
+                  <p role="alert">
+                    Round {irvTie.round} has {formatCount(irvTieCandidateIds.length, "candidate")} tied for elimination.
+                  </p>
+                </div>
+                <fieldset disabled={isSavingPhase || !finalVotingState.isClosed}>
+                  <legend>Select the admin tie-break decision</legend>
+                  {irvTieCandidateIds.map((candidateId) => {
+                    const candidate = finalRows.find((row) => row.id === candidateId);
+
+                    return (
+                      <label className="admin-tie-option" key={candidateId}>
+                        <input
+                          type="radio"
+                          name="irv-tie-candidate"
+                          value={candidateId}
+                          checked={selectedTieCandidateId === candidateId}
+                          onChange={() => setSelectedTieCandidateId(candidateId)}
+                        />
+                        <span>
+                          <strong>{candidate?.title || candidateId}</strong>
+                          <small>{candidate?.artist || "Artist not listed"}</small>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </fieldset>
+                {!finalVotingState.isClosed ? (
+                  <p className="helper-note">
+                    {finalVotingState.isAvailable
+                      ? "Tie-break controls unlock after final voting closes."
+                      : "The final-close migration must be installed before recording a tie-break."}
+                  </p>
+                ) : null}
+                <button
+                  className="button button-danger"
+                  type="button"
+                  disabled={isSavingPhase || !finalVotingState.isClosed || !selectedTieCandidateId}
+                  onClick={requestResolveIrvTie}
+                >
+                  {activePhaseAction === "resolve_irv_tie" ? "Recording decision…" : "Record elimination and continue"}
+                </button>
+              </section>
             ) : null}
             <div className="admin-result-list">
               {irvRounds.map((round) => (
@@ -1397,6 +2086,49 @@ function Admin({
 
   function handleShelfCoverFileChange(event) {
     setShelfCoverFile(event.target.files?.[0] || null);
+  }
+
+  function moveShelfAlbum(albumId, direction) {
+    setShelfAlbums((currentAlbums) => {
+      const currentIndex = currentAlbums.findIndex((album) => album.id === albumId);
+      const nextIndex = currentIndex + direction;
+
+      if (currentIndex < 0 || nextIndex < 0 || nextIndex >= currentAlbums.length) {
+        return currentAlbums;
+      }
+
+      const nextAlbums = [...currentAlbums];
+      const [movedAlbum] = nextAlbums.splice(currentIndex, 1);
+      nextAlbums.splice(nextIndex, 0, movedAlbum);
+      return nextAlbums;
+    });
+  }
+
+  async function saveShelfOrder() {
+    setIsSavingShelfCover(true);
+    setError(null);
+
+    try {
+      await saveRecordShelfAlbums(supabase, shelfAlbums);
+      setIsShelfCurating(false);
+      showConfirmation("Record shelf order saved.", "shelf-order");
+    } catch (saveError) {
+      const saveErrorMessage = saveError.message || "The shelf order could not be saved.";
+      setError(saveErrorMessage);
+      showFailure(saveErrorMessage);
+    } finally {
+      setIsSavingShelfCover(false);
+    }
+  }
+
+  async function cancelShelfCuration() {
+    const savedAlbums = await loadRecordShelfAlbums(
+      supabase,
+      hasSupabaseConfig,
+      fallbackShelfAlbums,
+    );
+    setShelfAlbums(savedAlbums);
+    setIsShelfCurating(false);
   }
 
   function handleShelfArtistChange(albumId, artistName) {
@@ -1430,6 +2162,7 @@ function Admin({
 
     if (saveError) {
       setError(saveError.message);
+      showFailure(saveError.message);
       return;
     }
 
@@ -1437,7 +2170,9 @@ function Admin({
       ...currentOverrides,
       [album.id]: nextOverride,
     }));
-    setMessage(`${album.title} artist updated.`);
+    const successMessage = `${album.title} artist updated.`;
+    setMessage(successMessage);
+    showConfirmation(successMessage, `shelf-artist-${album.id}`);
   }
 
   async function handleShelfCoverUpload(event) {
@@ -1458,7 +2193,7 @@ function Admin({
     setIsSavingShelfCover(true);
 
     const extension = shelfCoverFile.name.split(".").pop()?.toLowerCase() || "jpg";
-    const storagePath = `${selectedShelfAlbum.id}/${Date.now()}.${extension}`;
+    const storagePath = `${selectedShelfAlbum.id}/${shelfCoverFile.lastModified}.${extension}`;
     const { error: uploadError } = await supabase.storage
       .from(RECORD_SHELF_BUCKET)
       .upload(storagePath, shelfCoverFile, {
@@ -1470,6 +2205,7 @@ function Admin({
     if (uploadError) {
       setIsSavingShelfCover(false);
       setError(uploadError.message);
+      showFailure(uploadError.message);
       return;
     }
 
@@ -1493,15 +2229,21 @@ function Admin({
 
     if (saveError) {
       setError(saveError.message);
+      showFailure(saveError.message);
       return;
     }
 
     setShelfCoverFile(null);
+    if (shelfCoverInputRef.current) {
+      shelfCoverInputRef.current.value = "";
+    }
     setShelfCoverOverrides((currentOverrides) => ({
       ...currentOverrides,
       [selectedShelfAlbum.id]: nextCover,
     }));
-    setMessage(`${selectedShelfAlbum.title} shelf cover updated.`);
+    const successMessage = `${selectedShelfAlbum.title} shelf cover updated.`;
+    setMessage(successMessage);
+    showConfirmation(successMessage, "shelf-cover");
   }
 
   async function handleShelfCoverClear(album) {
@@ -1524,6 +2266,7 @@ function Admin({
 
     if (deleteError) {
       setError(deleteError.message);
+      showFailure(deleteError.message);
       return;
     }
 
@@ -1532,7 +2275,9 @@ function Admin({
       delete nextOverrides[album.id];
       return nextOverrides;
     });
-    setMessage(`${album.title} will use the automatic cover again.`);
+    const successMessage = `${album.title} will use the automatic cover again.`;
+    setMessage(successMessage);
+    showConfirmation(successMessage, `shelf-clear-${album.id}`);
   }
 
   function renderShelfCoverManager() {
@@ -1544,21 +2289,43 @@ function Admin({
       <article className="surface-card vote-form-card admin-shelf-panel" id="admin-shelf">
         <div className="form-header">
           <div>
-            <span className="phase-pill phase-final">Shelf</span>
-            <h2>Manage record shelf covers</h2>
+            <span className="phase-pill phase-final">Auto queue</span>
+            <h2>Five records in rotation</h2>
           </div>
-          <p>Upload a custom image to replace one of the five current shelf album covers.</p>
+          <p>The newest archived album enters at 01. Position 05 is ejected automatically.</p>
         </div>
 
         {error ? <p className="form-error" role="alert">{error}</p> : null}
         {message ? <p className="form-success" role="status">{message}</p> : null}
 
+        <div className="admin-shelf-modebar">
+          <div>
+            <span className="admin-status-light" aria-hidden="true" />
+            <strong>{isShelfCurating ? "Manual curation active" : "Automatic FIFO active"}</strong>
+          </div>
+          {isShelfCurating ? (
+            <div className="admin-action-row">
+              <button className="button button-secondary" type="button" disabled={isSavingShelfCover} onClick={cancelShelfCuration}>
+                Cancel
+              </button>
+              <button className={`button button-primary ${successfulAction === "shelf-order" ? "is-success" : ""}`} type="button" disabled={isSavingShelfCover} onClick={saveShelfOrder}>
+                {getSubmitLabel("shelf-order", "Save shelf order", "Saving...", isSavingShelfCover)}
+              </button>
+            </div>
+          ) : (
+            <button className="button button-secondary" type="button" onClick={() => setIsShelfCurating(true)}>
+              Curate shelf
+            </button>
+          )}
+        </div>
+
         <div className="admin-shelf-grid">
-          {shelfAlbums.map((album) => {
+          {shelfAlbums.map((album, index) => {
             const override = shelfCoverOverrides[album.id];
 
             return (
-              <article className="admin-shelf-card" key={album.id}>
+              <article className={`admin-shelf-card ${isShelfCurating ? "is-curating" : ""}`} key={album.id}>
+                <span className="admin-shelf-position">{String(index + 1).padStart(2, "0")}</span>
                 {override?.cover_url ? (
                   <img src={override.cover_url} alt={`${album.title} custom cover`} />
                 ) : (
@@ -1568,43 +2335,53 @@ function Admin({
                 )}
                 <div>
                   <strong>{album.title}</strong>
-                  <p>{override?.artist_override || "Artist uses automatic lookup"}</p>
-                  <p>{override?.cover_url ? "Custom cover active" : "Using automatic cover"}</p>
+                  <p>{override?.artist_override || album.artist || "Artist uses automatic lookup"}</p>
+                  <span className="admin-shelf-source">{override?.cover_url ? "Custom artwork" : "Automatic artwork"}</span>
                 </div>
-                <div className="field-group admin-shelf-artist-field">
-                  <label htmlFor={`shelfArtist-${album.id}`}>Artist</label>
-                  <input
-                    id={`shelfArtist-${album.id}`}
-                    type="text"
-                    placeholder="Manual artist name"
-                    value={shelfArtistDrafts[album.id] || ""}
-                    onChange={(event) => handleShelfArtistChange(album.id, event.target.value)}
-                  />
-                </div>
-                <button
-                  aria-label={`Save artist for ${album.title}`}
-                  className="button button-secondary"
-                  type="button"
-                  disabled={isSavingShelfCover}
-                  onClick={() => handleShelfArtistSave(album)}
-                >
-                  Save artist
-                </button>
-                <button
-                  aria-label={`Clear cover and artist overrides for ${album.title}`}
-                  className="button button-secondary"
-                  type="button"
-                  disabled={!override || isSavingShelfCover}
-                  onClick={() => handleShelfCoverClear(album)}
-                >
-                  Clear overrides
-                </button>
+                {isShelfCurating ? (
+                  <div className="admin-shelf-curation-controls">
+                    <div className="admin-shelf-move-controls" aria-label={`Reorder ${album.title}`}>
+                      <button aria-label={`Move ${album.title} up`} disabled={index === 0} type="button" onClick={() => moveShelfAlbum(album.id, -1)}>Up</button>
+                      <button aria-label={`Move ${album.title} down`} disabled={index === shelfAlbums.length - 1} type="button" onClick={() => moveShelfAlbum(album.id, 1)}>Down</button>
+                    </div>
+                    <div className="field-group admin-shelf-artist-field">
+                      <label htmlFor={`shelfArtist-${album.id}`}>Artist override</label>
+                      <input
+                        id={`shelfArtist-${album.id}`}
+                        type="text"
+                        placeholder={album.artist || "Manual artist name"}
+                        value={shelfArtistDrafts[album.id] || ""}
+                        onChange={(event) => handleShelfArtistChange(album.id, event.target.value)}
+                      />
+                    </div>
+                    <div className="admin-action-row">
+                      <button
+                        aria-label={`Save artist for ${album.title}`}
+                        className="button button-secondary"
+                        type="button"
+                        disabled={isSavingShelfCover}
+                        onClick={() => handleShelfArtistSave(album)}
+                      >
+                        Save artist
+                      </button>
+                      <button
+                        aria-label={`Clear cover and artist overrides for ${album.title}`}
+                        className="button button-secondary"
+                        type="button"
+                        disabled={!override || isSavingShelfCover}
+                        onClick={() => handleShelfCoverClear(album)}
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </article>
             );
           })}
         </div>
 
-        <form className="vote-form admin-shelf-upload" onSubmit={handleShelfCoverUpload}>
+        {isShelfCurating ? <form className="vote-form admin-shelf-upload" onSubmit={handleShelfCoverUpload}>
           <div className="field-group">
             <label htmlFor="shelfAlbum">Album to replace</label>
             <select
@@ -1621,24 +2398,27 @@ function Admin({
           </div>
 
           <div className="field-group">
-            <label htmlFor="shelfCover">Replacement image</label>
+            <span className="admin-field-label">Replacement image</span>
             <input
+              ref={shelfCoverInputRef}
+              className="admin-file-input"
               id="shelfCover"
               type="file"
               accept="image/*"
               onChange={handleShelfCoverFileChange}
             />
+            <label className="admin-file-trigger" htmlFor="shelfCover">
+              <span>Upload cover</span>
+              <small>{shelfCoverFile?.name || "Select an image"}</small>
+            </label>
           </div>
 
-          <button className="button button-primary" type="submit" disabled={isSavingShelfCover}>
-            {isSavingShelfCover ? "Uploading..." : "Upload shelf cover"}
+          <button className={`button button-primary ${successfulAction === "shelf-cover" ? "is-success" : ""}`} type="submit" disabled={isSavingShelfCover}>
+            {getSubmitLabel("shelf-cover", "Upload shelf cover", "Uploading...", isSavingShelfCover)}
           </button>
-        </form>
+        </form> : null}
 
         {isLoadingShelfCovers ? <p className="helper-note">Loading custom shelf covers...</p> : null}
-        <p className="helper-note">
-          If this says the bucket or table is missing, run the latest Supabase SQL migration.
-        </p>
       </article>
     );
   }
@@ -1646,6 +2426,7 @@ function Admin({
   function renderMemberActions(member) {
     const canRemoveAdmin =
       member.status === "approved" && member.role === "admin" && adminCount > 1;
+    const isBusy = busyMemberIds.includes(member.user_id);
 
     return (
       <div className="member-actions">
@@ -1654,9 +2435,10 @@ function Admin({
             aria-label={`Approve ${getMemberName(member)}`}
             className="button button-secondary"
             type="button"
+            disabled={isBusy}
             onClick={() => updateMembership(member.user_id, { status: "approved" })}
           >
-            Approve
+            {getSubmitLabel(`member-${member.user_id}`, "Approve", "Working...", isBusy)}
           </button>
         ) : null}
 
@@ -1665,6 +2447,7 @@ function Admin({
             aria-label={`Reject ${getMemberName(member)}`}
             className="button button-secondary"
             type="button"
+            disabled={isBusy}
             onClick={() => updateMembership(member.user_id, { status: "rejected" })}
           >
             Reject
@@ -1676,6 +2459,7 @@ function Admin({
             aria-label={`Restore ${getMemberName(member)} to pending`}
             className="button button-secondary"
             type="button"
+            disabled={isBusy}
             onClick={() => updateMembership(member.user_id, { status: "pending" })}
           >
             Restore pending
@@ -1687,6 +2471,7 @@ function Admin({
             aria-label={`Make ${getMemberName(member)} an admin`}
             className="button button-secondary"
             type="button"
+            disabled={isBusy}
             onClick={() => updateMembership(member.user_id, { role: "admin" })}
           >
             Make admin
@@ -1698,7 +2483,7 @@ function Admin({
             aria-label={`Remove admin access from ${getMemberName(member)}`}
             className="button button-secondary"
             type="button"
-            disabled={!canRemoveAdmin}
+            disabled={!canRemoveAdmin || isBusy}
             onClick={() => updateMembership(member.user_id, { role: "member" })}
           >
             Remove admin
@@ -1725,9 +2510,28 @@ function Admin({
 
     return (
       <>
+        <div className="member-selection-header">
+          <label>
+            <input
+              type="checkbox"
+              checked={pagedMembers.length > 0 && pagedMembers.every((member) => selectedMemberIds.includes(member.user_id))}
+              onChange={toggleAllVisibleMembers}
+            />
+            Select this page
+          </label>
+          <span>{formatCount(selectedMemberIds.length, "selected account")}</span>
+        </div>
         <div className="member-list">
           {pagedMembers.map((member) => (
-            <article className="member-row" key={member.user_id}>
+            <article className={`member-row ${selectedMemberIds.includes(member.user_id) ? "is-selected" : ""}`} key={member.user_id}>
+              <label className="member-select-control">
+                <input
+                  aria-label={`Select ${getMemberName(member)}`}
+                  type="checkbox"
+                  checked={selectedMemberIds.includes(member.user_id)}
+                  onChange={() => toggleMemberSelection(member.user_id)}
+                />
+              </label>
               <div>
                 <strong>{getMemberName(member)}</strong>
                 <p>{member.email}</p>
@@ -1742,6 +2546,23 @@ function Admin({
             </article>
           ))}
         </div>
+
+        {selectedMemberIds.length ? (
+          <div className="member-bulk-bar" role="region" aria-label="Bulk member actions">
+            <strong>{formatCount(selectedMemberIds.length, "account")} selected</strong>
+            <div className="admin-action-row">
+              <button className="button button-secondary" type="button" onClick={() => setSelectedMemberIds([])}>
+                Clear
+              </button>
+              <button className="button button-secondary" type="button" disabled={busyMemberIds.length > 0} onClick={requestBulkReject}>
+                Reject selected
+              </button>
+              <button className={`button button-primary ${successfulAction === "bulk-approved" ? "is-success" : ""}`} type="button" disabled={busyMemberIds.length > 0} onClick={() => runBulkMemberStatus("approved")}>
+                {getSubmitLabel("bulk-approved", "Approve selected", "Approving...", busyMemberIds.length > 0)}
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         <div className="member-pagination">
           <span>
@@ -1882,14 +2703,13 @@ function Admin({
 
   return (
     <div className="sideb-page sideb-subpage sideb-admin-page">
-      <main className="sideb-subpage-main" id="main-content" tabIndex="-1">
+      <main className="sideb-subpage-main" id="main-content" ref={adminMainRef} tabIndex="-1">
         <section className="sideb-page-hero sideb-page-hero-split sideb-admin-hero">
           <div>
-            <p className="sideb-kicker">Admin</p>
-            <h1>Voting control room.</h1>
+            <p className="sideb-kicker">ALC / Operations terminal</p>
+            <h1>Club control room.</h1>
             <p>
-              Manage member access, watch live results, and move the active poll
-              through each phase.
+              Run the weekly cycle, curate the public shelf, and keep member access moving.
             </p>
           </div>
 
@@ -1901,14 +2721,123 @@ function Admin({
           </aside>
         </section>
 
-        {renderAdminSnapshot()}
-        {renderCreatePoll()}
-        {renderCurrentAlbumManager()}
-        {renderEventsManager()}
-        {renderCurrentResults()}
-        {renderShelfCoverManager()}
-        {renderMemberBody()}
+        {canManage ? (
+          <>
+            <nav className="admin-sticky-nav" aria-label="Admin workspace sections">
+              <button className="admin-sticky-brand" type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
+                <span className="admin-status-light" aria-hidden="true" />
+                Live console
+              </button>
+              <div>
+                {ADMIN_PANELS.filter((panel) => panel.id !== "events" || hasSiteEventsConfig).map((panel) => (
+                  <button
+                    aria-current={activePanel === panel.id ? "page" : undefined}
+                    className={activePanel === panel.id ? "is-active" : ""}
+                    key={panel.id}
+                    type="button"
+                    onClick={() => openAdminPanel(panel.id, panel.target)}
+                  >
+                    {panel.label}
+                    {panel.id === "members" && pendingMembers.length ? <span>{pendingMembers.length}</span> : null}
+                  </button>
+                ))}
+              </div>
+            </nav>
+
+            {renderAdminSnapshot()}
+
+            <div className="admin-workspace">
+              <AdminPanel
+                eyebrow="01 / Poll desk"
+                id="admin-poll"
+                isOpen={activePanel === "poll"}
+                summary={`${formatPhaseLabel(poll.phase)} · ${poll.status}`}
+                title="Weekly voting cycle"
+                onToggle={() => toggleAdminPanel("poll")}
+              >
+                {renderCreatePoll()}
+                {renderCurrentResults()}
+              </AdminPanel>
+
+              <AdminPanel
+                eyebrow="02 / Now playing"
+                id="admin-current-album-panel"
+                isOpen={activePanel === "album"}
+                summary={`${poll.albumOfWeek.title} · ${poll.albumOfWeek.artist}`}
+                title="Current album"
+                onToggle={() => toggleAdminPanel("album")}
+              >
+                {renderCurrentAlbumManager()}
+              </AdminPanel>
+
+              {hasSiteEventsConfig ? (
+                <AdminPanel
+                  eyebrow="03 / Calendar"
+                  id="admin-events-panel"
+                  isOpen={activePanel === "events"}
+                  summary={nextUpcomingEvent ? `${nextUpcomingEvent.displayDate} · ${nextUpcomingEvent.title}` : "No event posted"}
+                  title="Events"
+                  onToggle={() => toggleAdminPanel("events")}
+                >
+                  {renderEventsManager()}
+                </AdminPanel>
+              ) : null}
+
+              <AdminPanel
+                eyebrow="04 / FIFO 05"
+                id="admin-shelf-panel"
+                isOpen={activePanel === "shelf"}
+                summary={`${shelfAlbums.length}/5 slots · automatic queue`}
+                title="Record shelf"
+                onToggle={() => toggleAdminPanel("shelf")}
+              >
+                {renderShelfCoverManager()}
+              </AdminPanel>
+
+              <AdminPanel
+                eyebrow="05 / Access desk"
+                id="admin-members-panel"
+                isOpen={activePanel === "members"}
+                summary={`${formatCount(pendingMembers.length, "pending request")} · ${formatCount(approvedMemberCount, "active member")}`}
+                title="Member access"
+                onToggle={() => toggleAdminPanel("members")}
+              >
+                {renderMemberBody()}
+              </AdminPanel>
+            </div>
+          </>
+        ) : renderMemberBody()}
       </main>
+
+      {toast ? (
+        <div className={`admin-toast admin-toast-${toast.type}`} role={toast.type === "error" ? "alert" : "status"}>
+          <span aria-hidden="true" />
+          <p>{toast.message}</p>
+          <button aria-label="Dismiss notification" type="button" onClick={() => setToast(null)}>Close</button>
+        </div>
+      ) : null}
+
+      {confirmation ? (
+        <div className="admin-dialog-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget && !isConfirming) {
+            dismissConfirmation();
+          }
+        }}>
+          <div aria-describedby="admin-confirm-description" aria-labelledby="admin-confirm-title" aria-modal="true" className="admin-dialog" ref={confirmationDialogRef} role="dialog">
+            <span className="admin-terminal-label">{confirmation.eyebrow || "Confirmation required"}</span>
+            <h2 id="admin-confirm-title">{confirmation.title}</h2>
+            <p id="admin-confirm-description">{confirmation.description}</p>
+            <div className="admin-action-row">
+              <button autoFocus className="button button-secondary" type="button" disabled={isConfirming} onClick={dismissConfirmation}>
+                Cancel
+              </button>
+              <button className={`button ${confirmation.intent === "primary" ? "button-primary" : "button-danger"}`} type="button" disabled={isConfirming} onClick={confirmPendingAction}>
+                {isConfirming ? "Working..." : confirmation.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -17,7 +17,10 @@ You need:
   3. `supabase/three-phase-voting.sql`
   4. `supabase/site-content.sql`, required for current album editing and optional for event editing
   5. `supabase/current-album-ratings.sql`, required for phase-one album ratings and rated archive entries
-  6. `supabase/security-hardening.sql` **last**
+  6. `supabase/security-hardening.sql`
+  7. `supabase/record-shelf-queue.sql`, required for the automatic five-album FIFO shelf
+  8. `supabase/event-voting-hardening.sql` **last**
+- Run the read-only `supabase/event-readiness-verification.sql` and require every check to return `PASS`.
 
 The five member accounts are useful because the app intentionally allows one nomination per approved account per poll. Five nominations gives you enough candidates to test the final phase properly.
 

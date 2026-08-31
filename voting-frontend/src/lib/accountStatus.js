@@ -1,4 +1,4 @@
-export function getAccountStatus(session, membership) {
+export function getAccountStatus(session, membership, membershipLookupStatus = "ready") {
   if (!session) {
     return "signed-out";
   }
@@ -7,19 +7,25 @@ export function getAccountStatus(session, membership) {
     return "unverified";
   }
 
-  if (
-    !membership ||
-    membership.user_id !== session.user.id ||
-    membership.status === "pending"
-  ) {
+  const hasCurrentMembership = membership?.user_id === session.user.id;
+
+  if (hasCurrentMembership && membership.status === "approved") {
+    return "approved";
+  }
+
+  if (membershipLookupStatus === "unavailable") {
+    return "unavailable";
+  }
+
+  if (hasCurrentMembership && membership.status === "pending") {
     return "pending";
   }
 
-  if (membership.status !== "approved") {
+  if (hasCurrentMembership) {
     return "blocked";
   }
 
-  return "approved";
+  return "pending";
 }
 
 export const accountStatusContent = {
@@ -34,6 +40,10 @@ export const accountStatusContent = {
   pending: {
     label: "Approval pending",
     title: "Your membership is in the queue",
+  },
+  unavailable: {
+    label: "Status unavailable",
+    title: "Membership could not be checked",
   },
   blocked: {
     label: "Access unavailable",

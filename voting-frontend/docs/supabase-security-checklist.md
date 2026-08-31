@@ -1,6 +1,11 @@
 # Supabase Security Checklist
 
-Apply `supabase/security-hardening.sql` **last**, after all other SQL files. Re-run it whenever an older setup SQL file is re-run, because those files recreate earlier policies and grants.
+Apply `supabase/security-hardening.sql`, then `supabase/record-shelf-queue.sql`,
+then `supabase/event-voting-hardening.sql` **last**. For an existing project,
+the queue and event files are safe to rerun in that order. If any older setup
+SQL is rerun, repeat all three because older files recreate earlier functions,
+policies, and grants. Finish with the read-only
+`supabase/event-readiness-verification.sql` and require every row to say `PASS`.
 
 ## Expected public surface
 
@@ -32,7 +37,7 @@ their bearer token.
 
 ## Dashboard checks before launch
 
-- In **Database > Tables**, confirm RLS is enabled for every app table: `memberships`, `votes`, `vote_choices`, `album_ratings`, `album_archive_entries`, `polls`, `poll_candidates`, `banned_albums`, `banned_artists`, `site_events`, and `record_shelf_covers`.
+- In **Database > Tables**, confirm RLS is enabled for every app table: `memberships`, `votes`, `vote_choices`, `album_ratings`, `album_archive_entries`, `polls`, `poll_candidates`, `banned_albums`, `banned_artists`, `site_events`, `record_shelf_covers`, `record_shelf_items`, and `poll_irv_tie_resolutions`.
 - In **Project Settings > Data API**, keep the exposed schemas list minimal. `public` is required by this frontend; do not add a private/admin schema.
 - In **Project Settings > Data API**, turn off **Automatically expose new tables and functions** (if shown) and keep the RLS-on-by-default option enabled. The migration also revokes default grants so new objects fail closed.
 - In **Project Settings > API Keys**, use only the publishable/anon key in `VITE_SUPABASE_ANON_KEY`. Never put `service_role`, secret, or database credentials in a `VITE_` variable. Rotate any secret that has ever been committed or shipped to a browser.
@@ -52,7 +57,8 @@ The `service_role` key bypasses RLS by design. These checks cannot make it safe 
 
 ## SQL verification
 
-Run these read-only queries in the SQL editor after the hardening migration.
+Run `supabase/event-readiness-verification.sql` in the SQL editor after the
+final migration. The queries below remain useful for a wider manual review.
 
 All rows returned here should show `rls_enabled = true`:
 

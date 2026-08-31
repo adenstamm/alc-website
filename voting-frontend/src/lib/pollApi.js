@@ -1,8 +1,18 @@
+import {
+  createTimedRequestSignal,
+  getRetryDelayMs,
+  isAbortError,
+  parseRetryAfter,
+  waitForRetry,
+} from "./requestRetry.js";
+
 export class PollApiError extends Error {
-  constructor(message, { retryAfter = 0, status = 0 } = {}) {
+  constructor(message, { cause, retryAfter = 0, retryAfterMs = 0, status = 0 } = {}) {
     super(message);
     this.name = "PollApiError";
+    this.cause = cause;
     this.retryAfter = retryAfter;
+    this.retryAfterMs = retryAfterMs || (retryAfter * 1_000);
     this.status = status;
   }
 }
@@ -46,7 +56,7 @@ function getPollErrorMessage(status, retryAfter) {
   return "Could not load the current ballot. Check your connection and try again.";
 }
 
-export async function fetchCurrentPoll(session, { signal } = {}) {
+export async function fetchCurrentPoll(session, { requestTimeoutMs = 8_000, signal } = {}) {
   const headers = {
     Accept: "application/json",
   };
@@ -55,36 +65,130 @@ export async function fetchCurrentPoll(session, { signal } = {}) {
     headers["X-AlbumASU-Session"] = session.access_token;
   }
 
-  const response = await fetch("/api/current-poll", {
-    cache: "no-store",
-    method: "GET",
-    credentials: "same-origin",
-    headers,
-    signal,
-  });
+  let response;
+  const request = createTimedRequestSignal(signal, requestTimeoutMs);
+
+  try {
+    response = await fetch("/api/current-poll", {
+      cache: "no-store",
+      method: "GET",
+      credentials: "same-origin",
+      headers,
+      signal: request.signal,
+    });
+  } catch (error) {
+    if (signal?.aborted || (isAbortError(error) && !request.didTimeOut())) {
+      throw error;
+    }
+
+    throw new PollApiError(
+      request.didTimeOut()
+        ? "The ballot request timed out. Check your connection and try again."
+        : getPollErrorMessage(0, 0), {
+      cause: error,
+      status: 0,
+      },
+    );
+  } finally {
+    request.cleanup();
+  }
 
   if (!response.ok) {
-    const retryAfter = Number.parseInt(response.headers.get("Retry-After") || "0", 10) || 0;
+    const retryAfterHeader = response.headers.get("Retry-After");
+    const retryAfterMs = parseRetryAfter(retryAfterHeader);
+    const retryAfter = Math.ceil(retryAfterMs / 1_000);
     throw new PollApiError(getPollErrorMessage(response.status, retryAfter), {
       retryAfter,
+      retryAfterMs,
       status: response.status,
     });
   }
 
-  return response.json();
+  try {
+    return await response.json();
+  } catch (error) {
+    throw new PollApiError("The ballot service returned an incomplete response. Try again.", {
+      cause: error,
+      status: 502,
+    });
+  }
+}
+
+function shouldRetryPollRequest(error) {
+  return error?.status === 429 || error?.status >= 500 || error?.status === 0;
+}
+
+async function fetchCurrentPollWithRetry(session, {
+  baseDelayMs,
+  maxAttempts,
+  maxAutomaticRetryAfterMs,
+  maxDelayMs,
+  random,
+  requestTimeoutMs,
+  signal,
+  sleep,
+}) {
+  let lastError;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      return await fetchCurrentPoll(session, { requestTimeoutMs, signal });
+    } catch (error) {
+      if (isAbortError(error)) {
+        throw error;
+      }
+
+      lastError = error;
+      const isLastAttempt = attempt >= maxAttempts - 1;
+      const retryAfterIsTooLong = error.retryAfterMs > maxAutomaticRetryAfterMs;
+
+      if (isLastAttempt || retryAfterIsTooLong || !shouldRetryPollRequest(error)) {
+        throw error;
+      }
+
+      await sleep(getRetryDelayMs(attempt, {
+        baseDelayMs,
+        maxDelayMs,
+        random,
+        retryAfterMs: error.retryAfterMs,
+      }), { signal });
+    }
+  }
+
+  throw lastError;
 }
 
 export async function fetchReliableCurrentPoll(
   session,
-  { requireCandidates = Boolean(session?.access_token), signal } = {},
+  {
+    baseDelayMs = 250,
+    maxAttempts = 3,
+    maxAutomaticRetryAfterMs = 5_000,
+    maxDelayMs = 2_000,
+    random = Math.random,
+    requireCandidates = Boolean(session?.access_token),
+    requestTimeoutMs = 8_000,
+    signal,
+    sleep = waitForRetry,
+  } = {},
 ) {
-  let poll = await fetchCurrentPoll(session, { signal });
+  const retryOptions = {
+    baseDelayMs,
+    maxAttempts,
+    maxAutomaticRetryAfterMs,
+    maxDelayMs,
+    random,
+    requestTimeoutMs,
+    signal,
+    sleep,
+  };
+  let poll = await fetchCurrentPollWithRetry(session, retryOptions);
 
   if (!isIncompleteMemberBallot(poll, session, { requireCandidates })) {
     return poll;
   }
 
-  poll = await fetchCurrentPoll(session, { signal });
+  poll = await fetchCurrentPollWithRetry(session, retryOptions);
 
   if (isIncompleteMemberBallot(poll, session, { requireCandidates })) {
     throw new PollApiError(

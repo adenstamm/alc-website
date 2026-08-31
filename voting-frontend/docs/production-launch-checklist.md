@@ -46,8 +46,10 @@ Use this checklist for the `https://albumasu.com` launch.
 - Create a Cloudflare Turnstile widget for the production domains, store its
   public site key as `VITE_TURNSTILE_SITE_KEY`, and configure its secret in
   Supabase Authentication CAPTCHA protection.
-- Apply `supabase/security-hardening.sql` last and confirm anonymous users have
-  no application RPC grants.
+- Apply the database files in the documented order: `security-hardening.sql`,
+  then `record-shelf-queue.sql`, then `event-voting-hardening.sql` last.
+- Run the read-only `event-readiness-verification.sql`, require every row to
+  report `PASS`, and confirm anonymous users have no application write/RPC grants.
 - Run the Supabase Security Advisor and review
   [`supabase-security-checklist.md`](supabase-security-checklist.md).
 

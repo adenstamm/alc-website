@@ -11,6 +11,7 @@ function Account({
   authReady,
   hasSupabaseConfig,
   membership,
+  membershipLookupStatus,
   navigate,
   refreshMembership,
   session,
@@ -21,7 +22,7 @@ function Account({
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [profileMessage, setProfileMessage] = useState(null);
   const [profileError, setProfileError] = useState(null);
-  const accountStatus = getAccountStatus(session, membership);
+  const accountStatus = getAccountStatus(session, membership, membershipLookupStatus);
   const statusContent = accountStatusContent[accountStatus];
   const accountName = getAccountName(session, membership);
 

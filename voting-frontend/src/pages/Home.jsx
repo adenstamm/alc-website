@@ -4,6 +4,7 @@ import genresPoster from "../assets/genres-this-year.png";
 import {
   fetchAlbumMetadata,
   getRecentShelfAlbums,
+  loadRecordShelfAlbums,
   loadRecordShelfCoverOverrides,
 } from "../lib/recordShelf";
 
@@ -23,7 +24,8 @@ function Home({
     canScrollForward: true,
   });
   const crateWheelRef = useRef(null);
-  const shelfAlbums = useMemo(() => getRecentShelfAlbums(), []);
+  const fallbackShelfAlbums = useMemo(() => getRecentShelfAlbums(), []);
+  const [shelfAlbums, setShelfAlbums] = useState(fallbackShelfAlbums);
   const quickLinks = useMemo(
     () => [
       ...homeActions,
@@ -49,6 +51,20 @@ function Home({
   const currentAlbum = currentPoll.albumOfWeek;
   const configuredAlbumCover = currentAlbum.coverUrl || null;
   const albumCover = configuredAlbumCover === failedAlbumCover ? null : configuredAlbumCover;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    loadRecordShelfAlbums(supabase, hasSupabaseConfig, fallbackShelfAlbums).then((albums) => {
+      if (isMounted) {
+        setShelfAlbums(albums);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [fallbackShelfAlbums, hasSupabaseConfig, supabase]);
 
   useEffect(() => {
     const controller = new AbortController();

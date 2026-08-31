@@ -1,7 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { phaseContent } from "../data/clubContent";
 import { getAccountStatus } from "../lib/accountStatus";
+import {
+  clearStoredBallot,
+  readStoredBallot,
+  writeStoredBallot,
+} from "../lib/ballotStorage";
 import {
   getCurrentAlbumRatingError,
   normalizeCurrentAlbumRating,
@@ -17,41 +22,8 @@ import {
   validatePrimarySelection,
 } from "../lib/votingLogic";
 
-function getStorageKey(userId, pollId, phase) {
-  return `alc-ballot-${userId}-${pollId}-${phase}`;
-}
-
-function readStoredBallot(userId, pollId, phase) {
-  if (!userId) {
-    return null;
-  }
-
-  try {
-    const storedBallot = window.localStorage.getItem(getStorageKey(userId, pollId, phase));
-    return storedBallot ? JSON.parse(storedBallot) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredBallot(userId, pollId, phase, ballot) {
-  if (!userId || !ballot) {
-    return;
-  }
-
-  window.localStorage.setItem(getStorageKey(userId, pollId, phase), JSON.stringify(ballot));
-}
-
-function clearStoredBallot(userId, pollId, phase) {
-  if (!userId) {
-    return;
-  }
-
-  window.localStorage.removeItem(getStorageKey(userId, pollId, phase));
-}
-
-function createDefaultFormState(poll) {
-  if (poll.phase === "nominations") {
+function createDefaultFormState(phase, finalistIds = []) {
+  if (phase === "nominations") {
     return {
       albumTitle: "",
       artistName: "",
@@ -64,7 +36,7 @@ function createDefaultFormState(poll) {
     albumTitle: "",
     artistName: "",
     selectedCandidateIds: [],
-    rankedCandidateIds: (poll.finalists || []).map((candidate) => candidate.id),
+    rankedCandidateIds: finalistIds,
   };
 }
 
@@ -108,6 +80,32 @@ function attachUserToVote(vote, userId) {
   return normalizedVote ? { ...normalizedVote, userId } : null;
 }
 
+async function fetchAuthoritativeStoredBallot(supabase, { pollId, phase, userId }) {
+  try {
+    const { data, error } = await supabase
+      .from("votes")
+      .select("poll_id, phase, album_title, artist_name, created_at, vote_choices(candidate_id, rank)")
+      .eq("poll_id", pollId)
+      .eq("phase", phase)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (error || !data) {
+      return { ballot: null, error };
+    }
+
+    return {
+      ballot: attachUserToVote({
+        ...data,
+        choices: data.vote_choices || [],
+      }, userId),
+      error: null,
+    };
+  } catch (error) {
+    return { ballot: null, error };
+  }
+}
+
 function formatNominationCount(count) {
   return `${count} nomination${count === 1 ? "" : "s"}`;
 }
@@ -126,19 +124,47 @@ function getVoteSubmissionError(error) {
   return message || "Something went wrong while saving your vote.";
 }
 
+function shouldReconcileVoteSubmission(error) {
+  if (!error) {
+    return true;
+  }
+
+  const message = String(error.message || "").toLowerCase();
+  const status = Number(error.status || 0) || 0;
+
+  return (
+    error.code === "23505" ||
+    message.includes("already_voted") ||
+    message.includes("votes_one_per_user_per_poll_phase") ||
+    status === 0 ||
+    status === 429 ||
+    status >= 500 ||
+    message.includes("fetch") ||
+    message.includes("network") ||
+    message.includes("timeout") ||
+    message.includes("connection") ||
+    message.includes("gateway")
+  );
+}
+
 function Poll({
   authReady,
   hasSupabaseConfig,
   membership,
+  membershipLookupStatus,
   navigate,
   poll,
   pollError,
   pollErrorStatus,
+  refreshMembership,
   refreshPoll,
   session,
   supabase,
 }) {
-  const [formState, setFormState] = useState(() => createDefaultFormState(poll));
+  const [formState, setFormState] = useState(() => createDefaultFormState(
+    poll.phase,
+    (poll.finalists || []).map((candidate) => candidate.id),
+  ));
   const [storedBallot, setStoredBallot] = useState(null);
   const [storedCurrentAlbumRating, setStoredCurrentAlbumRating] = useState(null);
   const [currentAlbumRating, setCurrentAlbumRating] = useState("");
@@ -147,8 +173,11 @@ function Poll({
   const [isSubmittingCurrentAlbumRating, setIsSubmittingCurrentAlbumRating] = useState(false);
   const [isLoadingVote, setIsLoadingVote] = useState(false);
   const [isRefreshingBallot, setIsRefreshingBallot] = useState(false);
+  const [isRefreshingMembership, setIsRefreshingMembership] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
+  const [roundCheckMessage, setRoundCheckMessage] = useState(null);
+  const lastManualRoundCheck = useRef(0);
 
   const phaseDetails = phaseContent[poll.phase] || phaseContent.nominations;
   const userId = session?.user?.id;
@@ -156,8 +185,17 @@ function Poll({
     storedBallot?.pollId === poll.id &&
     storedBallot?.phase === poll.phase &&
     storedBallot?.userId === userId;
-  const accountStatus = getAccountStatus(session, membership);
+  const accountStatus = getAccountStatus(session, membership, membershipLookupStatus);
   const canVote = hasSupabaseConfig && accountStatus === "approved";
+  const finalClosesAt = poll.finalClosesAt || poll.final_closes_at;
+  const finalClosedAt = poll.finalClosedAt || poll.final_closed_at;
+  const finalIsClosed = poll.phase === "final" && (
+    poll.finalIsClosed === true
+    || poll.finalIsClosed === "true"
+    || poll.final_is_closed === true
+    || poll.final_is_closed === "true"
+    || Boolean(finalClosedAt)
+  );
   const candidateOptions = useMemo(
     () => (poll.phase === "final" ? poll.finalists || [] : poll.candidates || []),
     [poll.candidates, poll.finalists, poll.phase],
@@ -171,11 +209,20 @@ function Poll({
   );
   const ballotNeedsCandidates =
     poll.phase !== "nominations" && candidateOptions.length === 0;
+  const ballotChoiceIdsKey = JSON.stringify(
+    poll.phase === "nominations"
+      ? []
+      : candidateOptions.map((candidate) => candidate.id),
+  );
 
   useEffect(() => {
-    setFormState(createDefaultFormState(poll));
+    const ballotChoiceIds = JSON.parse(ballotChoiceIdsKey);
+    setFormState(createDefaultFormState(
+      poll.phase,
+      poll.phase === "final" ? ballotChoiceIds : [],
+    ));
     setFormError(null);
-  }, [poll]);
+  }, [ballotChoiceIdsKey, poll.id, poll.phase]);
 
   useEffect(() => {
     if (!supabase || !userId || accountStatus !== "approved") {
@@ -188,34 +235,29 @@ function Poll({
 
     async function loadStoredVote() {
       setIsLoadingVote(true);
-      setStoredBallot(readStoredBallot(userId, poll.id, poll.phase));
+      const cachedBallot = readStoredBallot(userId, poll.id, poll.phase);
+      setStoredBallot(cachedBallot);
 
-      const { data, error } = await supabase
-        .from("votes")
-        .select("poll_id, phase, album_title, artist_name, created_at, vote_choices(candidate_id, rank)")
-        .eq("poll_id", poll.id)
-        .eq("phase", poll.phase)
-        .eq("user_id", userId)
-        .maybeSingle();
+      const { ballot, error } = await fetchAuthoritativeStoredBallot(supabase, {
+        pollId: poll.id,
+        phase: poll.phase,
+        userId,
+      });
 
       if (!isMounted) {
         return;
       }
 
-      if (!error && data) {
-        const userScopedVote = attachUserToVote({
-          ...data,
-          choices: data.vote_choices || [],
-        }, userId);
-        writeStoredBallot(userId, poll.id, poll.phase, userScopedVote);
-        setStoredBallot(userScopedVote);
-      } else {
+      if (ballot) {
+        writeStoredBallot(userId, poll.id, poll.phase, ballot);
+        setStoredBallot(ballot);
+      } else if (!error) {
         clearStoredBallot(userId, poll.id, poll.phase);
         setStoredBallot(null);
-
-        if (error) {
-          setFormError(error.message);
-        }
+      } else if (!cachedBallot) {
+        setFormError(
+          "Your saved ballot could not be checked. Your access is still active; try again in a moment.",
+        );
       }
 
       setIsLoadingVote(false);
@@ -312,11 +354,88 @@ function Poll({
     }));
   }
 
+  function acceptSavedBallot(savedBallot) {
+    writeStoredBallot(userId, poll.id, poll.phase, savedBallot);
+    setStoredBallot(savedBallot);
+    setFormError(null);
+  }
+
+  async function reconcileSavedBallot() {
+    const { ballot } = await fetchAuthoritativeStoredBallot(supabase, {
+      pollId: poll.id,
+      phase: poll.phase,
+      userId,
+    });
+
+    if (!ballot) {
+      return false;
+    }
+
+    acceptSavedBallot(ballot);
+    return true;
+  }
+
+  async function runBallotSubmission(request, {
+    getErrorMessage = getVoteSubmissionError,
+    missingConfirmationMessage,
+  }) {
+    let data = null;
+    let error;
+
+    try {
+      const result = await request();
+      data = result?.data ?? null;
+      error = result?.error ?? null;
+
+      if (error && result?.status && !error.status) {
+        error = {
+          ...error,
+          message: error.message,
+          status: result.status,
+        };
+      }
+    } catch (requestError) {
+      error = requestError;
+    }
+
+    let savedBallot = attachUserToVote(data, userId);
+
+    if (!savedBallot && shouldReconcileVoteSubmission(error)) {
+      const recovered = await reconcileSavedBallot();
+
+      if (recovered) {
+        setIsSubmitting(false);
+        return true;
+      }
+    }
+
+    if (error) {
+      setFormError(getErrorMessage(error));
+      setIsSubmitting(false);
+      return false;
+    }
+
+    if (!savedBallot) {
+      setFormError(missingConfirmationMessage);
+      setIsSubmitting(false);
+      return false;
+    }
+
+    acceptSavedBallot(savedBallot);
+    setIsSubmitting(false);
+    return true;
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setFormError(null);
 
     if (hasSubmitted) {
+      return;
+    }
+
+    if (finalIsClosed) {
+      setFormError("Final voting is closed. No new rankings can be submitted.");
       return;
     }
 
@@ -343,29 +462,20 @@ function Poll({
         return;
       }
 
-      const { data, error } = await supabase.rpc("submit_nomination", {
-        target_poll_id: poll.id,
-        album_title_input: nominationValidation.albumTitle,
-        artist_name_input: nominationValidation.artistName,
-      });
-
-      setIsSubmitting(false);
-
-      if (error) {
-        setFormError(getNominationSubmissionError(error, getVoteSubmissionError));
-        return;
-      }
-
-      const savedBallot = attachUserToVote(data, userId);
-      if (!savedBallot) {
-        setFormError("Your nomination was saved, but the confirmation could not be loaded.");
-        await refreshPoll();
-        return;
-      }
-
-      writeStoredBallot(userId, poll.id, poll.phase, savedBallot);
-      setStoredBallot(savedBallot);
-      await refreshPoll();
+      await runBallotSubmission(
+        () => supabase.rpc("submit_nomination", {
+          target_poll_id: poll.id,
+          album_title_input: nominationValidation.albumTitle,
+          artist_name_input: nominationValidation.artistName,
+        }),
+        {
+          getErrorMessage: (error) => (
+            getNominationSubmissionError(error, getVoteSubmissionError)
+          ),
+          missingConfirmationMessage:
+            "Your nomination may have been saved, but its confirmation could not be loaded. Check again before resubmitting.",
+        },
+      );
       return;
     }
 
@@ -385,28 +495,16 @@ function Poll({
         return;
       }
 
-      const { data, error } = await supabase.rpc("submit_primary_ballot", {
-        target_poll_id: poll.id,
-        candidate_ids: formState.selectedCandidateIds,
-      });
-
-      setIsSubmitting(false);
-
-      if (error) {
-        setFormError(getVoteSubmissionError(error));
-        return;
-      }
-
-      const savedBallot = attachUserToVote(data, userId);
-      if (!savedBallot) {
-        setFormError("Your ballot was saved, but the confirmation could not be loaded.");
-        await refreshPoll();
-        return;
-      }
-
-      writeStoredBallot(userId, poll.id, poll.phase, savedBallot);
-      setStoredBallot(savedBallot);
-      await refreshPoll();
+      await runBallotSubmission(
+        () => supabase.rpc("submit_primary_ballot", {
+          target_poll_id: poll.id,
+          candidate_ids: formState.selectedCandidateIds,
+        }),
+        {
+          missingConfirmationMessage:
+            "Your ballot may have been saved, but its confirmation could not be loaded. Check again before resubmitting.",
+        },
+      );
       return;
     }
 
@@ -426,28 +524,16 @@ function Poll({
       return;
     }
 
-    const { data, error } = await supabase.rpc("submit_final_ballot", {
-      target_poll_id: poll.id,
-      ranked_candidate_ids: formState.rankedCandidateIds,
-    });
-
-    setIsSubmitting(false);
-
-    if (error) {
-      setFormError(getVoteSubmissionError(error));
-      return;
-    }
-
-    const savedBallot = attachUserToVote(data, userId);
-    if (!savedBallot) {
-      setFormError("Your ranking was saved, but the confirmation could not be loaded.");
-      await refreshPoll();
-      return;
-    }
-
-    writeStoredBallot(userId, poll.id, poll.phase, savedBallot);
-    setStoredBallot(savedBallot);
-    await refreshPoll();
+    await runBallotSubmission(
+      () => supabase.rpc("submit_final_ballot", {
+        target_poll_id: poll.id,
+        ranked_candidate_ids: formState.rankedCandidateIds,
+      }),
+      {
+        missingConfirmationMessage:
+          "Your ranking may have been saved, but its confirmation could not be loaded. Check again before resubmitting.",
+      },
+    );
   }
 
   async function handleCurrentAlbumRatingSubmit(event) {
@@ -492,17 +578,41 @@ function Poll({
   }
 
   async function handleBallotReload() {
-    if (isRefreshingBallot) {
+    const now = Date.now();
+
+    if (isRefreshingBallot || now - lastManualRoundCheck.current < 1_500) {
       return;
     }
 
+    lastManualRoundCheck.current = now;
     setIsRefreshingBallot(true);
     setFormError(null);
+    setRoundCheckMessage(null);
 
     try {
-      await refreshPoll({ force: true });
+      const refreshedPoll = await refreshPoll({ force: true });
+
+      if (refreshedPoll?.id === poll.id && refreshedPoll?.phase === poll.phase) {
+        setRoundCheckMessage("This ballot is up to date.");
+      } else if (!refreshedPoll) {
+        setRoundCheckMessage("The new round could not be checked. Try again in a moment.");
+      }
     } finally {
       setIsRefreshingBallot(false);
+    }
+  }
+
+  async function handleMembershipReload() {
+    if (isRefreshingMembership || !refreshMembership) {
+      return;
+    }
+
+    setIsRefreshingMembership(true);
+
+    try {
+      await refreshMembership();
+    } finally {
+      setIsRefreshingMembership(false);
     }
   }
 
@@ -599,6 +709,27 @@ function Poll({
           <a className="button button-secondary" href="/account" onClick={(event) => { event.preventDefault(); navigate("/account"); }}>
             View account status
           </a>
+        </div>
+      );
+    }
+
+    if (accountStatus === "unavailable") {
+      return (
+        <div className="confirmation-card ballot-recovery" role="alert">
+          <p className="eyebrow">Membership check unavailable</p>
+          <h3>Your approval could not be verified right now.</h3>
+          <p>
+            You are still signed in. We retried automatically, but the membership service
+            did not answer. Wait a moment and check again.
+          </p>
+          <button
+            className="button button-secondary"
+            type="button"
+            disabled={isRefreshingMembership}
+            onClick={handleMembershipReload}
+          >
+            {isRefreshingMembership ? "Checking membership…" : "Check membership again"}
+          </button>
         </div>
       );
     }
@@ -866,6 +997,22 @@ function Poll({
     );
   }
 
+  function renderFinalClosed() {
+    const cutoff = finalClosedAt || finalClosesAt;
+
+    return (
+      <div className="confirmation-card">
+        <p className="eyebrow">Final voting closed</p>
+        <h3>The final ballot is locked.</h3>
+        <p>
+          No new rankings can be submitted. The admin can now finalize any tied
+          elimination round and publish the official winner.
+        </p>
+        {cutoff ? <p className="timestamp">Closed {formatTimestamp(cutoff)}</p> : null}
+      </div>
+    );
+  }
+
   return (
     <div className="sideb-page sideb-subpage sideb-vote-page">
       <main className="sideb-subpage-main" id="main-content" tabIndex="-1">
@@ -889,8 +1036,8 @@ function Poll({
 
             {renderCurrentAlbumRating()}
 
-            {renderAccountGate() ||
-            (isLoadingVote ? (
+            {finalIsClosed && !hasSubmitted ? renderFinalClosed() : renderAccountGate() ||
+            (isLoadingVote && !hasSubmitted ? (
               <div className="confirmation-card">
                 <p className="eyebrow">Loading ballot</p>
                 <h3>Checking for an existing submission.</h3>
@@ -963,6 +1110,17 @@ function Poll({
                   <dd>{poll.status}</dd>
                 </div>
               </dl>
+              <button
+                className="button button-secondary full-width"
+                type="button"
+                disabled={isRefreshingBallot}
+                onClick={handleBallotReload}
+              >
+                {isRefreshingBallot ? "Checking for a new round…" : "Check for new round"}
+              </button>
+              {roundCheckMessage ? (
+                <p className="helper-note" role="status">{roundCheckMessage}</p>
+              ) : null}
             </article>
           </aside>
         </section>

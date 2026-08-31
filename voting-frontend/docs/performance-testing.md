@@ -50,3 +50,52 @@ production test contract.
 - Do not add nomination or ballot submission calls to this production test.
   Write-path performance tests require an isolated Supabase test project and
   disposable accounts and polls.
+
+## Isolated 100-voter rehearsal
+
+`performance/staging-vote-load.mjs` exercises the path used during an actual
+event: 100 already-signed-in members sharing one source IP read through the
+staging Azure `/api/current-poll` endpoint, query their memberships, submit
+primary ballots, and submit final rankings directly to staging Supabase. It
+also verifies exact committed row counts, the 18-hour final deadline, and that
+a manually closed final rejects late ballots.
+
+This is an API/database capacity rehearsal, not a replacement for Playwright.
+Playwright checks what a person sees and can click; this script checks the
+shared-IP proxy limit, authenticated concurrency, transaction correctness, and
+database throughput. Run both before the event.
+
+The script has deliberately strict guardrails:
+
+- It rejects the known production Supabase project and every `albumasu.com`
+  host.
+- It requires the exact `ALBUMASU_STAGING_LOAD_CONFIRM=isolated-staging-only`
+  acknowledgement.
+- It refuses to run when staging already contains an active poll.
+- It creates uniquely named disposable accounts and one disposable poll, then
+  deletes only those exact resources in a `finally` cleanup.
+- It caps the run at 150 voters.
+
+Create an ignored `.env.staging-load.local` file inside `voting-frontend`:
+
+```sh
+STAGING_APP_URL=https://your-staging-app.example
+STAGING_SUPABASE_URL=https://your-staging-project.supabase.co
+STAGING_SUPABASE_ANON_KEY=your-staging-anon-key
+STAGING_SUPABASE_SERVICE_ROLE_KEY=your-staging-service-role-key
+ALBUMASU_STAGING_LOAD_CONFIRM=isolated-staging-only
+LOAD_TEST_VOTERS=100
+```
+
+Never commit that file or paste the service-role key into chat. Apply the full
+database migration sequence to staging first, make sure it has no active poll,
+then run:
+
+```sh
+npm run test:staging-load
+```
+
+The account provisioning/sign-in setup is intentionally outside the measured
+event stages because attendees are expected to arrive verified, approved, and
+signed in. The measured output reports pass counts and p50/p95/p99 latency for
+membership reads, Azure/API poll reads, and both ballot bursts.

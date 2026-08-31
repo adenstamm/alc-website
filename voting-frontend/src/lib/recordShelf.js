@@ -46,6 +46,63 @@ export function getRecentShelfAlbums() {
   }));
 }
 
+function normalizeShelfRow(row) {
+  return {
+    id: row.album_id,
+    title: row.album_title,
+    artist: row.artist_name || "ALC archive",
+    period: row.position === 1 ? "Most recent listen" : `${row.position} listens ago`,
+    note: "Recently added to the club archive.",
+  };
+}
+
+export async function loadRecordShelfAlbums(supabase, hasSupabaseConfig, fallbackAlbums = getRecentShelfAlbums()) {
+  if (!hasSupabaseConfig || !supabase) {
+    return fallbackAlbums;
+  }
+
+  const { data, error } = await supabase
+    .from("record_shelf_items")
+    .select("position, album_id, album_title, artist_name, archived_at")
+    .order("position", { ascending: true });
+
+  if (error || !data?.length) {
+    return fallbackAlbums;
+  }
+
+  const configuredAlbums = data.map(normalizeShelfRow);
+  const configuredTitles = new Set(
+    configuredAlbums.map((album) => normalizeAlbumTitle(album.title)),
+  );
+  const fallbackFill = fallbackAlbums.filter(
+    (album) => !configuredTitles.has(normalizeAlbumTitle(album.title)),
+  );
+
+  return [...configuredAlbums, ...fallbackFill]
+    .slice(0, 5)
+    .map((album, index) => ({
+      ...album,
+      period: index === 0 ? "Most recent listen" : `${index + 1} listens ago`,
+    }));
+}
+
+export async function saveRecordShelfAlbums(supabase, albums) {
+  const shelfItems = albums.slice(0, 5).map((album) => ({
+    album_id: album.id,
+    album_title: album.title,
+    artist_name: album.artist || "ALC archive",
+  }));
+  const { error } = await supabase.rpc("save_record_shelf_order", {
+    shelf_items: shelfItems,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return albums.slice(0, 5);
+}
+
 export function getAlbumArchive(dynamicEntries = []) {
   const archiveAlbums = mergeAlbumArchiveEntries(
     parseAlbumArchiveText(bannedAlbumsText),

@@ -57,16 +57,51 @@ test("poll requests forward abort signals", async () => {
 
   globalThis.fetch = async (_url, options) => {
     requestOptions = options;
-    return Response.json({ id: "poll-1" });
+    return new Promise((_resolve, reject) => {
+      options.signal.addEventListener("abort", () => reject(
+        options.signal.reason || new DOMException("Aborted", "AbortError"),
+      ), { once: true });
+    });
   };
 
   try {
-    await fetchCurrentPoll(null, { signal: controller.signal });
+    const pendingRequest = fetchCurrentPoll(null, { signal: controller.signal });
+    await Promise.resolve();
+    controller.abort();
+    await assert.rejects(pendingRequest, (error) => error.name === "AbortError");
   } finally {
     globalThis.fetch = originalFetch;
   }
 
-  assert.equal(requestOptions.signal, controller.signal);
+  assert.equal(requestOptions.signal.aborted, true);
+});
+
+test("hung poll requests time out and enter bounded retry recovery", async () => {
+  const originalFetch = globalThis.fetch;
+  let requestCount = 0;
+
+  globalThis.fetch = async (_url, options) => {
+    requestCount += 1;
+    return new Promise((_resolve, reject) => {
+      options.signal.addEventListener("abort", () => reject(
+        options.signal.reason || new DOMException("Aborted", "AbortError"),
+      ), { once: true });
+    });
+  };
+
+  try {
+    await assert.rejects(
+      () => fetchReliableCurrentPoll(null, {
+        maxAttempts: 2,
+        requestTimeoutMs: 1,
+        sleep: async () => {},
+      }),
+      (error) => error.status === 0 && /timed out/i.test(error.message),
+    );
+    assert.equal(requestCount, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("rate-limit responses include a useful retry window", async () => {
@@ -106,6 +141,81 @@ test("expired member sessions are distinguished from network failures", async ()
         return true;
       },
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("transient poll failures retry with bounded backoff", async () => {
+  const originalFetch = globalThis.fetch;
+  const delays = [];
+  let requestCount = 0;
+
+  globalThis.fetch = async () => {
+    requestCount += 1;
+    return requestCount < 3
+      ? new Response(null, { status: 503 })
+      : Response.json({ id: "poll-1", phase: "nominations" });
+  };
+
+  try {
+    const poll = await fetchReliableCurrentPoll(null, {
+      random: () => 0,
+      sleep: async (delay) => {
+        delays.push(delay);
+      },
+    });
+
+    assert.equal(poll.id, "poll-1");
+    assert.equal(requestCount, 3);
+    assert.deepEqual(delays, [250, 500]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("automatic poll retry never runs before Retry-After", async () => {
+  const originalFetch = globalThis.fetch;
+  const delays = [];
+  let requestCount = 0;
+
+  globalThis.fetch = async () => {
+    requestCount += 1;
+    return requestCount === 1
+      ? new Response(null, { headers: { "Retry-After": "2" }, status: 429 })
+      : Response.json({ id: "poll-1", phase: "nominations" });
+  };
+
+  try {
+    await fetchReliableCurrentPoll(null, {
+      random: () => 0,
+      sleep: async (delay) => {
+        delays.push(delay);
+      },
+    });
+
+    assert.deepEqual(delays, [2_000]);
+    assert.equal(requestCount, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("long Retry-After windows remain manual instead of retrying too early", async () => {
+  const originalFetch = globalThis.fetch;
+  let requestCount = 0;
+
+  globalThis.fetch = async () => {
+    requestCount += 1;
+    return new Response(null, { headers: { "Retry-After": "12" }, status: 429 });
+  };
+
+  try {
+    await assert.rejects(
+      () => fetchReliableCurrentPoll(null, { sleep: async () => {} }),
+      (error) => error.status === 429 && error.retryAfter === 12,
+    );
+    assert.equal(requestCount, 1);
   } finally {
     globalThis.fetch = originalFetch;
   }

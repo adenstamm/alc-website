@@ -15,6 +15,7 @@ const navItems = [
 function SideBNav({
   authReady,
   membership,
+  membershipLookupStatus,
   session,
   showAdminLink = false,
 }) {
@@ -25,7 +26,7 @@ function SideBNav({
   const visibleNavItems = showAdminLink
     ? [...navItems, { label: "Admin", path: "/admin" }]
     : navItems;
-  const accountStatus = getAccountStatus(session, membership);
+  const accountStatus = getAccountStatus(session, membership, membershipLookupStatus);
   const accountName = getAccountName(session, membership);
   const accountLabel = authReady ? (session ? accountName : "Sign in") : "Account";
 

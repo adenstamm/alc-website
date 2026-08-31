@@ -91,14 +91,26 @@ Apply the SQL files in this order:
 3. `supabase/three-phase-voting.sql`
 4. `supabase/site-content.sql`
 5. `supabase/current-album-ratings.sql`
-6. `supabase/security-hardening.sql` **last**
+6. `supabase/security-hardening.sql`
+7. `supabase/record-shelf-queue.sql`
+8. `supabase/event-voting-hardening.sql` **last**
 
 Create the first account through `/account`, then promote its `memberships` row
 to `status = 'approved'` and `role = 'admin'`. Future accounts can be reviewed
 from the application admin page.
 
-Reapply `security-hardening.sql` after any older setup script because those
-scripts recreate their original grants and policies.
+For an existing project that already ran `security-hardening.sql`, run
+`record-shelf-queue.sql` and then `event-voting-hardening.sql`, in that order.
+Both are idempotent and carry their own restricted grants. Do not run an older
+setup file afterward: older files recreate pre-hardening function bodies. If
+that happens, repeat steps 6 through 8 in order.
+
+SQL Editor history can help identify what was submitted manually, but it is not
+a reliable migration ledger: a query can be edited, partially selected, or fail
+inside a transaction. Run `supabase/event-readiness-verification.sql` after the
+last migration instead. It performs read-only live-catalog checks for the
+required columns, constraints, function bodies, RLS policies, and grants; its
+summary must contain only `PASS` rows before an event.
 
 ## Quality and delivery
 - Set the Supabase production Site URL to `https://albumasu.com`.

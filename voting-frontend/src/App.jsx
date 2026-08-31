@@ -28,7 +28,9 @@ import {
 import { hasSiteEventsConfig, hasSupabaseConfig, supabase } from "./lib/supabaseClient";
 import Home from "./pages/Home";
 import { createLatestRequestCoordinator } from "./lib/latestRequestCoordinator";
+import { fetchMembershipWithRetry } from "./lib/membershipApi";
 import { fetchReliableCurrentPoll } from "./lib/pollApi";
+import { getPollFocusRefreshDelay, getPollRefreshDelay } from "./lib/pollRefresh";
 import { normalizeSiteEvent } from "./lib/siteContent";
 import "./styles/sideb-mock.css";
 
@@ -114,8 +116,14 @@ function App() {
   const currentPath = normalizePath(location.pathname);
   const isPersonalLetter = currentPath === SIDNEY_LETTER_ROUTE;
   const previousPath = useRef(currentPath);
+  const activeSessionUserId = useRef(null);
+  const membershipRequestCoordinator = useRef(null);
   const pollRequestCoordinator = useRef(null);
   const settledPollScope = useRef(null);
+
+  if (membershipRequestCoordinator.current == null) {
+    membershipRequestCoordinator.current = createLatestRequestCoordinator();
+  }
 
   if (pollRequestCoordinator.current == null) {
     pollRequestCoordinator.current = createLatestRequestCoordinator();
@@ -124,6 +132,7 @@ function App() {
   const [authReady, setAuthReady] = useState(!hasSupabaseConfig);
   const [session, setSession] = useState(null);
   const [membership, setMembership] = useState(null);
+  const [membershipLookupStatus, setMembershipLookupStatus] = useState("ready");
   const [livePoll, setLivePoll] = useState(hasSupabaseConfig ? null : currentPoll);
   const [liveEvents, setLiveEvents] = useState(hasSiteEventsConfig ? null : specialEvents);
   const [pollReady, setPollReady] = useState(!hasSupabaseConfig);
@@ -131,7 +140,7 @@ function App() {
   const [pollError, setPollError] = useState(null);
   const [pollErrorStatus, setPollErrorStatus] = useState(0);
 
-  const refreshPoll = useCallback(({ force = true } = {}) => {
+  const refreshPoll = useCallback(({ background = false, force = true } = {}) => {
     if (!hasSupabaseConfig) {
       setLivePoll(currentPoll);
       setPollReady(true);
@@ -155,14 +164,12 @@ function App() {
       setPollReady(false);
     }
 
-    setPollError(null);
-    setPollErrorStatus(0);
-
     return pollRequestCoordinator.current.run(
       requestKey,
       async ({ isLatest, signal }) => {
         try {
           const data = await fetchReliableCurrentPoll(session, {
+            maxAttempts: background ? 1 : 3,
             requireCandidates,
             signal,
           });
@@ -174,17 +181,21 @@ function App() {
           const nextPoll = normalizeLivePoll(data);
           settledPollScope.current = requestKey;
           setLivePoll(nextPoll);
+          setPollError(null);
+          setPollErrorStatus(0);
           return nextPoll;
         } catch (error) {
           if (isAbortedRequest(error) || !isLatest()) {
             return null;
           }
 
-          settledPollScope.current = requestKey;
-          setPollError(error.message || "Could not load the current ballot.");
-          setPollErrorStatus(error.status || 0);
+          if (!background) {
+            settledPollScope.current = requestKey;
+            setPollError(error.message || "Could not load the current ballot.");
+            setPollErrorStatus(error.status || 0);
+          }
 
-          if (isScopeChange) {
+          if (isScopeChange && !background) {
             setLivePoll(currentPoll);
           }
 
@@ -228,24 +239,58 @@ function App() {
     }
   }, []);
 
-  const loadMembership = useCallback(async (nextSession) => {
+  const loadMembership = useCallback(async (nextSession, { force = false } = {}) => {
     if (!hasSupabaseConfig || !nextSession?.user) {
+      membershipRequestCoordinator.current.cancel();
       setMembership(null);
-      return;
+      setMembershipLookupStatus("ready");
+      return null;
     }
 
-    const { data, error } = await supabase
-      .from("memberships")
-      .select("user_id, email, display_name, status, role, created_at, updated_at")
-      .eq("user_id", nextSession.user.id)
-      .maybeSingle();
+    const userId = nextSession.user.id;
 
-    if (error) {
-      setMembership(null);
-      return;
-    }
+    return membershipRequestCoordinator.current.run(
+      userId,
+      async ({ isLatest, signal }) => {
+        if (isLatest()) {
+          setMembershipLookupStatus("loading");
+        }
 
-    setMembership(data);
+        try {
+          const data = await fetchMembershipWithRetry(({ signal: lookupSignal }) => {
+            let query = supabase
+              .from("memberships")
+              .select("user_id, email, display_name, status, role, created_at, updated_at")
+              .eq("user_id", userId);
+
+            if (typeof query.abortSignal === "function") {
+              query = query.abortSignal(lookupSignal);
+            }
+
+            return query.maybeSingle();
+          }, { signal });
+
+          if (!isLatest()) {
+            return null;
+          }
+
+          setMembership(data);
+          setMembershipLookupStatus("ready");
+          return data;
+        } catch (error) {
+          if (isAbortedRequest(error) || !isLatest()) {
+            return null;
+          }
+
+          setMembership((currentMembership) => (
+            currentMembership?.user_id === userId ? currentMembership : null
+          ));
+          setMembershipLookupStatus("unavailable");
+          return null;
+        }
+      },
+      { force },
+    );
   }, []);
 
   useEffect(() => {
@@ -264,7 +309,72 @@ function App() {
     }
   }, [authReady, currentPath, refreshEvents, refreshPoll]);
 
+  useEffect(() => {
+    if (currentPath !== "/vote" || !authReady) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let refreshTimer;
+
+    const scheduleRefresh = () => {
+      if (cancelled) {
+        return;
+      }
+
+      refreshTimer = window.setTimeout(async () => {
+        if (!cancelled && document.visibilityState === "visible") {
+          await refreshPoll({ background: true, force: false });
+        }
+
+        scheduleRefresh();
+      }, getPollRefreshDelay());
+    };
+
+    scheduleRefresh();
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(refreshTimer);
+    };
+  }, [authReady, currentPath, refreshPoll]);
+
+  useEffect(() => {
+    if (currentPath !== "/vote" || !authReady) {
+      return undefined;
+    }
+
+    let focusTimer;
+
+    const queueFocusedRefresh = () => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
+      window.clearTimeout(focusTimer);
+      focusTimer = window.setTimeout(() => {
+        refreshPoll({ background: true, force: false });
+      }, getPollFocusRefreshDelay());
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        queueFocusedRefresh();
+      }
+    };
+
+    window.addEventListener("focus", queueFocusedRefresh);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearTimeout(focusTimer);
+      window.removeEventListener("focus", queueFocusedRefresh);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [authReady, currentPath, refreshPoll]);
+
   useEffect(() => () => {
+    membershipRequestCoordinator.current?.cancel();
     pollRequestCoordinator.current?.cancel();
   }, []);
 
@@ -314,9 +424,15 @@ function App() {
         return;
       }
 
-      setSession(data.session);
-      await loadMembership(data.session);
-      setAuthReady(true);
+      const nextSession = data.session;
+      const nextUserId = nextSession?.user?.id || null;
+      activeSessionUserId.current = nextUserId;
+      setSession(nextSession);
+      await loadMembership(nextSession);
+
+      if (isMounted && activeSessionUserId.current === nextUserId) {
+        setAuthReady(true);
+      }
     }
 
     loadSession();
@@ -324,10 +440,17 @@ function App() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setAuthReady(false);
+      const nextUserId = nextSession?.user?.id || null;
+      const userChanged = activeSessionUserId.current !== nextUserId;
+      activeSessionUserId.current = nextUserId;
+
+      if (userChanged) {
+        setAuthReady(false);
+      }
+
       setSession(nextSession);
-      loadMembership(nextSession).finally(() => {
-        if (isMounted) {
+      loadMembership(nextSession, { force: userChanged }).finally(() => {
+        if (isMounted && activeSessionUserId.current === nextUserId) {
           setAuthReady(true);
         }
       });
@@ -347,7 +470,10 @@ function App() {
     }
   }, [currentPath, routerNavigate]);
 
-  const refreshCurrentMembership = useCallback(() => loadMembership(session), [loadMembership, session]);
+  const refreshCurrentMembership = useCallback(
+    () => loadMembership(session, { force: true }),
+    [loadMembership, session],
+  );
   const showAdminLink = membership?.status === "approved" && membership?.role === "admin";
 
   function withRouteData(element, { events = false, poll = false } = {}) {
@@ -364,6 +490,7 @@ function App() {
         <SideBNav
           authReady={authReady}
           membership={membership}
+          membershipLookupStatus={membershipLookupStatus}
           session={session}
           showAdminLink={showAdminLink}
         />
@@ -401,6 +528,7 @@ function App() {
                     authReady={authReady}
                     hasSupabaseConfig={hasSupabaseConfig}
                     membership={membership}
+                    membershipLookupStatus={membershipLookupStatus}
                     navigate={navigate}
                     refreshMembership={refreshCurrentMembership}
                     session={session}
@@ -476,10 +604,12 @@ function App() {
                     authReady={authReady}
                     hasSupabaseConfig={hasSupabaseConfig}
                     membership={membership}
+                    membershipLookupStatus={membershipLookupStatus}
                     navigate={navigate}
                     poll={livePoll}
                     pollError={pollError}
                     pollErrorStatus={pollErrorStatus}
+                    refreshMembership={refreshCurrentMembership}
                     refreshPoll={refreshPoll}
                     session={session}
                     supabase={supabase}

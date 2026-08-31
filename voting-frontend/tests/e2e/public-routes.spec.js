@@ -66,6 +66,49 @@ async function installMockSession(page, {
   });
 }
 
+async function installAdminPollFixture(page, { poll, results }) {
+  const userId = "33333333-3333-4333-8333-333333333333";
+
+  await installMockSession(page, {
+    displayName: "Event Admin",
+    email: "event-admin@albumasu.com",
+    userId,
+  });
+  await page.route("**/rest/v1/memberships**", (route) => route.fulfill({
+    body: JSON.stringify([{
+      created_at: "2026-08-30T12:00:00.000Z",
+      display_name: "Event Admin",
+      email: "event-admin@albumasu.com",
+      role: "admin",
+      status: "approved",
+      updated_at: "2026-08-30T12:00:00.000Z",
+      user_id: userId,
+    }]),
+    contentType: "application/json",
+    status: 200,
+  }));
+  await page.route("**/rest/v1/record_shelf_items**", (route) => route.fulfill({
+    body: "[]",
+    contentType: "application/json",
+    status: 200,
+  }));
+  await page.route("**/rest/v1/record_shelf_covers**", (route) => route.fulfill({
+    body: "[]",
+    contentType: "application/json",
+    status: 200,
+  }));
+  await page.route("**/rest/v1/rpc/get_admin_poll_results", (route) => route.fulfill({
+    body: JSON.stringify(typeof results === "function" ? results() : results),
+    contentType: "application/json",
+    status: 200,
+  }));
+  await page.route("**/api/current-poll", (route) => route.fulfill({
+    body: JSON.stringify(typeof poll === "function" ? poll() : poll),
+    contentType: "application/json",
+    status: 200,
+  }));
+}
+
 test.beforeEach(async ({ page }) => {
   // Keep the suite deterministic when third-party album metadata is unavailable.
   await page.route("https://musicbrainz.org/**", (route) => route.abort());
@@ -185,7 +228,7 @@ test("unknown routes preserve the URL and show a recoverable not-found page", as
   await expect(page.getByRole("link", { name: "Return home" })).toBeVisible();
 });
 
-test("temporary ballot failures offer a working reload action", async ({ page }) => {
+test("temporary ballot failures retry automatically before showing an error", async ({ page }) => {
   let pollRequestCount = 0;
 
   await page.route("**/api/current-poll", async (route) => {
@@ -218,13 +261,186 @@ test("temporary ballot failures offer a working reload action", async ({ page })
 
   await page.goto("/vote");
 
-  await expect(page.getByRole("heading", { name: "Too many ballot refreshes." })).toBeVisible();
-  const reloadButton = page.getByRole("button", { name: "Reload ballot" });
-  await expect(reloadButton).toBeVisible();
-  await reloadButton.click();
-
   await expect(page.getByRole("heading", { name: "Sign in or create an account to vote." })).toBeVisible();
   expect(pollRequestCount).toBeGreaterThanOrEqual(2);
+});
+
+test("a transient membership failure retries instead of showing approval pending", async ({ page }) => {
+  const userId = "33333333-3333-4333-8333-333333333333";
+  let membershipRequestCount = 0;
+
+  await installMockSession(page, {
+    displayName: "Retry Tester",
+    email: "retry-test@albumasu.com",
+    userId,
+  });
+  await page.route("**/rest/v1/memberships**", async (route) => {
+    membershipRequestCount += 1;
+
+    if (membershipRequestCount < 3) {
+      await route.fulfill({
+        body: JSON.stringify({ message: "Temporary gateway failure" }),
+        contentType: "application/json",
+        status: 503,
+      });
+      return;
+    }
+
+    await route.fulfill({
+      body: JSON.stringify([{
+        created_at: "2026-08-27T12:00:00.000Z",
+        display_name: "Retry Tester",
+        email: "retry-test@albumasu.com",
+        role: "member",
+        status: "approved",
+        updated_at: "2026-08-27T12:00:00.000Z",
+        user_id: userId,
+      }]),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
+  await page.route("**/rest/v1/votes**", (route) => route.fulfill({
+    body: "[]",
+    contentType: "application/json",
+    status: 200,
+  }));
+  await page.route("**/rest/v1/album_ratings**", (route) => route.fulfill({
+    body: "[]",
+    contentType: "application/json",
+    status: 200,
+  }));
+
+  await page.goto("/vote");
+
+  await expect(page.getByLabel("Album title")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your account is waiting for member approval." }))
+    .toHaveCount(0);
+  expect(membershipRequestCount).toBe(3);
+});
+
+test("an open voter page advances rounds without erasing an in-progress ballot", async ({ page }) => {
+  const userId = "44444444-4444-4444-8444-444444444444";
+  let activePhase = "nominations";
+  let pollRequestCount = 0;
+
+  await installMockSession(page, {
+    displayName: "Round Sync Tester",
+    email: "round-sync@albumasu.com",
+    userId,
+  });
+  await page.route("**/rest/v1/memberships**", (route) => route.fulfill({
+    body: JSON.stringify([{
+      created_at: "2026-08-30T12:00:00.000Z",
+      display_name: "Round Sync Tester",
+      email: "round-sync@albumasu.com",
+      role: "member",
+      status: "approved",
+      updated_at: "2026-08-30T12:00:00.000Z",
+      user_id: userId,
+    }]),
+    contentType: "application/json",
+    status: 200,
+  }));
+  await page.route("**/rest/v1/votes**", (route) => route.fulfill({
+    body: "[]",
+    contentType: "application/json",
+    status: 200,
+  }));
+  await page.route("**/rest/v1/album_ratings**", (route) => route.fulfill({
+    body: "[]",
+    contentType: "application/json",
+    status: 200,
+  }));
+  await page.route("**/api/current-poll", (route) => {
+    pollRequestCount += 1;
+    return route.fulfill({
+      body: JSON.stringify({
+      album_of_week: { artist: "Fleetwood Mac", title: "Rumours" },
+      candidates: activePhase === "primary" ? [{
+        artist: "Geese",
+        id: "getting-killed",
+        nominationCount: 12,
+        title: "Getting Killed",
+      }] : [],
+      cycle_label: "Event Week",
+      description: activePhase === "primary" ? "Choose an album." : "Nominate an album.",
+      finalists: [],
+      id: "event-week",
+      phase: activePhase,
+      question: "What should the club listen to next?",
+      status: activePhase === "primary" ? "Primary voting is open" : "Nominations are open",
+    }),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
+  await page.goto("/vote");
+
+  await page.getByLabel("Album title").fill("Charm");
+  await page.getByLabel("Artist").fill("Clairo");
+  const requestCountBeforeUnchangedRefresh = pollRequestCount;
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect.poll(() => pollRequestCount).toBeGreaterThan(requestCountBeforeUnchangedRefresh);
+  await expect(page.getByLabel("Album title")).toHaveValue("Charm");
+  await expect(page.getByLabel("Artist")).toHaveValue("Clairo");
+
+  activePhase = "primary";
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+
+  await expect(page.getByRole("checkbox")).toHaveCount(1);
+  await expect(page.getByText("Getting Killed", { exact: true })).toBeVisible();
+});
+
+test("the voter sees a locked final after the server deadline", async ({ page }) => {
+  const userId = "55555555-5555-4555-8555-555555555555";
+
+  await installMockSession(page, {
+    displayName: "Closed Final Tester",
+    email: "closed-final@albumasu.com",
+    userId,
+  });
+  await page.route("**/rest/v1/memberships**", (route) => route.fulfill({
+    body: JSON.stringify([{
+      created_at: "2026-08-30T12:00:00.000Z",
+      display_name: "Closed Final Tester",
+      email: "closed-final@albumasu.com",
+      role: "member",
+      status: "approved",
+      updated_at: "2026-08-30T12:00:00.000Z",
+      user_id: userId,
+    }]),
+    contentType: "application/json",
+    status: 200,
+  }));
+  await page.route("**/rest/v1/votes**", (route) => route.fulfill({
+    body: "[]",
+    contentType: "application/json",
+    status: 200,
+  }));
+  await page.route("**/api/current-poll", (route) => route.fulfill({
+    body: JSON.stringify({
+      album_of_week: { artist: "Fleetwood Mac", title: "Rumours" },
+      candidates: [],
+      cycle_label: "Event Week",
+      description: "Rank the finalists.",
+      finalClosedAt: null,
+      finalClosesAt: "2026-08-30T18:00:00.000Z",
+      finalIsClosed: true,
+      finalOpenedAt: "2026-08-30T00:00:00.000Z",
+      finalists: [{ artist: "Geese", id: "getting-killed", title: "Getting Killed" }],
+      id: "event-week",
+      phase: "final",
+      question: "Rank the finalists.",
+      status: "Final voting is closed",
+    }),
+    contentType: "application/json",
+    status: 200,
+  }));
+  await page.goto("/vote");
+
+  await expect(page.getByRole("heading", { name: "The final ballot is locked." })).toBeVisible();
+  await expect(page.getByRole("button", { name: /submit.*ranking/i })).toHaveCount(0);
 });
 
 test("approved members can rate the current album separately from their nomination", async ({ page }) => {
@@ -406,6 +622,7 @@ test("creating a poll never reloads the archived poll results", async ({ page })
   await expect(page.locator(".admin-rating-summary")).toBeVisible();
   const requestCountBeforeCreate = resultRequests.length;
 
+  await page.getByRole("button", { name: "Create new weekly poll" }).click();
   await page.getByLabel("Cycle label").fill("Week 3 - Jazz");
   await page.getByLabel("Current album title").fill("Currents");
   await page.getByLabel("Current album artist").fill("Tame Impala");
@@ -420,6 +637,185 @@ test("creating a poll never reloads the archived poll results", async ({ page })
   ).toBeTruthy();
   await expect(page.getByText("Old nomination that must disappear", { exact: true })).toHaveCount(0);
   await expect(page.getByText("No nominations have been submitted yet.")).toBeVisible();
+});
+
+test("admin phase changes require an in-app confirmation", async ({ page }) => {
+  let advanceCalls = 0;
+  const poll = {
+    album_of_week: { artist: "Fleetwood Mac", title: "Rumours" },
+    candidates: [],
+    cycle_label: "Event Week",
+    description: "Choose the next album.",
+    finalists: [],
+    id: "event-week",
+    phase: "nominations",
+    question: "What should the club listen to next?",
+    status: "Nominations are open",
+  };
+  const results = {
+    ballotCounts: { final: 0, nominations: 7, primary: 0 },
+    currentAlbumRating: { averageRating: 8.4, ratingCount: 7 },
+    finalists: [],
+    irv: { rounds: [], tie: null, winnerId: null },
+    nominations: [{
+      artist: "Geese",
+      id: "getting-killed",
+      nominationCount: 7,
+      title: "Getting Killed",
+    }],
+    primaryResults: [],
+  };
+
+  await installAdminPollFixture(page, { poll, results });
+  await page.route("**/rest/v1/rpc/advance_to_primary", async (route) => {
+    advanceCalls += 1;
+    await route.fulfill({ body: "{}", contentType: "application/json", status: 200 });
+  });
+  await page.goto("/admin");
+
+  await expect(page.getByText("Unique members submitted")).toBeVisible();
+  const moveToPrimaryButton = page.getByRole("button", { name: "Move to primary" });
+  await moveToPrimaryButton.click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "Are you ready?" })).toBeVisible();
+  await expect(dialog).toContainText("closes nominations");
+  await expect(page.locator("main#main-content")).toHaveJSProperty("inert", true);
+  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(dialog.getByRole("button", { name: "Open primary voting" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+  expect(advanceCalls).toBe(0);
+
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(moveToPrimaryButton).toBeFocused();
+  await moveToPrimaryButton.click();
+  await page.getByRole("dialog").getByRole("button", { name: "Open primary voting" }).click();
+
+  await expect.poll(() => advanceCalls).toBe(1);
+  await expect(page.getByText("Poll moved to primary.").first()).toBeVisible();
+});
+
+test("opening final voting confirms the 18 hour consequence", async ({ page }) => {
+  let advancePayload = null;
+  const candidates = [
+    { artist: "Geese", id: "getting-killed", primaryVotes: 12, title: "Getting Killed" },
+    { artist: "Big Thief", id: "dragon", primaryVotes: 12, title: "Dragon New Warm Mountain" },
+  ];
+
+  await installAdminPollFixture(page, {
+    poll: {
+      album_of_week: { artist: "Fleetwood Mac", title: "Rumours" },
+      candidates,
+      cycle_label: "Event Week",
+      description: "Choose finalists.",
+      finalists: [],
+      id: "event-week",
+      phase: "primary",
+      question: "Which albums advance?",
+      status: "Primary voting is open",
+    },
+    results: {
+      ballotCounts: { final: 0, nominations: 7, primary: 18 },
+      currentAlbumRating: { averageRating: 8.4, ratingCount: 7 },
+      finalists: [],
+      irv: { rounds: [], tie: null, winnerId: null },
+      nominations: [],
+      primaryResults: candidates,
+    },
+  });
+  await page.route("**/rest/v1/rpc/advance_to_final", async (route) => {
+    advancePayload = route.request().postDataJSON();
+    await route.fulfill({ body: "{}", contentType: "application/json", status: 200 });
+  });
+  await page.goto("/admin");
+
+  await page.locator(".candidate-option").nth(0).click();
+  await page.locator(".candidate-option").nth(1).click();
+  await page.getByRole("button", { name: "Move to final" }).click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "Are you ready?" })).toBeVisible();
+  await expect(dialog).toContainText("automatically close 18 hours later");
+  expect(advancePayload).toBeNull();
+  await dialog.getByRole("button", { name: "Open final voting" }).click();
+
+  await expect.poll(() => advancePayload).not.toBeNull();
+  expect(advancePayload.candidate_ids.sort()).toEqual(["dragon", "getting-killed"]);
+});
+
+test("a closed final tie can be resolved through a confirmed admin decision", async ({ page }) => {
+  let tieBreakPayload = null;
+  const finalists = [
+    { artist: "Geese", id: "getting-killed", title: "Getting Killed" },
+    { artist: "Big Thief", id: "dragon", title: "Dragon New Warm Mountain" },
+    { artist: "Fleetwood Mac", id: "rumours", title: "Rumours" },
+  ];
+
+  await installAdminPollFixture(page, {
+    poll: {
+      album_of_week: { artist: "Fleetwood Mac", title: "Rumours" },
+      candidates: finalists,
+      cycle_label: "Event Week",
+      description: "Rank the finalists.",
+      finalClosedAt: "2026-08-30T18:00:00.000Z",
+      finalClosesAt: "2026-08-30T18:00:00.000Z",
+      finalIsClosed: true,
+      finalOpenedAt: "2026-08-30T00:00:00.000Z",
+      finalists,
+      id: "event-week",
+      phase: "final",
+      question: "Rank the finalists.",
+      status: "Final voting is closed",
+    },
+    results: {
+      ballotCounts: { final: 24, nominations: 7, primary: 18 },
+      currentAlbumRating: { averageRating: 8.4, ratingCount: 7 },
+      finalVoting: {
+        closedAt: "2026-08-30T18:00:00.000Z",
+        closesAt: "2026-08-30T18:00:00.000Z",
+        isClosed: true,
+        openedAt: "2026-08-30T00:00:00.000Z",
+      },
+      finalists,
+      irv: {
+        rounds: [{
+          eliminatedCandidateId: "rumours",
+          round: 1,
+          tallies: finalists.map((candidate) => ({ candidateId: candidate.id, votes: 8 })),
+        }],
+        tie: { candidateIds: ["getting-killed", "dragon"], round: 2 },
+        winnerId: null,
+      },
+      nominations: [],
+      primaryResults: [],
+    },
+  });
+  await page.route("**/rest/v1/rpc/resolve_irv_tie", async (route) => {
+    tieBreakPayload = route.request().postDataJSON();
+    await route.fulfill({ body: "{}", contentType: "application/json", status: 200 });
+  });
+  await page.goto("/admin");
+
+  await expect(page.getByText("24", { exact: true }).first()).toBeVisible();
+  await page.getByRole("radio", { name: /Getting Killed/ }).check();
+  await page.getByRole("button", { name: "Record elimination and continue" }).click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "Are you ready?" })).toBeVisible();
+  await expect(dialog).toContainText("permanently recorded");
+  expect(tieBreakPayload).toBeNull();
+  await dialog.getByRole("button", { name: "Eliminate Getting Killed" }).click();
+
+  await expect.poll(() => tieBreakPayload).not.toBeNull();
+  expect(tieBreakPayload).toEqual({
+    eliminated_candidate_id_input: "getting-killed",
+    target_poll_id: "event-week",
+    target_round: 2,
+  });
+  await expect(page.getByText("Getting Killed was eliminated from round 2.").first()).toBeVisible();
 });
 
 test("the unlisted Sidney letter opens from its sealed envelope", async ({ page }) => {
