@@ -426,57 +426,59 @@ function Home({
             </div>
           </div>
 
-          <ul
-            aria-label="Five most recently listened albums"
-            className="sideb-crate-wheel"
-            id="recent-albums-track"
-            onKeyDown={handleCrateWheelKeyDown}
-            ref={crateWheelRef}
-            tabIndex="0"
-          >
-            {shelfAlbums.map((album, index) => {
-              const metadata = albumMetadata[album.id];
-              const artist = metadata?.artist || album.artist;
+          <div className="sideb-crate-frame">
+            <ul
+              aria-label="Five most recently listened albums"
+              className="sideb-crate-wheel"
+              id="recent-albums-track"
+              onKeyDown={handleCrateWheelKeyDown}
+              ref={crateWheelRef}
+              tabIndex="0"
+            >
+              {shelfAlbums.map((album, index) => {
+                const metadata = albumMetadata[album.id];
+                const artist = metadata?.artist || album.artist;
 
-              return (
-                <li
-                  aria-label={`${index + 1} of ${shelfAlbums.length}: ${album.title} by ${artist}`}
-                  aria-roledescription="slide"
-                  className="sideb-crate-slide"
-                  data-carousel-item
-                  key={album.id}
-                >
-                  <article
-                    className="sideb-crate-card"
-                    title={`${album.title} by ${artist}`}
+                return (
+                  <li
+                    aria-label={`${index + 1} of ${shelfAlbums.length}: ${album.title} by ${artist}`}
+                    aria-roledescription="slide"
+                    className="sideb-crate-slide"
+                    data-carousel-item
+                    key={album.id}
                   >
-                    <div className="sideb-album-art">
-                      <div className={`sideb-record sideb-record-${(index % 3) + 1}`} aria-hidden="true">
-                        <span />
+                    <article
+                      className="sideb-crate-card"
+                      title={`${album.title} by ${artist}`}
+                    >
+                      <div className="sideb-album-art">
+                        <div className={`sideb-record sideb-record-${(index % 3) + 1}`} aria-hidden="true">
+                          <span />
+                        </div>
+                        {metadata?.coverUrl ? (
+                          <img
+                            alt=""
+                            decoding="async"
+                            height="600"
+                            loading="lazy"
+                            onError={(event) => {
+                              event.currentTarget.hidden = true;
+                            }}
+                            referrerPolicy="no-referrer"
+                            src={metadata.coverUrl}
+                            width="600"
+                          />
+                        ) : null}
                       </div>
-                      {metadata?.coverUrl ? (
-                        <img
-                          alt=""
-                          decoding="async"
-                          height="600"
-                          loading="lazy"
-                          onError={(event) => {
-                            event.currentTarget.hidden = true;
-                          }}
-                          referrerPolicy="no-referrer"
-                          src={metadata.coverUrl}
-                          width="600"
-                        />
-                      ) : null}
-                    </div>
-                    <p>Session {String(index + 1).padStart(2, "0")}</p>
-                    <h3>{album.title}</h3>
-                    <span>{artist}</span>
-                  </article>
-                </li>
-              );
-            })}
-          </ul>
+                      <p>Session {String(index + 1).padStart(2, "0")}</p>
+                      <h3>{album.title}</h3>
+                      <span>{artist}</span>
+                    </article>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         </section>
       </main>
     </div>

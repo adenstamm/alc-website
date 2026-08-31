@@ -6944,7 +6944,7 @@
 /* Home-page rhythm: compact editorial groupings with shared card baselines. */
 @media (min-width: 921px) {
   .sideb-hero-copy {
-    width: min(100%, 72rem);
+    width: min(100%, 62rem);
   }
 
   .sideb-hero .sideb-kicker {
@@ -6952,9 +6952,9 @@
   }
 
   .sideb-hero h1 {
-    max-width: 72rem;
-    font-size: clamp(5.4rem, 8.3vw, 8.4rem);
-    line-height: 0.82;
+    max-width: 62rem;
+    font-size: clamp(4.7rem, 6.7vw, 7rem);
+    line-height: 0.84;
   }
 
   .sideb-hero h1 span:first-child {
@@ -6973,6 +6973,63 @@
   .sideb-hero .sideb-actions {
     margin-top: 32px;
   }
+
+  .sideb-link-grid {
+    padding-block: clamp(44px, 4.5vw, 60px);
+  }
+
+  .sideb-link-card {
+    min-height: 184px;
+  }
+
+  .sideb-crates {
+    padding-top: clamp(62px, 6vw, 88px);
+    padding-bottom: clamp(76px, 7vw, 108px);
+  }
+
+  .sideb-section-heading {
+    margin-bottom: clamp(28px, 3vw, 40px);
+  }
+
+  .sideb-section-heading h2 {
+    font-size: clamp(3rem, 4.2vw, 4.7rem);
+  }
+
+  .sideb-crate-frame {
+    position: relative;
+    overflow: hidden;
+    padding: 18px 18px 0;
+    border: 1px solid rgba(242, 231, 209, 0.28);
+    border-bottom: 3px solid rgba(201, 123, 60, 0.58);
+    background:
+      linear-gradient(180deg, rgba(255, 243, 220, 0.025), transparent 24%),
+      rgba(10, 7, 5, 0.48);
+  }
+
+  .sideb-crate-wheel {
+    grid-auto-columns: clamp(224px, 21vw, 292px);
+    gap: 16px;
+    padding: 0 0 18px;
+    scroll-padding-inline: 0;
+  }
+
+  .sideb-crate-card {
+    padding: 11px 11px 18px;
+    border-color: rgba(242, 231, 209, 0.2);
+    box-shadow: none;
+  }
+
+  .sideb-album-art {
+    margin-bottom: 18px;
+  }
+
+  .sideb-crate-card h3 {
+    font-size: clamp(1.55rem, 1.8vw, 1.9rem);
+  }
+}
+
+.sideb-crate-frame {
+  min-width: 0;
 }
 
 @media (min-width: 921px) and (max-height: 700px) {

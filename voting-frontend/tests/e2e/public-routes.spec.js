@@ -155,6 +155,27 @@ test("the homepage omits the year-in-genres campaign", async ({ page }) => {
   await expect(page.locator('a[href="/genres"]')).toHaveCount(0);
 });
 
+test("the desktop record shelf stays contained and visibly framed", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+
+  const shelfFrame = page.locator(".sideb-crate-frame");
+  const firstCard = page.locator(".sideb-crate-card").first();
+
+  await expect(shelfFrame).toBeVisible();
+  await expect(shelfFrame).toHaveCSS("border-top-width", "1px");
+  await expect(firstCard).toBeVisible();
+
+  const layout = await page.evaluate(() => ({
+    cardWidth: document.querySelector(".sideb-crate-card")?.getBoundingClientRect().width,
+    pageWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth,
+  }));
+
+  expect(layout.cardWidth).toBeLessThanOrEqual(300);
+  expect(layout.pageWidth).toBe(layout.viewportWidth);
+});
+
 test("the homepage shelf refreshes on focus when the queue changes", async ({ page }) => {
   let shelfRows = [];
 
