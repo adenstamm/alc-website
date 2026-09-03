@@ -1115,14 +1115,22 @@ function Admin({
       return;
     }
 
+    const isProvisional = finalVotingState.isAvailable && !finalVotingState.isClosed;
+
     openConfirmation({
-      confirmLabel: `Eliminate ${candidate.title}`,
-      description: `${candidate.title} by ${candidate.artist} will be permanently recorded as the manual elimination for round ${irvTie.round}. The ranked-choice count will then continue and may produce another tie.`,
+      confirmLabel: isProvisional
+        ? `Provisionally eliminate ${candidate.title}`
+        : `Eliminate ${candidate.title}`,
+      description: isProvisional
+        ? `${candidate.title} by ${candidate.artist} will be used as the provisional manual elimination for round ${irvTie.round}. The next accepted final ballot will automatically clear this decision and recalculate the ranked-choice count.`
+        : `${candidate.title} by ${candidate.artist} will be permanently recorded as the manual elimination for round ${irvTie.round}. The ranked-choice count will then continue and may produce another tie.`,
       eyebrow: "Manual IRV tie-break",
       intent: "danger",
       onConfirm: () => runAdminAction(
         "resolve_irv_tie",
-        `${candidate.title} was eliminated from round ${irvTie.round}.`,
+        isProvisional
+          ? `${candidate.title} was provisionally eliminated from round ${irvTie.round}. A new final ballot will reset the decision.`
+          : `${candidate.title} was eliminated from round ${irvTie.round}.`,
         {
           eliminated_candidate_id_input: candidate.id,
           target_round: irvTie.round,
@@ -2042,7 +2050,7 @@ function Admin({
                     Round {irvTie.round} has {formatCount(irvTieCandidateIds.length, "candidate")} tied for elimination.
                   </p>
                 </div>
-                <fieldset disabled={isSavingPhase || !finalVotingState.isClosed}>
+                <fieldset disabled={isSavingPhase || !finalVotingState.isAvailable}>
                   <legend>Select the admin tie-break decision</legend>
                   {irvTieCandidateIds.map((candidateId) => {
                     const candidate = finalRows.find((row) => row.id === candidateId);
@@ -2064,20 +2072,24 @@ function Admin({
                     );
                   })}
                 </fieldset>
-                {!finalVotingState.isClosed ? (
-                  <p className="helper-note">
-                    {finalVotingState.isAvailable
-                      ? "Tie-break controls unlock after final voting closes."
-                      : "The final-close migration must be installed before recording a tie-break."}
-                  </p>
-                ) : null}
+                <p className="helper-note">
+                  {!finalVotingState.isAvailable
+                    ? "The provisional tie-break migration must be installed before recording a decision."
+                    : finalVotingState.isClosed
+                      ? "Final voting is closed, so this decision will remain part of the official count."
+                      : "This decision is provisional. The next accepted final ballot will clear it and recalculate the count."}
+                </p>
                 <button
                   className="button button-danger"
                   type="button"
-                  disabled={isSavingPhase || !finalVotingState.isClosed || !selectedTieCandidateId}
+                  disabled={isSavingPhase || !finalVotingState.isAvailable || !selectedTieCandidateId}
                   onClick={requestResolveIrvTie}
                 >
-                  {activePhaseAction === "resolve_irv_tie" ? "Recording decision…" : "Record elimination and continue"}
+                  {activePhaseAction === "resolve_irv_tie"
+                    ? "Recording decision…"
+                    : finalVotingState.isClosed
+                      ? "Record elimination and continue"
+                      : "Record provisional elimination"}
                 </button>
               </section>
             ) : null}

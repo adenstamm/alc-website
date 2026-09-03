@@ -8,13 +8,16 @@
 --   site-content.sql
 --   current-album-ratings.sql
 --   security-hardening.sql
---   event-voting-hardening.sql (last)
+--   event-voting-hardening.sql
+--   automatic-winner-publishing.sql
+--   provisional-tie-breaks.sql (last)
 --
 -- Existing project where security-hardening.sql already ran:
---   Run only this file. It is deliberately safe to rerun and establishes
---   least-privilege grants for every object it creates or replaces. Do not
---   rerun an older setup file afterward, because it would restore an older
---   function body without these event-safety invariants.
+--   Run this file, automatic-winner-publishing.sql, then
+--   provisional-tie-breaks.sql. Each is deliberately safe to rerun; keep
+--   provisional-tie-breaks.sql last so this open-final behavior stays active.
+--   Do not rerun an older setup file afterward, because it would restore an
+--   older function body without these event-safety invariants.
 
 begin;
 
@@ -79,7 +82,7 @@ create table if not exists public.poll_irv_tie_resolutions (
 );
 
 comment on table public.poll_irv_tie_resolutions is
-  'Append-only administrator decisions for otherwise unresolved IRV elimination ties.';
+  'Administrator IRV decisions. Decisions made during open final voting are provisional and cleared by the next accepted final ballot.';
 
 alter table public.poll_irv_tie_resolutions enable row level security;
 
@@ -498,6 +501,14 @@ begin
       raise exception 'ALREADY_VOTED: Your account already submitted this phase.' using errcode = 'P0001';
   end;
 
+  -- An open-final tie decision is only valid for the exact ballot set the
+  -- administrator reviewed. Clear every saved resolution after (and only
+  -- after) a new ballot is accepted so duplicate or rejected submissions do
+  -- not disturb the current count. The shared poll-row lock above conflicts
+  -- with the administrator's exclusive lock, making the reset race-free.
+  delete from public.poll_irv_tie_resolutions
+  where poll_id = target_poll_id;
+
   foreach candidate_id_value in array ranked_candidate_ids loop
     insert into public.vote_choices (vote_id, candidate_id, rank)
     values (saved_vote.id, candidate_id_value, rank_index);
@@ -686,9 +697,11 @@ begin
 end;
 $$;
 
--- A tie decision is append-only and only valid after final voting has closed.
--- The poll-row lock prevents two admins from resolving the same tie or a late
--- ballot from crossing the decision.
+-- Administrators may make a provisional tie decision while final voting is
+-- open. The next accepted final ballot clears all saved resolutions for the
+-- poll. After the deadline, the same decision is durable because late ballots
+-- are rejected. The exclusive poll-row lock prevents a decision from crossing
+-- an accepted ballot.
 create or replace function public.resolve_irv_tie(
   target_poll_id text,
   target_round integer,
@@ -700,7 +713,6 @@ security definer
 set search_path = pg_catalog, public
 as $$
 declare
-  final_poll public.polls%rowtype;
   irv_result jsonb;
   pending_tie jsonb;
   pending_round integer;
@@ -714,20 +726,6 @@ begin
   end if;
 
   perform public.lock_poll_phase_for_admin(target_poll_id, 'final');
-
-  select * into final_poll
-  from public.polls
-  where id = target_poll_id;
-
-  if not (
-    final_poll.final_closed_at is not null
-    or (
-      final_poll.final_closes_at is not null
-      and now() >= final_poll.final_closes_at
-    )
-  ) then
-    raise exception 'FINAL_STILL_OPEN: Close final voting before resolving an IRV tie.' using errcode = 'P0001';
-  end if;
 
   irv_result := public.calculate_irv_result(target_poll_id);
   pending_tie := irv_result -> 'tie';
