@@ -837,6 +837,145 @@ test("opening final voting confirms the 18 hour consequence", async ({ page }) =
   expect(advancePayload.candidate_ids.sort()).toEqual(["dragon", "getting-killed"]);
 });
 
+test("an admin can remove an album from primary voting", async ({ page }) => {
+  let removePayload = null;
+  let candidates = [
+    { artist: "Geese", id: "getting-killed", primaryVotes: 12, title: "Getting Killed" },
+    { artist: "Big Thief", id: "dragon", primaryVotes: 9, title: "Dragon New Warm Mountain" },
+  ];
+  const currentPoll = () => ({
+    album_of_week: { artist: "Fleetwood Mac", title: "Rumours" },
+    candidates,
+    cycle_label: "Event Week",
+    description: "Choose finalists.",
+    finalists: [],
+    id: "event-week",
+    phase: "primary",
+    question: "Which albums advance?",
+    status: "Primary voting is open",
+  });
+  const currentResults = () => ({
+    ballotCounts: { final: 0, nominations: 7, primary: 18 },
+    currentAlbumRating: { averageRating: 8.4, ratingCount: 7 },
+    finalists: [],
+    irv: { rounds: [], tie: null, winnerId: null },
+    nominations: [],
+    primaryResults: candidates,
+  });
+
+  await installAdminPollFixture(page, {
+    poll: currentPoll,
+    results: currentResults,
+  });
+  await page.route("**/rest/v1/rpc/remove_primary_candidate", async (route) => {
+    removePayload = route.request().postDataJSON();
+    candidates = candidates.filter((candidate) => candidate.id !== "getting-killed");
+    await route.fulfill({
+      body: JSON.stringify({
+        affectedBallotCount: 12,
+        candidateId: "getting-killed",
+        resetBallotCount: 2,
+      }),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
+  await page.goto("/admin");
+
+  const candidateRow = page.locator(".admin-primary-candidate-row", { hasText: "Getting Killed" });
+  await expect(candidateRow).toBeVisible();
+  await candidateRow.getByRole("button", { name: "Remove Getting Killed from primary voting" }).click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "Remove Getting Killed?" })).toBeVisible();
+  await expect(dialog).toContainText("members who selected only this album will be able to submit a new ballot");
+  expect(removePayload).toBeNull();
+  await dialog.getByRole("button", { name: "Remove album" }).click();
+
+  await expect.poll(() => removePayload).not.toBeNull();
+  expect(removePayload).toEqual({
+    candidate_id_input: "getting-killed",
+    target_poll_id: "event-week",
+  });
+  await expect(page.locator(".candidate-option", { hasText: "Getting Killed" })).toHaveCount(0);
+  await expect(page.getByText("Getting Killed was removed from primary voting.").first()).toBeVisible();
+});
+
+test("an open final tie can be resolved provisionally", async ({ page }) => {
+  let tieBreakPayload = null;
+  const finalists = [
+    { artist: "Geese", id: "getting-killed", title: "Getting Killed" },
+    { artist: "Big Thief", id: "dragon", title: "Dragon New Warm Mountain" },
+    { artist: "Fleetwood Mac", id: "rumours", title: "Rumours" },
+  ];
+
+  await installAdminPollFixture(page, {
+    poll: {
+      album_of_week: { artist: "Fleetwood Mac", title: "Rumours" },
+      candidates: finalists,
+      cycle_label: "Event Week",
+      description: "Rank the finalists.",
+      finalClosedAt: null,
+      finalClosesAt: "2099-08-30T18:00:00.000Z",
+      finalIsClosed: false,
+      finalOpenedAt: "2099-08-30T00:00:00.000Z",
+      finalists,
+      id: "event-week",
+      phase: "final",
+      question: "Rank the finalists.",
+      status: "Final IRV voting is open",
+    },
+    results: {
+      ballotCounts: { final: 24, nominations: 7, primary: 18 },
+      currentAlbumRating: { averageRating: 8.4, ratingCount: 7 },
+      finalVoting: {
+        closedAt: null,
+        closesAt: "2099-08-30T18:00:00.000Z",
+        isClosed: false,
+        openedAt: "2099-08-30T00:00:00.000Z",
+      },
+      finalists,
+      irv: {
+        rounds: [{
+          eliminatedCandidateId: "rumours",
+          round: 1,
+          tallies: finalists.map((candidate) => ({ candidateId: candidate.id, votes: 8 })),
+        }],
+        tie: { candidateIds: ["getting-killed", "dragon"], round: 2 },
+        winnerId: null,
+      },
+      nominations: [],
+      primaryResults: [],
+    },
+  });
+  await page.route("**/rest/v1/rpc/resolve_irv_tie", async (route) => {
+    tieBreakPayload = route.request().postDataJSON();
+    await route.fulfill({ body: "{}", contentType: "application/json", status: 200 });
+  });
+  await page.goto("/admin");
+
+  await expect(page.getByText("This decision is provisional.")).toBeVisible();
+  const choice = page.getByRole("radio", { name: /Getting Killed/ });
+  await expect(choice).toBeEnabled();
+  await choice.check();
+  await page.getByRole("button", { name: "Record provisional elimination" }).click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "Are you ready?" })).toBeVisible();
+  await expect(dialog).toContainText("provisional manual elimination");
+  await expect(dialog).toContainText("next accepted final ballot");
+  expect(tieBreakPayload).toBeNull();
+  await dialog.getByRole("button", { name: "Provisionally eliminate Getting Killed" }).click();
+
+  await expect.poll(() => tieBreakPayload).not.toBeNull();
+  expect(tieBreakPayload).toEqual({
+    eliminated_candidate_id_input: "getting-killed",
+    target_poll_id: "event-week",
+    target_round: 2,
+  });
+  await expect(page.getByText(/Getting Killed was provisionally eliminated/).first()).toBeVisible();
+});
+
 test("a closed final tie can be resolved through a confirmed admin decision", async ({ page }) => {
   let tieBreakPayload = null;
   const finalists = [
@@ -968,4 +1107,29 @@ test("archive progressively reveals the full catalog", async ({ page }) => {
 
   await page.getByRole("button", { name: /Load 36 more/i }).click();
   await expect(archiveRows).toHaveCount(72);
+});
+
+test("archive rating summaries include the number of perfect 10s", async ({ page }) => {
+  await page.route("https://playwright.supabase.co/rest/v1/album_archive_entries**", (route) => (
+    route.fulfill({
+      body: JSON.stringify([{
+        album_title: "QA Perfect Score Album",
+        archived_at: "2026-09-01T12:00:00.000Z",
+        artist_name: "QA Artist",
+        average_rating: 8.75,
+        poll_id: "qa-perfect-score-week",
+        rating_count: 12,
+        ten_rating_count: 3,
+      }]),
+      contentType: "application/json",
+      status: 200,
+    })
+  ));
+  await page.goto("/archive");
+
+  const archiveRow = page.locator(".archive-catalog-row", { hasText: "QA Perfect Score Album" });
+  await expect(archiveRow).toBeVisible();
+  await expect(archiveRow).toContainText("8.8/10");
+  await expect(archiveRow).toContainText("3 perfect 10s");
+  await expect(archiveRow).not.toContainText("12 ratings");
 });

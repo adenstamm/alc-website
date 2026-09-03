@@ -10,7 +10,8 @@
 --   security-hardening.sql
 --   event-voting-hardening.sql
 --   automatic-winner-publishing.sql
---   provisional-tie-breaks.sql (last)
+--   provisional-tie-breaks.sql
+--   archive-perfect-scores-and-primary-removal.sql (last)
 --
 -- Existing project where security-hardening.sql already ran:
 --   Run this file, automatic-winner-publishing.sql, then

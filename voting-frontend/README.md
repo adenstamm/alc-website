@@ -94,25 +94,33 @@ Apply the SQL files in this order:
 6. `supabase/security-hardening.sql`
 7. `supabase/record-shelf-queue.sql`
 8. `supabase/event-voting-hardening.sql`
-9. `supabase/automatic-winner-publishing.sql` **last**
+9. `supabase/automatic-winner-publishing.sql`
+10. `supabase/provisional-tie-breaks.sql`
+11. `supabase/archive-perfect-scores-and-primary-removal.sql`
+12. `supabase/immediate-manual-finalization.sql` **last**
 
 Create the first account through `/account`, then promote its `memberships` row
 to `status = 'approved'` and `role = 'admin'`. Future accounts can be reviewed
 from the application admin page.
 
 For an existing project that already ran `security-hardening.sql`, run
-`record-shelf-queue.sql`, `event-voting-hardening.sql`, and
-`automatic-winner-publishing.sql`, in that order. All three are idempotent and
-carry their own restricted grants. Do not run an older setup file afterward:
-older files recreate pre-hardening function bodies. If that happens, repeat
-steps 6 through 9 in order.
+`record-shelf-queue.sql`, `event-voting-hardening.sql`,
+`automatic-winner-publishing.sql`, `provisional-tie-breaks.sql`, and
+`archive-perfect-scores-and-primary-removal.sql`, followed by
+`immediate-manual-finalization.sql`. All six are
+idempotent and carry their own restricted grants. Do not run an older setup
+file afterward: older files recreate pre-hardening function bodies. If that
+happens, repeat steps 6 through 12 in order.
 
 Then enable **Cron** under Supabase Dashboard → Integrations → Cron and run
-`supabase/automatic-winner-cron.sql` once. It registers one idempotent job that
-checks for due finals every minute. A winner becomes the published current
-album without opening the next nomination phase; the admin form prefills that
-winner when the next genre/cycle is ready. Unresolved IRV ties remain pending
-for the existing manual administrator tie-break.
+`supabase/automatic-winner-cron.sql` once. It registers one idempotent fallback
+job that checks for due finals every minute. Pressing **Close final voting**
+publishes immediately; the cron handles finals that expire without a manual
+close. A winner becomes the published current album without opening the next
+nomination phase, and the admin form prefills that winner when the next
+genre/cycle is ready. Unresolved IRV ties remain pending for the existing
+manual administrator tie-break and publish immediately after the last tie is
+resolved.
 
 SQL Editor history can help identify what was submitted manually, but it is not
 a reliable migration ledger: a query can be edited, partially selected, or fail

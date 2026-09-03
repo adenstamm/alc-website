@@ -1,10 +1,13 @@
 # Supabase Security Checklist
 
-Apply `supabase/security-hardening.sql`, then `supabase/record-shelf-queue.sql`,
-then `supabase/event-voting-hardening.sql` **last**. For an existing project,
-the queue and event files are safe to rerun in that order. If any older setup
-SQL is rerun, repeat all three because older files recreate earlier functions,
-policies, and grants. Finish with the read-only
+Apply `supabase/security-hardening.sql`, `supabase/record-shelf-queue.sql`,
+`supabase/event-voting-hardening.sql`, `supabase/automatic-winner-publishing.sql`,
+`supabase/provisional-tie-breaks.sql`, then
+`supabase/archive-perfect-scores-and-primary-removal.sql`, followed by
+`supabase/immediate-manual-finalization.sql` **last**. For an
+existing project, these files are safe to rerun in that order. If any older
+setup SQL is rerun, repeat the sequence because older files recreate earlier
+functions, policies, and grants. Finish with the read-only
 `supabase/event-readiness-verification.sql` and require every row to say `PASS`.
 
 ## Expected public surface
@@ -23,7 +26,8 @@ Signed-in users additionally get the member/admin RPCs used by the app and these
 | `memberships` | `SELECT`, `UPDATE` | Own row can be read; only admins can update rows. A member changes their own display name through the RPC. |
 | `votes`, `vote_choices` | `SELECT` only | Members see their own ballot; admins can read all. Inserts only work through ballot RPCs. |
 | `album_ratings` | `SELECT` only | Members see their own current-album rating; admins can read all. Inserts only work through the rating RPC. |
-| `album_archive_entries` | `SELECT` | Everyone can read archived album averages; writes only occur inside the admin poll-creation RPC. |
+| `album_archive_entries` | `SELECT` | Everyone can read archived rating summaries; writes only occur in server-side poll finalization and creation functions. |
+| `poll_candidate_exclusions` | None | No direct browser access; the admin-only removal RPC records exclusions. |
 | `site_events` | `SELECT`, `INSERT`, `UPDATE`, `DELETE` | Everyone can read; only admins can write. |
 | `record_shelf_covers` | `SELECT`, `INSERT`, `UPDATE`, `DELETE` | Everyone can read; only admins can write. |
 
@@ -37,7 +41,7 @@ their bearer token.
 
 ## Dashboard checks before launch
 
-- In **Database > Tables**, confirm RLS is enabled for every app table: `memberships`, `votes`, `vote_choices`, `album_ratings`, `album_archive_entries`, `polls`, `poll_candidates`, `banned_albums`, `banned_artists`, `site_events`, `record_shelf_covers`, `record_shelf_items`, and `poll_irv_tie_resolutions`.
+- In **Database > Tables**, confirm RLS is enabled for every app table: `memberships`, `votes`, `vote_choices`, `album_ratings`, `album_archive_entries`, `polls`, `poll_candidates`, `poll_candidate_exclusions`, `banned_albums`, `banned_artists`, `site_events`, `record_shelf_covers`, `record_shelf_items`, and `poll_irv_tie_resolutions`.
 - In **Project Settings > Data API**, keep the exposed schemas list minimal. `public` is required by this frontend; do not add a private/admin schema.
 - In **Project Settings > Data API**, turn off **Automatically expose new tables and functions** (if shown) and keep the RLS-on-by-default option enabled. The migration also revokes default grants so new objects fail closed.
 - In **Project Settings > API Keys**, use only the publishable/anon key in `VITE_SUPABASE_ANON_KEY`. Never put `service_role`, secret, or database credentials in a `VITE_` variable. Rotate any secret that has ever been committed or shipped to a browser.
@@ -71,8 +75,9 @@ join pg_catalog.pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'public'
   and c.relname = any (array[
     'memberships', 'votes', 'vote_choices', 'album_ratings',
-    'album_archive_entries', 'polls', 'poll_candidates', 'banned_albums',
-    'banned_artists', 'site_events', 'record_shelf_covers'
+    'album_archive_entries', 'polls', 'poll_candidates',
+    'poll_candidate_exclusions', 'banned_albums', 'banned_artists',
+    'site_events', 'record_shelf_covers'
   ])
 order by c.relname;
 ```

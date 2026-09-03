@@ -19,7 +19,11 @@ You need:
   5. `supabase/current-album-ratings.sql`, required for phase-one album ratings and rated archive entries
   6. `supabase/security-hardening.sql`
   7. `supabase/record-shelf-queue.sql`, required for the automatic five-album FIFO shelf
-  8. `supabase/event-voting-hardening.sql` **last**
+  8. `supabase/event-voting-hardening.sql`
+  9. `supabase/automatic-winner-publishing.sql`
+  10. `supabase/provisional-tie-breaks.sql`
+  11. `supabase/archive-perfect-scores-and-primary-removal.sql`
+  12. `supabase/immediate-manual-finalization.sql` **last**
 - Run the read-only `supabase/event-readiness-verification.sql` and require every check to return `PASS`.
 
 The five member accounts are useful because the app intentionally allows one nomination per approved account per poll. Five nominations gives you enough candidates to test the final phase properly.
@@ -53,7 +57,8 @@ For each approved member test account:
 
 As the admin, open `/admin`, refresh the rating summary, and confirm it shows
 the correct average and member-rating count. When the next poll is created,
-confirm the finished current album appears in `/archive` with the same average.
+confirm the finished current album appears in `/archive` with the same average,
+rating count, and number of perfect 10 ratings.
 6. Return to `/account` and sign out.
 
 Suggested safe test nominations:
@@ -86,6 +91,12 @@ Expected:
 - The old nomination form is no longer available.
 
 ## Phase 2: Primary Voting
+
+Before submitting every member ballot, remove one test album from `/admin` and
+confirm the destructive-action dialog explains how existing selections are
+handled. Verify the album disappears from both the admin results and member
+ballot after refresh. A member whose only selection was the removed album must
+be able to submit a replacement primary ballot.
 
 For at least one approved member account:
 
@@ -135,12 +146,25 @@ Also test:
 - Refresh after submitting and confirm the saved ranking still appears.
 - Sign in as admin and open `/admin`.
 - Confirm IRV rounds are visible in the admin results panel only.
+- If the count has an elimination tie while voting is still open, record a
+  provisional tie-break and confirm the count continues.
+- Submit one newly accepted final ballot from another approved member, refresh
+  the admin results, and confirm the provisional decision disappeared and the
+  count was recalculated. A duplicate or rejected ballot must not clear it.
 
 Expected:
 
 - All five finalists must be ranked.
 - Same account cannot submit final twice.
 - Admin results show IRV rounds and either a winner or a manual tie notice.
+- Open-final tie-break decisions last only until the next accepted ballot;
+  decisions made after voting closes remain official.
+
+As the admin, press **Close final voting now** and confirm the outgoing album
+appears in `/archive` immediately with its average, rating count, and perfect-10
+count. Confirm the IRV winner becomes the current album without waiting for the
+cron job. If closing reveals a tie, resolve each required tie and confirm the
+winner publishes immediately after the last resolution.
 
 ## Cleanup Options
 

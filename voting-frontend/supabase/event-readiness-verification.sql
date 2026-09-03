@@ -1,5 +1,5 @@
--- Read-only live-state verification for the event-voting hardening migration.
--- Run this in Supabase SQL Editor after event-voting-hardening.sql. It reads
+-- Read-only live-state verification for the complete production migration set.
+-- Run this in Supabase SQL Editor after the final documented migration. It reads
 -- PostgreSQL catalogs and current poll metadata only; it creates or changes
 -- nothing. Every returned row must say PASS before an event.
 
@@ -30,6 +30,7 @@ required_functions(function_name, signature) as (
     ('submit_primary_ballot', 'public.submit_primary_ballot(text,text[])'),
     ('submit_current_album_rating', 'public.submit_current_album_rating(text,integer)'),
     ('advance_to_primary', 'public.advance_to_primary(text)'),
+    ('remove_primary_candidate', 'public.remove_primary_candidate(text,text)'),
     ('save_finalists', 'public.save_finalists(text,text[])'),
     ('advance_to_final', 'public.advance_to_final(text,text[])'),
     ('submit_final_ballot', 'public.submit_final_ballot(text,text[])'),
@@ -63,6 +64,61 @@ checks(area, check_name, passed, details) as (
       ', ' order by column_name
     )
   from column_inventory
+
+  union all
+
+  select
+    'schema',
+    'archive perfect-score count exists',
+    count(*) = 1
+      and max(data_type) = 'integer'
+      and max(is_nullable) = 'NO',
+    coalesce(string_agg(format('%s=%s nullable=%s', column_name, data_type, is_nullable), ', '), 'MISSING')
+  from information_schema.columns
+  where table_schema = 'public'
+    and table_name = 'album_archive_entries'
+    and column_name = 'ten_rating_count'
+
+  union all
+
+  select
+    'schema',
+    'candidate-exclusion table has RLS',
+    coalesce((
+      select c.relrowsecurity
+      from pg_catalog.pg_class c
+      where c.oid = pg_catalog.to_regclass('public.poll_candidate_exclusions')
+    ), false),
+    format(
+      'table=%s, rls=%s',
+      coalesce(pg_catalog.to_regclass('public.poll_candidate_exclusions')::text, 'MISSING'),
+      coalesce((
+        select c.relrowsecurity::text
+        from pg_catalog.pg_class c
+        where c.oid = pg_catalog.to_regclass('public.poll_candidate_exclusions')
+      ), 'false')
+    )
+
+  union all
+
+  select
+    'schema',
+    'archive perfect-score trigger is enabled',
+    exists (
+      select 1
+      from pg_catalog.pg_trigger trigger_row
+      where trigger_row.tgrelid = pg_catalog.to_regclass('public.album_archive_entries')
+        and trigger_row.tgname = 'album_archive_entries_sync_ten_rating_count'
+        and not trigger_row.tgisinternal
+        and trigger_row.tgenabled <> 'D'
+    ),
+    coalesce((
+      select format('enabled=%s', trigger_row.tgenabled)
+      from pg_catalog.pg_trigger trigger_row
+      where trigger_row.tgrelid = pg_catalog.to_regclass('public.album_archive_entries')
+        and trigger_row.tgname = 'album_archive_entries_sync_ten_rating_count'
+        and not trigger_row.tgisinternal
+    ), 'MISSING')
 
   union all
 
@@ -296,6 +352,22 @@ checks(area, check_name, passed, details) as (
   union all
 
   select
+    'finalization',
+    'manual close and closed-final tie resolution publish immediately',
+    coalesce(
+      pg_catalog.pg_get_functiondef(
+        pg_catalog.to_regprocedure('public.close_final_voting(text)')
+      ) ilike '%finalize_poll_winner%'
+      and pg_catalog.pg_get_functiondef(
+        pg_catalog.to_regprocedure('public.resolve_irv_tie(text,integer,text)')
+      ) ilike '%finalize_poll_winner%',
+      false
+    ),
+    'close_final_voting finalizes directly; the last closed-final tie resolution does the same'
+
+  union all
+
+  select
     'locking',
     'manual and automatic shelf writers share one advisory lock',
     coalesce(
@@ -483,6 +555,80 @@ checks(area, check_name, passed, details) as (
   union all
 
   select
+    'primary',
+    'candidate removal is serialized and durable',
+    coalesce(
+      pg_catalog.pg_get_functiondef(
+        pg_catalog.to_regprocedure('public.remove_primary_candidate(text,text)')
+      ) ilike '%lock_poll_phase_for_admin%primary%'
+      and pg_catalog.pg_get_functiondef(
+        pg_catalog.to_regprocedure('public.remove_primary_candidate(text,text)')
+      ) ilike '%poll_candidate_exclusions%'
+      and pg_catalog.pg_get_functiondef(
+        pg_catalog.to_regprocedure('public.rebuild_poll_candidates(text)')
+      ) ilike '%poll_candidate_exclusions%',
+      false
+    ),
+    format(
+      'remove_md5=%s, rebuild_md5=%s',
+      coalesce(md5(pg_catalog.pg_get_functiondef(
+        pg_catalog.to_regprocedure('public.remove_primary_candidate(text,text)')
+      )), 'MISSING'),
+      coalesce(md5(pg_catalog.pg_get_functiondef(
+        pg_catalog.to_regprocedure('public.rebuild_poll_candidates(text)')
+      )), 'MISSING')
+    )
+
+  union all
+
+  select
+    'IRV',
+    'administrators can resolve the current tie while final voting is open',
+    coalesce(
+      pg_catalog.pg_get_functiondef(
+        pg_catalog.to_regprocedure('public.resolve_irv_tie(text,integer,text)')
+      ) ilike '%lock_poll_phase_for_admin%'
+      and pg_catalog.pg_get_functiondef(
+        pg_catalog.to_regprocedure('public.resolve_irv_tie(text,integer,text)')
+      ) not ilike '%FINAL_STILL_OPEN%',
+      false
+    ),
+    format(
+      'definition_md5=%s',
+      coalesce(md5(pg_catalog.pg_get_functiondef(
+        pg_catalog.to_regprocedure('public.resolve_irv_tie(text,integer,text)')
+      )), 'MISSING')
+    )
+
+  union all
+
+  select
+    'IRV',
+    'accepted final ballots clear provisional tie decisions',
+    coalesce(
+      position(
+        'delete from public.poll_irv_tie_resolutions'
+        in lower(pg_catalog.pg_get_functiondef(
+          pg_catalog.to_regprocedure('public.submit_final_ballot(text,text[])')
+        ))
+      ) > position(
+        'insert into public.votes'
+        in lower(pg_catalog.pg_get_functiondef(
+          pg_catalog.to_regprocedure('public.submit_final_ballot(text,text[])')
+        ))
+      ),
+      false
+    ),
+    format(
+      'definition_md5=%s',
+      coalesce(md5(pg_catalog.pg_get_functiondef(
+        pg_catalog.to_regprocedure('public.submit_final_ballot(text,text[])')
+      )), 'MISSING')
+    )
+
+  union all
+
+  select
     'RLS',
     'only admins can directly read tie-resolution audit rows',
     exists (
@@ -517,6 +663,11 @@ checks(area, check_name, passed, details) as (
       pg_catalog.to_regprocedure('public.resolve_irv_tie(text,integer,text)'),
       'EXECUTE'
     ), false)
+    and coalesce(pg_catalog.has_function_privilege(
+      'authenticated',
+      pg_catalog.to_regprocedure('public.remove_primary_candidate(text,text)'),
+      'EXECUTE'
+    ), false)
     and not coalesce(pg_catalog.has_function_privilege(
       'anon',
       pg_catalog.to_regprocedure('public.submit_final_ballot(text,text[])'),
@@ -526,8 +677,27 @@ checks(area, check_name, passed, details) as (
       'anon',
       pg_catalog.to_regprocedure('public.resolve_irv_tie(text,integer,text)'),
       'EXECUTE'
+    ), false)
+    and not coalesce(pg_catalog.has_function_privilege(
+      'anon',
+      pg_catalog.to_regprocedure('public.remove_primary_candidate(text,text)'),
+      'EXECUTE'
     ), false),
-    'authenticated can execute submit/resolve; anon cannot'
+    'authenticated can execute submit/resolve/remove; anon cannot'
+
+  union all
+
+  select
+    'grants',
+    'candidate exclusions are RPC-only',
+    not exists (
+      select 1
+      from information_schema.role_table_grants grant_row
+      where grant_row.table_schema = 'public'
+        and grant_row.table_name = 'poll_candidate_exclusions'
+        and grant_row.grantee in ('anon', 'authenticated')
+    ),
+    'anon/authenticated have no direct table privileges'
 
   union all
 
@@ -740,6 +910,35 @@ checks(area, check_name, passed, details) as (
       order by created_at desc
       limit 1
     ), 'no active poll')
+
+  union all
+
+  select
+    'live state',
+    'archived perfect-score totals match ratings',
+    not exists (
+      select 1
+      from public.album_archive_entries archive
+      where archive.ten_rating_count <> (
+        select count(*)::integer
+        from public.album_ratings rating
+        where rating.poll_id = archive.poll_id
+          and rating.rating = 10
+      )
+    ),
+    format(
+      'mismatches=%s',
+      (
+        select count(*)
+        from public.album_archive_entries archive
+        where archive.ten_rating_count <> (
+          select count(*)::integer
+          from public.album_ratings rating
+          where rating.poll_id = archive.poll_id
+            and rating.rating = 10
+        )
+      )
+    )
 
   union all
 

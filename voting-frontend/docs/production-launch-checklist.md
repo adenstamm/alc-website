@@ -47,7 +47,10 @@ Use this checklist for the `https://albumasu.com` launch.
   public site key as `VITE_TURNSTILE_SITE_KEY`, and configure its secret in
   Supabase Authentication CAPTCHA protection.
 - Apply the database files in the documented order: `security-hardening.sql`,
-  then `record-shelf-queue.sql`, then `event-voting-hardening.sql` last.
+  `record-shelf-queue.sql`, `event-voting-hardening.sql`,
+  `automatic-winner-publishing.sql`, `provisional-tie-breaks.sql`, then
+  `archive-perfect-scores-and-primary-removal.sql`, and
+  `immediate-manual-finalization.sql` last.
 - Run the read-only `event-readiness-verification.sql`, require every row to
   report `PASS`, and confirm anonymous users have no application write/RPC grants.
 - Run the Supabase Security Advisor and review

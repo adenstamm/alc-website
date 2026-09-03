@@ -239,6 +239,10 @@ function getAdminActionDisplayError(action, actionError) {
     return "Final close controls need the latest Supabase event migration. Voting is still open.";
   }
 
+  if (isMissingFunction && action === "remove_primary_candidate") {
+    return "Album removal needs the latest Supabase archive and primary-controls migration. Nothing was removed.";
+  }
+
   return getAdminActionErrorMessage(actionError);
 }
 
@@ -1002,6 +1006,21 @@ function Admin({
     });
   }
 
+  function requestRemovePrimaryCandidate(candidate) {
+    openConfirmation({
+      confirmLabel: "Remove album",
+      description: `${candidate.title} by ${candidate.artist} will be removed from this primary ballot. Existing selections for this album will be discarded; members who selected only this album will be able to submit a new ballot.`,
+      eyebrow: "Primary ballot · Remove album",
+      intent: "danger",
+      onConfirm: () => runAdminAction(
+        "remove_primary_candidate",
+        `${candidate.title} was removed from primary voting.`,
+        { candidate_id_input: candidate.id },
+      ),
+      title: `Remove ${candidate.title}?`,
+    });
+  }
+
   async function runAdminAction(
     action,
     successMessage,
@@ -1143,12 +1162,12 @@ function Admin({
   function requestCloseFinalVoting() {
     openConfirmation({
       confirmLabel: "Close final voting now",
-      description: `This immediately stops every new final ballot, before the automatic deadline${finalVotingState.closesAt ? ` at ${formatAdminTimestamp(finalVotingState.closesAt, { includeDate: true })}` : ""}. Existing ballots stay counted, and the poll cannot be reopened from this page.`,
+      description: `This immediately stops every new final ballot, before the automatic deadline${finalVotingState.closesAt ? ` at ${formatAdminTimestamp(finalVotingState.closesAt, { includeDate: true })}` : ""}. Existing ballots stay counted, the current album is archived, and the winner is published unless IRV requires an administrator tie-break.`,
       eyebrow: "Permanent voting cutoff",
       intent: "danger",
       onConfirm: () => runAdminAction(
         "close_final_voting",
-        "Final voting is closed. Results are now official.",
+        "Final voting is closed. The winner is published unless a tie-break is required below.",
       ),
       title: "Close final voting now?",
     });
@@ -1973,22 +1992,30 @@ function Admin({
                 const isSelected = selectedFinalistIds.includes(candidate.id);
 
                 return (
-                  <label
-                    className={`admin-result-row candidate-option ${isSelected ? "is-selected" : ""}`}
-                    key={candidate.id}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      disabled={!isSelected && selectedCount >= requiredFinalistCount}
-                      onChange={() => toggleFinalist(candidate.id)}
-                    />
-                    <div>
-                      <strong>{candidate.title}</strong>
-                      <p>{candidate.artist}</p>
-                    </div>
-                    <span>{formatCount(candidate.primaryVotes || 0, "vote")}</span>
-                  </label>
+                  <div className="admin-primary-candidate-row" key={candidate.id}>
+                    <label className={`admin-result-row candidate-option ${isSelected ? "is-selected" : ""}`}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        disabled={!isSelected && selectedCount >= requiredFinalistCount}
+                        onChange={() => toggleFinalist(candidate.id)}
+                      />
+                      <div>
+                        <strong>{candidate.title}</strong>
+                        <p>{candidate.artist}</p>
+                      </div>
+                      <span>{formatCount(candidate.primaryVotes || 0, "vote")}</span>
+                    </label>
+                    <button
+                      aria-label={`Remove ${candidate.title} from primary voting`}
+                      className="admin-candidate-remove"
+                      disabled={isSavingPhase}
+                      type="button"
+                      onClick={() => requestRemovePrimaryCandidate(candidate)}
+                    >
+                      Remove
+                    </button>
+                  </div>
                 );
               })}
             </div>

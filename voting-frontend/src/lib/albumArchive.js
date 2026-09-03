@@ -69,6 +69,9 @@ function normalizeDynamicArchiveEntry(entry) {
     ratingCount: Number.isInteger(Number(entry.rating_count))
       ? Number(entry.rating_count)
       : 0,
+    tenRatingCount: Number.isInteger(Number(entry.ten_rating_count))
+      ? Number(entry.ten_rating_count)
+      : 0,
     title,
   };
 }

@@ -69,6 +69,7 @@ test("dynamic archive entries append chronologically with rating summaries", () 
         artist_name: "Portishead",
         average_rating: "8.25",
         rating_count: 12,
+        ten_rating_count: 3,
         archived_at: "2026-08-27T12:00:00.000Z",
       },
       {
@@ -85,6 +86,7 @@ test("dynamic archive entries append chronologically with rating summaries", () 
   assert.deepEqual(merged.map((album) => album.title), ["Blue", "Pink Moon", "Dummy"]);
   assert.equal(merged[2].averageRating, 8.25);
   assert.equal(merged[2].ratingCount, 12);
+  assert.equal(merged[2].tenRatingCount, 3);
 });
 
 test("dynamic archive entries enrich matching static albums instead of duplicating them", () => {
@@ -102,4 +104,5 @@ test("dynamic archive entries enrich matching static albums instead of duplicati
   assert.equal(merged.length, 1);
   assert.equal(merged[0].averageRating, 8.5);
   assert.equal(merged[0].pollId, "week-2");
+  assert.equal(merged[0].tenRatingCount, 0);
 });

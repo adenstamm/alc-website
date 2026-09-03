@@ -46,7 +46,7 @@ function Archive() {
 
     const { data, error } = await supabase
       .from("album_archive_entries")
-      .select("poll_id, album_title, artist_name, average_rating, rating_count, archived_at")
+      .select("poll_id, album_title, artist_name, average_rating, rating_count, ten_rating_count, archived_at")
       .order("archived_at", { ascending: true });
 
     if (error) {
@@ -181,7 +181,9 @@ function Archive() {
                     {album.ratingCount > 0 && formatAverageRating(album.averageRating) ? (
                       <span className="archive-catalog-rating">
                         <strong>{formatAverageRating(album.averageRating)}<small>/10</small></strong>
-                        <span>{album.ratingCount} {album.ratingCount === 1 ? "rating" : "ratings"}</span>
+                        <span>
+                          {album.tenRatingCount || 0} perfect {album.tenRatingCount === 1 ? "10" : "10s"}
+                        </span>
                       </span>
                     ) : null}
                   </li>
