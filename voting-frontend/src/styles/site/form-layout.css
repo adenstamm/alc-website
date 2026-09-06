@@ -1,0 +1,267 @@
+/* Request line, account desk, and control room */
+
+.surface-card,
+.vote-form-card,
+.sidebar-card,
+.account-auth-card,
+.account-pass-card,
+.account-settings-card,
+.account-message-card,
+.account-side-note {
+  border-radius: 4px;
+  border-color: rgba(242, 231, 209, 0.12);
+  background:
+    linear-gradient(145deg, rgba(199, 121, 61, 0.045), transparent 44%),
+    var(--color-surface);
+  box-shadow: var(--shadow-low);
+}
+
+.sideb-vote-page .sideb-page-hero,
+.sideb-admin-page .sideb-page-hero,
+.sideb-account-page .sideb-page-hero {
+  background:
+    linear-gradient(90deg, rgba(201, 123, 60, 0.055), transparent 34%),
+    repeating-linear-gradient(90deg, transparent 0 72px, rgba(255, 255, 255, 0.018) 72px 73px),
+    var(--color-console);
+}
+
+.sideb-vote-page .sideb-page-hero::after,
+.sideb-admin-page .sideb-page-hero::after {
+  border-radius: 0;
+  background: repeating-linear-gradient(90deg, rgba(201, 123, 60, 0.14) 0 3px, transparent 3px 10px);
+  box-shadow: none;
+  opacity: 0.22;
+  transform: rotate(-8deg);
+}
+
+.vote-layout {
+  align-items: start;
+}
+
+.vote-form-card {
+  border-top: 2px solid rgba(201, 123, 60, 0.52);
+}
+
+.form-header {
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border-console);
+}
+
+.form-header h2,
+.sidebar-title {
+  letter-spacing: -0.015em;
+}
+
+.phase-pill {
+  border-radius: 2px;
+  border: 1px solid var(--border-console);
+  background: rgba(201, 123, 60, 0.07);
+  color: var(--color-signal-soft);
+  box-shadow: 0 0 18px rgba(201, 123, 60, 0.06);
+  letter-spacing: 0.12em;
+}
+
+.field-group label,
+.meta-list dt,
+.current-record-meta dt,
+.account-details dt {
+  color: var(--color-muted-strong);
+  font-family: var(--font-mono);
+  letter-spacing: 0.1em;
+}
+
+.field-group input,
+.field-group select,
+.field-group textarea {
+  border-radius: 3px;
+  border-color: rgba(242, 231, 209, 0.16);
+  background:
+    linear-gradient(90deg, rgba(201, 123, 60, 0.025), transparent 36%),
+    rgba(7, 7, 6, 0.62);
+}
+
+.field-group input:focus,
+.field-group select:focus,
+.field-group textarea:focus {
+  border-color: var(--color-signal);
+  box-shadow: 0 0 0 3px rgba(201, 123, 60, 0.11), var(--shadow-signal);
+}
+
+.sideb-button,
+.button {
+  border-radius: var(--radius-control);
+}
+
+.sideb-button-primary,
+.button-primary {
+  border-color: var(--color-signal);
+  background: var(--color-signal);
+  color: #151006;
+  box-shadow: 0 14px 32px rgba(139, 91, 22, 0.2);
+}
+
+.sideb-button-primary:hover,
+.button-primary:hover:not(:disabled) {
+  background: var(--color-signal-soft);
+  color: #120d05;
+}
+
+.sideb-button-ghost,
+.button-secondary {
+  border-color: var(--border-console);
+  background: var(--color-console);
+}
+
+.candidate-option,
+.ranked-choice {
+  border-radius: 2px;
+  border-color: rgba(242, 231, 209, 0.14);
+  border-left: 1px solid rgba(201, 123, 60, 0.25);
+  background:
+    linear-gradient(90deg, rgba(201, 123, 60, 0.035), transparent 36%),
+    var(--color-console);
+}
+
+.candidate-option:hover,
+.ranked-choice:hover {
+  border-color: rgba(201, 123, 60, 0.4);
+  border-left-color: var(--color-signal);
+}
+
+.candidate-option.is-selected {
+  border-color: rgba(201, 123, 60, 0.58);
+  border-left-color: var(--color-signal);
+  background:
+    linear-gradient(90deg, rgba(201, 123, 60, 0.1), transparent 44%),
+    var(--color-console-raised);
+  box-shadow: var(--shadow-signal);
+}
+
+.confirmation-card {
+  border-radius: 2px;
+  border-color: rgba(201, 123, 60, 0.26);
+  background:
+    repeating-linear-gradient(0deg, rgba(44, 31, 20, 0.06) 0 1px, transparent 1px 28px),
+    #e2d3b8;
+  color: #21150e;
+}
+
+.confirmation-card .eyebrow,
+.confirmation-card h3,
+.confirmation-card p,
+.confirmation-card strong {
+  color: inherit;
+}
+
+.poll-sidebar {
+  position: sticky;
+  top: calc(var(--nav-height) + 20px);
+}
+
+.sidebar-card {
+  border-left: 1px solid rgba(201, 123, 60, 0.42);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 52px, rgba(255, 255, 255, 0.014) 52px 53px),
+    var(--color-console);
+}
+
+.account-hero-pass,
+.account-pass-card {
+  border-radius: 3px;
+  border-color: rgba(201, 123, 60, 0.32);
+  background:
+    linear-gradient(115deg, rgba(201, 123, 60, 0.075), transparent 46%),
+    repeating-linear-gradient(90deg, transparent 0 58px, rgba(255, 255, 255, 0.015) 58px 59px),
+    var(--color-console);
+}
+
+.account-hero-pass {
+  transform: rotate(1.2deg);
+  box-shadow: 18px 22px 0 rgba(0, 0, 0, 0.16), var(--shadow-high);
+}
+
+.account-pass-card::after {
+  border-color: rgba(201, 123, 60, 0.11);
+}
+
+.account-monogram {
+  border-color: rgba(201, 123, 60, 0.4);
+  background: var(--color-surface-warm);
+  color: var(--color-signal-soft);
+}
+
+.account-status-pill,
+.member-badges span {
+  border-radius: 2px;
+}
+
+.sideb-admin-page .sideb-subpage-main {
+  width: min(100%, calc(var(--content-width) + 128px));
+}
+
+.sideb-admin-page .surface-card {
+  border-top: 2px solid rgba(201, 123, 60, 0.34);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 68px, rgba(255, 255, 255, 0.014) 68px 69px),
+    linear-gradient(145deg, rgba(201, 123, 60, 0.035), transparent 42%),
+    var(--color-console);
+}
+
+.admin-snapshot-grid {
+  gap: 8px;
+}
+
+.admin-snapshot-card,
+.admin-next-event,
+.admin-result-row,
+.admin-irv-round,
+.admin-event-row,
+.admin-shelf-card,
+.member-row {
+  border-radius: 2px;
+  border-color: rgba(242, 231, 209, 0.12);
+  background:
+    linear-gradient(90deg, rgba(201, 123, 60, 0.035), transparent 36%),
+    #1b130f;
+}
+
+.admin-snapshot-card {
+  border-top: 2px solid rgba(201, 123, 60, 0.34);
+}
+
+.admin-snapshot-card > span,
+.admin-next-event > span,
+.admin-result-row > span,
+.admin-event-row span {
+  color: var(--color-signal);
+}
+
+.admin-result-row.candidate-option.is-selected {
+  border-left-color: var(--color-signal);
+  box-shadow: var(--shadow-signal);
+}
+
+.admin-shelf-card > img,
+.admin-shelf-card > .cozy-album-cover {
+  border-radius: 1px;
+}
+
+.member-tabs,
+.member-filter-group,
+.auth-mode-switch {
+  border-radius: 3px;
+  background: rgba(12, 9, 7, 0.32);
+}
+
+.member-tabs button,
+.member-filter-group button,
+.auth-mode-switch button {
+  border-radius: 2px;
+}
+
+.member-tabs button.is-active,
+.member-filter-group button.is-active,
+.auth-mode-switch button.is-active {
+  background: var(--color-signal);
+  color: #151006;
+}

@@ -2,7 +2,6 @@
 -- ordering. Run after security-hardening.sql and before
 -- event-voting-hardening.sql.
 
-begin;
 
 create table if not exists public.record_shelf_items (
   position smallint primary key check (position between 1 and 5),
@@ -211,5 +210,3 @@ from public, anon, authenticated;
 revoke execute on function public.enqueue_archived_album_on_shelf()
 from public, anon, authenticated;
 grant execute on function public.save_record_shelf_order(jsonb) to authenticated;
-
-commit;

@@ -84,50 +84,35 @@ in a `VITE_` variable or shipped to the browser.
 
 ## Database setup
 
-Apply the SQL files in this order:
+Database changes live in numbered, immutable `supabase/migrations/*.sql` files.
+The runner applies pending migrations in order, in one transaction, and records
+their SHA-256 checksums in `app_migrations.history`. Re-running it is a no-op;
+changed or missing historical files are rejected.
 
-1. `supabase/schema.sql`
-2. `supabase/nomination-validation.sql`
-3. `supabase/three-phase-voting.sql`
-4. `supabase/site-content.sql`
-5. `supabase/current-album-ratings.sql`
-6. `supabase/security-hardening.sql`
-7. `supabase/record-shelf-queue.sql`
-8. `supabase/event-voting-hardening.sql`
-9. `supabase/automatic-winner-publishing.sql`
-10. `supabase/provisional-tie-breaks.sql`
-11. `supabase/archive-perfect-scores-and-primary-removal.sql`
-12. `supabase/immediate-manual-finalization.sql` **last**
+```sh
+# Supply DATABASE_URL securely in your shell; use a direct/session connection.
+npm run db:status
+npm run db:migrate
+```
 
-Create the first account through `/account`, then promote its `memberships` row
-to `status = 'approved'` and `role = 'admin'`. Future accounts can be reviewed
-from the application admin page.
+For an existing database created with the old SQL Editor workflow, first follow
+[the verified legacy-adoption procedure](docs/database-migrations.md). The runner
+refuses to replay the initial schema over an untracked existing database.
 
-For an existing project that already ran `security-hardening.sql`, run
-`record-shelf-queue.sql`, `event-voting-hardening.sql`,
-`automatic-winner-publishing.sql`, `provisional-tie-breaks.sql`, and
-`archive-perfect-scores-and-primary-removal.sql`, followed by
-`immediate-manual-finalization.sql`. All six are
-idempotent and carry their own restricted grants. Do not run an older setup
-file afterward: older files recreate pre-hardening function bodies. If that
-happens, repeat steps 6 through 12 in order.
+Run `npm run test:db` to install from an empty embedded PostgreSQL database and
+exercise voting, roles, migration replay, rollback, and legacy adoption. CI also
+runs the same suite against PostgreSQL 17. Production Supabase platform objects
+are represented by a test-only auth/storage contract; email delivery and the
+Storage HTTP API are separate integration concerns.
 
-Then enable **Cron** under Supabase Dashboard → Integrations → Cron and run
-`supabase/automatic-winner-cron.sql` once. It registers one idempotent fallback
-job that checks for due finals every minute. Pressing **Close final voting**
-publishes immediately; the cron handles finals that expire without a manual
-close. A winner becomes the published current album without opening the next
-nomination phase, and the admin form prefills that winner when the next
-genre/cycle is ready. Unresolved IRV ties remain pending for the existing
-manual administrator tie-break and publish immediately after the last tie is
-resolved.
+Create the first account through `/account`, then promote its membership to
+`status = 'approved'` and `role = 'admin'` using the Supabase administrator.
+Enable Supabase Cron and run `supabase/automatic-winner-cron.sql` to configure
+the optional deadline scheduler. Manual closing publishes immediately. A closed
+final with no ballots can be reopened by an admin for another 18 hours.
 
-SQL Editor history can help identify what was submitted manually, but it is not
-a reliable migration ledger: a query can be edited, partially selected, or fail
-inside a transaction. Run `supabase/event-readiness-verification.sql` after the
-last migration instead. It performs read-only live-catalog checks for the
-required columns, constraints, function bodies, RLS policies, and grants; its
-summary must contain only `PASS` rows before an event.
+See [database deployment and recovery](docs/database-migrations.md) for backups,
+legacy adoption, schema drift, scheduler setup, and catalog verification.
 
 ## Quality and delivery
 - Set the Supabase production Site URL to `https://albumasu.com`.
@@ -147,7 +132,7 @@ npm run check
 ```
 
 This runs linting, voting/content unit tests, a production build, and Playwright
-smoke tests across desktop Chromium and a mobile viewport. GitHub Actions runs
+tests against a production fixture build across desktop Chromium and a mobile viewport. GitHub Actions runs
 the same gate for every pull request and push to `main`.
 
 The production build also prerenders every known route into its own HTML file.
@@ -160,7 +145,8 @@ The quality gate runs:
 1. ESLint
 2. Voting and content unit tests
 3. A production Vite build
-4. 26 Playwright tests across desktop Chromium and a mobile viewport
+4. Clean-database migration and voting tests
+5. Playwright tests against the production build across desktop Chromium and mobile
 
 GitHub Actions executes the same gate for pull requests. Merges to `main`
 deploy the verified production build to Azure Static Web Apps.

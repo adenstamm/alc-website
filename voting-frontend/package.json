@@ -8,10 +8,14 @@
     "build": "vite build && node scripts/prerender.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "node src/lib/votingLogic.test.js && node src/lib/adminActions.test.js && node src/lib/albumCoverUpload.test.js && node src/lib/siteContent.test.js && node src/lib/albumArchive.test.js && node src/lib/archiveCatalog.test.js && node src/lib/accountStatus.test.js && node src/lib/currentAlbumRating.test.js && node src/lib/latestRequestCoordinator.test.js && node src/lib/pollApi.test.js && node src/lib/requestReliability.test.js && npm --prefix api test",
+    "test": "node src/lib/votingLogic.test.js && node src/lib/adminActions.test.js && node src/lib/albumCoverUpload.test.js && node src/lib/siteContent.test.js && node src/lib/albumArchive.test.js && node src/lib/archiveCatalog.test.js && node src/lib/accountStatus.test.js && node src/lib/currentAlbumRating.test.js && node src/lib/latestRequestCoordinator.test.js && node src/lib/pollApi.test.js && node src/lib/requestReliability.test.js && npm --prefix api test && node src/lib/recoverySession.test.js && node performance/report.test.js",
     "test:e2e": "playwright test",
     "test:staging-load": "node --env-file-if-exists=.env.staging-load.local performance/staging-vote-load.mjs",
-    "check": "npm run lint && npm run test && npm run build && npm run test:e2e"
+    "check": "npm run lint && npm run test && npm run test:db && npm run build && npm run test:e2e",
+    "test:db": "node tests/database/migrations.test.mjs",
+    "db:status": "node scripts/database/cli.mjs status",
+    "db:migrate": "node scripts/database/cli.mjs up",
+    "db:adopt-legacy": "node scripts/database/cli.mjs adopt-legacy"
   },
   "dependencies": {
     "@fontsource-variable/newsreader": "^5.3.0",
@@ -23,6 +27,7 @@
     "react-router": "^7.18.2"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@eslint/js": "^10.0.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -31,6 +36,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
+    "pg": "^8.23.0",
     "playwright": "^1.61.0",
     "vite": "^8.0.4"
   }

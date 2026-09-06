@@ -1,0 +1,10 @@
+.genres-schedule {
+  margin-top: clamp(2rem, 5vw, 4rem);
+  max-width: 46rem;
+}
+.genres-schedule h2 { font: 400 2rem var(--font-display); color: var(--color-cream-strong); }
+.genres-schedule > p { color: var(--color-muted-strong); }
+.genres-schedule dl { margin-top: 1.5rem; }
+.genres-schedule dl > div { display: grid; grid-template-columns: 5rem 1fr; padding: 0.75rem 0; border-bottom: 1px solid var(--border-strong); }
+.genres-schedule dt { color: var(--color-muted-strong); }
+.genres-schedule dd { margin: 0; color: var(--color-cream); }

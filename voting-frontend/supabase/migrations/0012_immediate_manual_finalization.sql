@@ -8,7 +8,6 @@
 -- now finalizes in the same transaction. If IRV still needs an administrator
 -- tie-break, resolving the last closed-final tie also finalizes immediately.
 
-begin;
 
 create or replace function public.close_final_voting(target_poll_id text)
 returns jsonb
@@ -131,5 +130,3 @@ grant execute on function public.close_final_voting(text)
 to authenticated;
 grant execute on function public.resolve_irv_tie(text, integer, text)
 to authenticated;
-
-commit;

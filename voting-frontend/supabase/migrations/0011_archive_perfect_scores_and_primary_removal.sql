@@ -9,7 +9,6 @@
 -- that album are removed atomically; a member whose ballot becomes empty may
 -- submit primary choices again.
 
-begin;
 
 alter table public.album_archive_entries
   add column if not exists ten_rating_count integer not null default 0;
@@ -257,5 +256,3 @@ from public, anon, authenticated;
 
 grant execute on function public.remove_primary_candidate(text, text)
 to authenticated;
-
-commit;

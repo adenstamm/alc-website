@@ -1,13 +1,10 @@
 # Supabase Security Checklist
 
-Apply `supabase/security-hardening.sql`, `supabase/record-shelf-queue.sql`,
-`supabase/event-voting-hardening.sql`, `supabase/automatic-winner-publishing.sql`,
-`supabase/provisional-tie-breaks.sql`, then
-`supabase/archive-perfect-scores-and-primary-removal.sql`, followed by
-`supabase/immediate-manual-finalization.sql` **last**. For an
-existing project, these files are safe to rerun in that order. If any older
-setup SQL is rerun, repeat the sequence because older files recreate earlier
-functions, policies, and grants. Finish with the read-only
+Use `npm run db:status` and `npm run db:migrate` with a server-side
+`DATABASE_URL`. The migration runner checks the ledger and checksums, then
+applies pending migrations atomically. Do not rerun individual historical files.
+For an existing untracked installation, follow the schema-checked adoption
+procedure in [Database migrations](database-migrations.md) first. Finish with
 `supabase/event-readiness-verification.sql` and require every row to say `PASS`.
 
 ## Expected public surface

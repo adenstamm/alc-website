@@ -9,7 +9,6 @@
 -- resolution for that poll before the count is recalculated. Rejected and
 -- duplicate submissions do not clear a decision.
 
-begin;
 
 comment on table public.poll_irv_tie_resolutions is
   'Administrator IRV decisions. Decisions made during open final voting are provisional and cleared by the next accepted final ballot.';
@@ -188,5 +187,3 @@ grant execute on function public.submit_final_ballot(text, text[])
 to authenticated;
 grant execute on function public.resolve_irv_tie(text, integer, text)
 to authenticated;
-
-commit;

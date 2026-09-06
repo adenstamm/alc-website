@@ -1,133 +1,109 @@
-/* global __ENV, __ITER, __VU */
-
+/* global __ENV, __ITER */
 import http from "k6/http";
 import { check, sleep } from "k6";
+import { Counter, Rate, Trend } from "k6/metrics";
+import { createReport, latencyTargets } from "./report.js";
 
 const baseUrl = (__ENV.BASE_URL || "").replace(/\/+$/, "");
 const profile = __ENV.TEST_PROFILE || "smoke";
-
-if (!baseUrl) {
-  throw new Error("BASE_URL is required.");
-}
-
-const profiles = {
-  smoke: {
-    executor: "constant-vus",
-    vus: 1,
-    duration: "1m",
-    gracefulStop: "10s",
-  },
-};
-
-if (!profiles[profile]) {
-  throw new Error(
-    `Unknown TEST_PROFILE "${profile}". Production monitoring only supports "smoke".`,
-  );
-}
-
-const publicRoutes = [
-  "/",
-  "/about",
-  "/archive",
-  "/current",
-  "/events",
-  "/vote",
-];
+if (!baseUrl) throw new Error("BASE_URL is required.");
+if (profile !== "smoke")
+  throw new Error("Production monitoring only supports smoke.");
+const routes = ["/", "/about", "/archive", "/current", "/events", "/vote"];
+const pageDuration = new Trend("static_page_duration", true);
+const pollDuration = new Trend("poll_api_duration", true);
+const pageRequests = new Counter("static_page_requests");
+const pollRequests = new Counter("poll_api_requests");
+const pageOk = new Rate("static_page_ok");
+const pollOk = new Rate("poll_api_ok");
+const firstPoll = new Trend("poll_first_duration", true);
+const repeatPoll = new Trend("poll_repeat_duration", true);
+const handlerDuration = new Trend("poll_handler_duration", true);
+const firstWorkerRequests = new Counter("worker_first_requests");
 
 export const options = {
   scenarios: {
-    member_read_path: profiles[profile],
+    read_path: {
+      executor: "constant-vus",
+      vus: 1,
+      duration: "1m",
+      gracefulStop: "15s",
+    },
   },
   thresholds: {
     checks: ["rate>0.99"],
     http_req_failed: ["rate<0.01"],
-    http_req_duration: ["p(95)<1000", "p(99)<2000"],
+    static_page_ok: ["rate>0.99"],
+    poll_api_ok: ["rate>0.99"],
+    static_page_duration: latencyTargets,
+    poll_api_duration: latencyTargets,
+    static_page_requests: ["count>=5"],
+    poll_api_requests: ["count>=5"],
   },
   summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)"],
-  userAgent: "albumasu-k6-capacity-test/1.0",
+  userAgent: "albumasu-availability-monitor/2.0",
 };
 
 export default function () {
-  const route = publicRoutes[(__VU + __ITER) % publicRoutes.length];
-  const pageResponse = http.get(`${baseUrl}${route}`, {
-    tags: { component: "azure-static-web-app", route },
-    headers: { "X-Load-Test": "albumasu-capacity-test" },
+  const route = routes[__ITER % routes.length];
+  const page = http.get(`${baseUrl}${route}`, {
+    timeout: "10s",
+    tags: { component: "static-page", route },
   });
+  pageDuration.add(page.timings.duration);
+  pageRequests.add(1);
+  pageOk.add(
+    check(
+      page,
+      {
+        "page returns HTTP 200": (r) => r.status === 200,
+        "page returns HTML": (r) =>
+          r.headers["Content-Type"]?.includes("text/html"),
+        "page contains app root": (r) => r.body?.includes('id="root"'),
+      },
+      { component: "static-page" },
+    ),
+  );
 
-  check(pageResponse, {
-    "page returns HTTP 200": (response) => response.status === 200,
-    "page returns HTML": (response) =>
-      response.headers["Content-Type"]?.includes("text/html"),
-    "page contains the React root": (response) =>
-      response.body?.includes('id="root"'),
+  const poll = http.get(`${baseUrl}/api/current-poll`, {
+    timeout: "10s",
+    tags: { component: "poll-api" },
   });
+  pollDuration.add(poll.timings.duration);
+  pollRequests.add(1);
+  (__ITER === 0 ? firstPoll : repeatPoll).add(poll.timings.duration);
+  firstWorkerRequests.add(
+    poll.headers["X-Albumasu-Worker-State"] === "first-request" ? 1 : 0,
+  );
+  const handler = poll.headers["Server-Timing"]?.match(/handler;dur=([\d.]+)/);
+  if (handler) handlerDuration.add(Number(handler[1]));
+  pollOk.add(
+    check(
+      poll,
+      {
+        "poll returns HTTP 200": (r) => r.status === 200,
+        "poll returns JSON": (r) =>
+          r.headers["Content-Type"]?.includes("application/json"),
+        "anonymous poll hides choices": (r) => {
+          try {
+            const data = r.json();
+            return (
+              data.candidates?.length === 0 && data.finalists?.length === 0
+            );
+          } catch {
+            return false;
+          }
+        },
+      },
+      { component: "poll-api" },
+    ),
+  );
 
-  const pollResponse = http.get(`${baseUrl}/api/current-poll`, {
-    tags: { component: "poll-proxy", operation: "get_current_poll" },
-  });
-
-  check(pollResponse, {
-    "poll proxy returns HTTP 200": (response) => response.status === 200,
-    "poll proxy returns JSON": (response) =>
-      response.headers["Content-Type"]?.includes("application/json"),
-    "anonymous poll hides ballot choices": (response) => {
-      try {
-        const poll = response.json();
-        return poll.candidates?.length === 0 && poll.finalists?.length === 0;
-      } catch {
-        return false;
-      }
-    },
-  });
-
-  // Active users read or navigate periodically; they do not continuously
-  // refresh. This think time models 100 simultaneous sessions without turning
-  // the capacity test into an unrealistic denial-of-service pattern.
-  sleep(8 + Math.random() * 7);
+  // Retain a low traffic rate; raw output preserves component + connection timings.
+  sleep(8 + Math.random() * 4);
 }
-
-function formatNumber(value, digits = 2) {
-  return Number.isFinite(value) ? value.toFixed(digits) : "n/a";
-}
-
-function metricValue(data, metricName, valueName) {
-  return data.metrics?.[metricName]?.values?.[valueName];
-}
-
 export function handleSummary(data) {
-  const requestCount = metricValue(data, "http_reqs", "count");
-  const requestsPerSecond = metricValue(data, "http_reqs", "rate");
-  const p95 = metricValue(data, "http_req_duration", "p(95)");
-  const p99 = metricValue(data, "http_req_duration", "p(99)");
-  const failureRate = metricValue(data, "http_req_failed", "rate");
-  const checkRate = metricValue(data, "checks", "rate");
-  const maxVirtualUsers = metricValue(data, "vus_max", "max");
-  const passed =
-    failureRate < 0.01 &&
-    checkRate > 0.99 &&
-    p95 < 1000 &&
-    p99 < 2000;
-
-  const report = [
-    "# AlbumASU performance test",
-    "",
-    `- Result: **${passed ? "PASS" : "FAIL"}**`,
-    `- Profile: \`${profile}\``,
-    `- Web target: \`${baseUrl}\``,
-    `- Maximum virtual users: ${formatNumber(maxVirtualUsers, 0)}`,
-    `- HTTP requests: ${formatNumber(requestCount, 0)}`,
-    `- Throughput: ${formatNumber(requestsPerSecond)} requests/second`,
-    `- p95 response time: ${formatNumber(p95)} ms`,
-    `- p99 response time: ${formatNumber(p99)} ms`,
-    `- HTTP failure rate: ${formatNumber(failureRate * 100)}%`,
-    `- Successful checks: ${formatNumber(checkRate * 100)}%`,
-    "",
-    "The test exercises read-only Cloudflare/Azure routes and the rate-limited",
-    "same-origin poll proxy. It never submits ballots or modifies production",
-    "election data.",
-    "",
-  ].join("\n");
-
+  const report = createReport(data, { profile, baseUrl });
   return {
     stdout: report,
     "performance-results/report.md": report,

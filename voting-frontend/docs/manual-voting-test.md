@@ -11,19 +11,8 @@ You need:
 - One approved admin account.
 - Five approved member test accounts.
 - A fresh poll created from `/admin`.
-- The latest Supabase SQL applied in this order:
-  1. `supabase/schema.sql`
-  2. `supabase/nomination-validation.sql`
-  3. `supabase/three-phase-voting.sql`
-  4. `supabase/site-content.sql`, required for current album editing and optional for event editing
-  5. `supabase/current-album-ratings.sql`, required for phase-one album ratings and rated archive entries
-  6. `supabase/security-hardening.sql`
-  7. `supabase/record-shelf-queue.sql`, required for the automatic five-album FIFO shelf
-  8. `supabase/event-voting-hardening.sql`
-  9. `supabase/automatic-winner-publishing.sql`
-  10. `supabase/provisional-tie-breaks.sql`
-  11. `supabase/archive-perfect-scores-and-primary-removal.sql`
-  12. `supabase/immediate-manual-finalization.sql` **last**
+- All tracked migrations applied with `npm run db:migrate`. For an existing
+  database, follow [verified legacy adoption](database-migrations.md) first.
 - Run the read-only `supabase/event-readiness-verification.sql` and require every check to return `PASS`.
 
 The five member accounts are useful because the app intentionally allows one nomination per approved account per poll. Five nominations gives you enough candidates to test the final phase properly.

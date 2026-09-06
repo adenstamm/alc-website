@@ -33,3 +33,5 @@ performance-results/*
 *.sw?
 
 secrets.txt
+
+dist-e2e/

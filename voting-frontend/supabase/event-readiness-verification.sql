@@ -35,6 +35,7 @@ required_functions(function_name, signature) as (
     ('advance_to_final', 'public.advance_to_final(text,text[])'),
     ('submit_final_ballot', 'public.submit_final_ballot(text,text[])'),
     ('close_final_voting', 'public.close_final_voting(text)'),
+    ('reopen_empty_final', 'public.reopen_empty_final(text)'),
     ('calculate_irv_result', 'public.calculate_irv_result(text)'),
     ('resolve_irv_tie', 'public.resolve_irv_tie(text,integer,text)'),
     ('get_admin_poll_results', 'public.get_admin_poll_results(text)'),

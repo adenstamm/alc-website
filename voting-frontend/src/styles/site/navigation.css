@@ -1,0 +1,303 @@
+/* Shared navigation */
+
+.sideb-nav {
+  z-index: 40;
+  min-height: var(--nav-height);
+}
+
+.sideb-nav-floating {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  left: 18px;
+  width: auto;
+  min-height: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: rgba(13, 9, 6, 0.88);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(18px) saturate(112%);
+  -webkit-backdrop-filter: blur(18px) saturate(112%);
+}
+
+.sideb-nav-floating .sideb-nav-inner {
+  min-height: 74px;
+}
+
+.sideb-nav-inner {
+  display: flex;
+  width: min(100%, calc(var(--content-width) + 96px));
+  min-height: var(--nav-height);
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(24px, 4vw, 64px);
+  margin: 0 auto;
+  padding: 0 clamp(22px, 4vw, 48px);
+}
+
+.sideb-brand {
+  display: inline-flex;
+  min-height: 52px;
+  align-items: center;
+  gap: 13px;
+  border-radius: 8px;
+  text-decoration: none;
+}
+
+.sideb-brand-image-link {
+  flex: 0 0 auto;
+  margin-left: clamp(8px, 1vw, 16px);
+}
+
+@media (min-width: 1200px) {
+  .sideb-brand-image-link {
+    margin-left: calc(clamp(8px, 1vw, 16px) + 50px);
+  }
+}
+
+.sideb-brand-image-frame {
+  display: block;
+  width: 62px;
+  flex: 0 0 62px;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid rgba(255, 244, 220, 0.12);
+  border-radius: 7px;
+  background: #951b43;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.24);
+}
+
+.sideb-brand-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.3);
+}
+
+.sideb-brand-wordmark {
+  display: grid;
+  min-width: max-content;
+  gap: 3px;
+  padding-left: 15px;
+  border-left: 1px solid rgba(231, 161, 94, 0.25);
+}
+
+.sideb-brand-wordmark strong {
+  color: var(--color-cream-strong);
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 400;
+  letter-spacing: 0.025em;
+  line-height: 1;
+}
+
+.sideb-brand-wordmark small {
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.sideb-logo {
+  position: relative;
+  display: grid;
+  width: 38px;
+  flex: 0 0 38px;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 2px solid var(--color-copper);
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 0 5px rgba(201, 123, 60, 0.08),
+    0 0 22px rgba(201, 123, 60, 0.08);
+}
+
+.sideb-logo::before {
+  width: 18px;
+  aspect-ratio: 1;
+  border: 1px solid rgba(201, 123, 60, 0.55);
+  border-radius: 50%;
+  content: "";
+}
+
+.sideb-logo span {
+  position: absolute;
+  width: 7px;
+  aspect-ratio: 1;
+  border: 2px solid var(--color-copper-bright);
+  border-radius: 50%;
+  background: var(--color-ink);
+}
+
+.sideb-brand-copy {
+  display: grid;
+  gap: 1px;
+}
+
+.sideb-brand-copy strong {
+  font-family: var(--font-display);
+  font-size: 1.65rem;
+  font-weight: 400;
+  letter-spacing: 0.035em;
+  line-height: 1;
+}
+
+.sideb-brand-copy small {
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.sideb-links {
+  display: flex;
+  min-width: 0;
+  order: 1;
+  align-items: center;
+  justify-content: flex-end;
+  gap: clamp(12px, 2.2vw, 32px);
+  margin-left: auto;
+}
+
+.sideb-links a {
+  position: relative;
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  border-radius: 6px;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: clamp(0.76rem, 0.9vw, 0.88rem);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: color 180ms var(--ease-out);
+}
+
+.sideb-links a::after {
+  position: absolute;
+  right: 50%;
+  bottom: 6px;
+  left: 50%;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--color-copper);
+  content: "";
+  transition:
+    right 180ms var(--ease-out),
+    left 180ms var(--ease-out);
+}
+
+.sideb-links a:hover,
+.sideb-links a.is-active {
+  color: var(--color-copper-bright);
+}
+
+.sideb-links a.is-active::after,
+.sideb-links a:hover::after {
+  right: 0;
+  left: 0;
+}
+
+.sideb-menu-toggle {
+  display: none;
+  order: 3;
+}
+
+.sideb-account-link {
+  position: relative;
+  display: inline-flex;
+  min-width: max-content;
+  min-height: 50px;
+  order: 2;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 13px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: rgba(201, 123, 60, 0.055);
+  color: var(--color-cream-strong);
+  text-decoration: none;
+  transition:
+    background-color 180ms var(--ease-out),
+    border-color 180ms var(--ease-out),
+    transform 180ms var(--ease-out);
+}
+
+.sideb-account-link:hover,
+.sideb-account-link.is-active {
+  border-color: rgba(231, 161, 94, 0.42);
+  background: rgba(201, 123, 60, 0.12);
+  transform: translateY(-1px);
+}
+
+.sideb-account-dot {
+  position: relative;
+  width: 12px;
+  flex: 0 0 12px;
+  aspect-ratio: 1;
+  border: 2px solid rgba(242, 231, 209, 0.18);
+  border-radius: 50%;
+  background: var(--color-muted);
+  box-shadow: 0 0 0 4px rgba(242, 231, 209, 0.035);
+}
+
+.sideb-account-dot.status-approved,
+.account-status-pill.status-approved {
+  --status-color: #a7c795;
+}
+
+.sideb-account-dot.status-pending,
+.account-status-pill.status-pending,
+.sideb-account-dot.status-unverified,
+.account-status-pill.status-unverified {
+  --status-color: var(--color-copper-bright);
+}
+
+.sideb-account-dot.status-blocked,
+.account-status-pill.status-blocked {
+  --status-color: #e0968b;
+}
+
+.sideb-account-dot.status-approved,
+.sideb-account-dot.status-pending,
+.sideb-account-dot.status-unverified,
+.sideb-account-dot.status-blocked {
+  border-color: color-mix(in srgb, var(--status-color), transparent 45%);
+  background: var(--status-color);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--status-color), transparent 88%);
+}
+
+.sideb-account-meta {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.sideb-account-meta strong,
+.sideb-account-meta small {
+  max-width: 116px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sideb-account-meta strong {
+  font-size: 0.78rem;
+  line-height: 1.1;
+}
+
+.sideb-account-meta small {
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}

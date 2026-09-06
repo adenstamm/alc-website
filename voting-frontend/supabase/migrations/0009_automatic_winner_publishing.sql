@@ -9,7 +9,6 @@
 -- published as the current album. An administrator still creates the next
 -- nomination poll after choosing its genre/cycle label.
 
-begin;
 
 alter table public.polls
   add column if not exists winner_candidate_id text,
@@ -525,5 +524,3 @@ grant execute on function public.finalize_poll_winner(text)
 to service_role;
 grant execute on function public.finalize_due_polls()
 to service_role;
-
-commit;

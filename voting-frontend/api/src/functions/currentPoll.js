@@ -12,11 +12,21 @@ const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
 };
 
+let requestsHandled = 0;
+const workerStartedAt = performance.now();
+
 app.http("current-poll", {
   methods: ["GET"],
   authLevel: "anonymous",
   route: "current-poll",
   handler: async (request, context) => {
+    const startedAt = performance.now();
+    const workerState = requestsHandled++ === 0 ? "first-request" : "reused";
+    const diagnostics = () => ({
+      "Server-Timing": `handler;dur=${(performance.now() - startedAt).toFixed(2)}`,
+      "X-AlbumASU-Worker-State": workerState,
+      "X-AlbumASU-Worker-Age-Ms": String(Math.round(performance.now() - workerStartedAt)),
+    });
     // Azure Static Web Apps may populate Authorization with its own platform
     // token. Only trust the application-specific session value set by our
     // same-origin client and rebuild the Supabase bearer header server-side.
@@ -33,6 +43,7 @@ app.http("current-poll", {
         jsonBody: { error: "Too many requests. Please wait before refreshing again." },
         headers: {
           ...SECURITY_HEADERS,
+          ...diagnostics(),
           "Cache-Control": "no-store",
           "Retry-After": String(rateLimit.retryAfter),
           "Vary": "X-AlbumASU-Session",
@@ -52,6 +63,7 @@ app.http("current-poll", {
         jsonBody: poll,
         headers: {
           ...SECURITY_HEADERS,
+          ...diagnostics(),
           "Cache-Control": "no-store",
           "Vary": "X-AlbumASU-Session",
           "X-AlbumASU-Poll-Scope": isAuthenticated ? "member" : "public",
@@ -75,6 +87,7 @@ app.http("current-poll", {
         },
         headers: {
           ...SECURITY_HEADERS,
+          ...diagnostics(),
           "Cache-Control": "no-store",
           "Vary": "X-AlbumASU-Session",
         },

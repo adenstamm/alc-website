@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
-  fetchAlbumMetadata,
   getRecentShelfAlbums,
   loadRecordShelfAlbums,
   loadRecordShelfCoverOverrides,
 } from "../lib/recordShelf";
+
+import useShelfMetadata from "../hooks/useShelfMetadata";
+import ShelfArtwork from "../components/ShelfArtwork";
 
 function Home({
   clubLinks,
@@ -15,7 +17,7 @@ function Home({
   navigate,
   supabase,
 }) {
-  const [albumMetadata, setAlbumMetadata] = useState({});
+  const [coverOverrides, setCoverOverrides] = useState({});
   const [failedAlbumCover, setFailedAlbumCover] = useState(null);
   const [crateWheelState, setCrateWheelState] = useState({
     hasOverflow: true,
@@ -25,6 +27,7 @@ function Home({
   const crateWheelRef = useRef(null);
   const fallbackShelfAlbums = useMemo(() => getRecentShelfAlbums(), []);
   const [shelfAlbums, setShelfAlbums] = useState(fallbackShelfAlbums);
+  const albumMetadata = useShelfMetadata(shelfAlbums, coverOverrides);
   const quickLinks = useMemo(
     () => [
       ...homeActions,
@@ -95,51 +98,10 @@ function Home({
   }, [fallbackShelfAlbums, hasSupabaseConfig, supabase]);
 
   useEffect(() => {
-    const controller = new AbortController();
-
-    async function loadAlbumMetadata() {
-      const albumIds = shelfAlbums.map((album) => album.id);
-      const [metadataEntries, coverOverrides] = await Promise.all([
-        Promise.all(
-          shelfAlbums.map(async (album) => {
-            try {
-              const metadata = await fetchAlbumMetadata(album.title, controller.signal, album.artist);
-              return [album.id, metadata];
-            } catch (error) {
-              if (error.name !== "AbortError") {
-                return [album.id, null];
-              }
-
-              return null;
-            }
-          }),
-        ),
-        loadRecordShelfCoverOverrides(supabase, hasSupabaseConfig, albumIds),
-      ]);
-
-      if (controller.signal.aborted) {
-        return;
-      }
-
-      const fetchedMetadata = Object.fromEntries(metadataEntries.filter(Boolean));
-      const manualMetadata = Object.fromEntries(
-        Object.entries(coverOverrides)
-          .filter(([, row]) => row.artist_override)
-          .map(([albumId, row]) => [
-            albumId,
-            {
-              ...fetchedMetadata[albumId],
-              artist: row.artist_override,
-            },
-          ]),
-      );
-
-      setAlbumMetadata({ ...fetchedMetadata, ...manualMetadata });
-    }
-
-    loadAlbumMetadata();
-
-    return () => controller.abort();
+    let active = true;
+    loadRecordShelfCoverOverrides(supabase, hasSupabaseConfig, shelfAlbums.map((album) => album.id))
+      .then((overrides) => { if (active) setCoverOverrides(overrides); });
+    return () => { active = false; };
   }, [hasSupabaseConfig, shelfAlbums, supabase]);
 
   useEffect(() => {
@@ -455,20 +417,16 @@ function Home({
                         <div className={`sideb-record sideb-record-${(index % 3) + 1}`} aria-hidden="true">
                           <span />
                         </div>
-                        {metadata?.coverUrl ? (
-                          <img
-                            alt=""
-                            decoding="async"
-                            height="600"
-                            loading="lazy"
-                            onError={(event) => {
-                              event.currentTarget.hidden = true;
-                            }}
-                            referrerPolicy="no-referrer"
-                            src={metadata.coverUrl}
-                            width="600"
-                          />
-                        ) : null}
+                        <ShelfArtwork
+                          alt=""
+                          decoding="async"
+                          height="600"
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          coverUrl={metadata?.coverUrl}
+                          fallbackCoverUrl={metadata?.fallbackCoverUrl}
+                          width="600"
+                        />
                       </div>
                       <p>Session {String(index + 1).padStart(2, "0")}</p>
                       <h3>{album.title}</h3>

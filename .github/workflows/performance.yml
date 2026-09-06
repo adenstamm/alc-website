@@ -34,7 +34,7 @@ jobs:
       - name: Run read-path performance test
         run: |
           mkdir -p performance-results
-          k6 run performance/site-read-path.js
+          k6 run --out json=performance-results/samples.json.gz performance/site-read-path.js
 
       - name: Add result to workflow summary
         if: always()

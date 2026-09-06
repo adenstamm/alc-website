@@ -1,0 +1,399 @@
+/* Listening Room / Broadcast hybrid
+   Public pages carry the warmth of a shared listening space while controls,
+   schedules, and stateful workflows borrow the precision of studio hardware. */
+
+.sideb-page {
+  background:
+    radial-gradient(circle at 82% 7%, rgba(199, 121, 61, 0.105), transparent 30rem),
+    radial-gradient(circle at 12% 68%, rgba(117, 73, 42, 0.11), transparent 36rem),
+    linear-gradient(180deg, #100c09, var(--color-ink) 76%);
+}
+
+.sideb-page::before {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 88px, rgba(255, 243, 220, 0.018) 88px 89px),
+    repeating-linear-gradient(0deg, rgba(255, 243, 220, 0.012) 0 1px, transparent 1px 5px),
+    linear-gradient(115deg, rgba(199, 121, 61, 0.025), transparent 42%);
+  background-size: auto, auto, 100% 100%;
+  mask-image: linear-gradient(to bottom, black, transparent 94%);
+}
+
+.sideb-kicker,
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--color-signal-soft);
+  letter-spacing: 0.17em;
+}
+
+.sideb-kicker::before,
+.eyebrow::before {
+  width: 6px;
+  flex: 0 0 6px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--color-signal);
+  box-shadow: 0 0 0 4px rgba(201, 123, 60, 0.08), 0 0 16px rgba(201, 123, 60, 0.42);
+  content: "";
+}
+
+/* Studio shelf navigation */
+
+.sideb-nav {
+  border-top: 2px solid rgba(201, 123, 60, 0.5);
+  border-bottom-color: rgba(242, 231, 209, 0.12);
+  background:
+    linear-gradient(90deg, rgba(199, 121, 61, 0.055), transparent 34%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.012) 0 1px, transparent 1px 92px),
+    rgba(11, 9, 7, 0.94);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(20px) saturate(115%);
+}
+
+.sideb-nav-floating {
+  top: 18px;
+  border: 1px solid rgba(242, 231, 209, 0.15);
+  border-top: 2px solid rgba(201, 123, 60, 0.6);
+  border-radius: 6px;
+  background:
+    linear-gradient(90deg, rgba(199, 121, 61, 0.06), transparent 36%),
+    rgba(11, 9, 7, 0.91);
+  box-shadow: 0 24px 62px rgba(0, 0, 0, 0.4);
+}
+
+.sideb-logo {
+  border-color: var(--color-signal);
+  background:
+    repeating-radial-gradient(circle, transparent 0 4px, rgba(231, 161, 94, 0.1) 4px 5px),
+    #130e0b;
+  box-shadow: inset 0 0 0 5px rgba(201, 123, 60, 0.055), 0 0 20px rgba(201, 123, 60, 0.1);
+}
+
+.sideb-brand-copy strong {
+  color: var(--color-cream-strong);
+  letter-spacing: 0.02em;
+}
+
+.sideb-brand-copy small {
+  color: var(--color-muted-strong);
+  letter-spacing: 0.1em;
+}
+
+.sideb-nav-signal {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--border-console);
+  background: rgba(201, 123, 60, 0.055);
+  color: var(--color-signal-soft);
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.sideb-nav-signal i,
+.site-footer-statement p i,
+.current-signal-line i,
+.sideb-floating-album-label i,
+.sideb-hero-signal i {
+  width: 6px;
+  flex: 0 0 6px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--color-signal);
+  box-shadow: 0 0 12px rgba(201, 123, 60, 0.7);
+}
+
+.sideb-links {
+  gap: clamp(9px, 1.4vw, 22px);
+}
+
+.sideb-links a {
+  gap: 7px;
+  letter-spacing: 0.12em;
+}
+
+.sideb-links a > span {
+  color: rgba(242, 231, 209, 0.5);
+  font-size: 0.52rem;
+  letter-spacing: 0.05em;
+}
+
+.sideb-links a::after {
+  height: 1px;
+  background: var(--color-signal);
+}
+
+.sideb-account-link {
+  border-radius: 4px;
+  background: rgba(255, 243, 220, 0.025);
+}
+
+/* Home: a real room with a precise program signal */
+
+.sideb-hero {
+  min-height: clamp(720px, 94svh, 920px);
+  background:
+    linear-gradient(90deg, rgba(8, 6, 4, 0.95) 0%, rgba(8, 6, 4, 0.77) 43%, rgba(8, 6, 4, 0.28) 80%),
+    linear-gradient(180deg, rgba(8, 6, 4, 0.05) 28%, rgba(8, 6, 4, 0.78) 100%),
+    var(--hero-image) center / cover no-repeat;
+}
+
+.sideb-hero::before {
+  background:
+    linear-gradient(90deg, rgba(201, 123, 60, 0.06) 0 1px, transparent 1px) 50% 0 / 14.285% 100%,
+    radial-gradient(circle at 73% 70%, rgba(201, 123, 60, 0.2), transparent 22rem),
+    repeating-radial-gradient(circle at 28% 42%, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 4px);
+  opacity: 0.78;
+}
+
+.sideb-hero::after {
+  right: -13vw;
+  bottom: -43vw;
+  border-color: rgba(201, 123, 60, 0.12);
+}
+
+.sideb-hero-copy {
+  width: min(100%, 850px);
+}
+
+.sideb-hero-signal {
+  display: inline-grid;
+  grid-template-columns: auto auto auto;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 28px;
+  border: 1px solid rgba(242, 231, 209, 0.16);
+  border-left: 1px solid var(--color-signal);
+  background: rgba(10, 8, 6, 0.58);
+  box-shadow: var(--shadow-signal);
+  backdrop-filter: blur(12px);
+}
+
+.sideb-hero-signal > * {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-left: 1px solid rgba(242, 231, 209, 0.11);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sideb-hero-signal > *:first-child {
+  border-left: 0;
+  color: var(--color-signal-soft);
+}
+
+.sideb-hero-signal strong {
+  color: var(--color-cream);
+}
+
+.sideb-hero-signal small {
+  color: var(--color-muted-strong);
+}
+
+.sideb-hero h1 {
+  font-size: clamp(4.8rem, 9vw, 8.9rem);
+  line-height: 0.79;
+}
+
+.sideb-hero h1 span:last-child {
+  color: var(--color-signal-soft);
+  text-shadow: 0 10px 40px rgba(0, 0, 0, 0.34);
+}
+
+.sideb-floating-album-link {
+  grid-template-columns: 104px minmax(0, 1fr);
+  min-height: 140px;
+  border-radius: 4px;
+  border-color: rgba(242, 231, 209, 0.19);
+  border-left: 1px solid var(--color-signal);
+  background:
+    linear-gradient(90deg, rgba(201, 123, 60, 0.065), transparent 42%),
+    rgba(12, 10, 8, 0.91);
+}
+
+.sideb-floating-album-link::after {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 28px;
+  height: 12px;
+  background: repeating-linear-gradient(90deg, var(--color-signal) 0 2px, transparent 2px 5px);
+  content: "";
+  opacity: 0.52;
+}
+
+.sideb-floating-album-label {
+  top: -31px;
+  right: auto;
+  left: -3px;
+  gap: 8px;
+  background: #251912;
+  color: var(--color-signal-soft);
+}
+
+.sideb-floating-album-art {
+  width: 104px;
+  box-shadow: 14px 12px 0 rgba(3, 2, 2, 0.5), 0 16px 34px rgba(0, 0, 0, 0.34);
+}
+
+.sideb-session-strip {
+  border-color: rgba(201, 123, 60, 0.17);
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.012) 0 1px, transparent 1px 80px),
+    linear-gradient(90deg, rgba(201, 123, 60, 0.075), transparent 46%),
+    var(--color-console);
+}
+
+.sideb-session-inner {
+  min-height: 116px;
+}
+
+.sideb-strip-mark {
+  border-color: var(--color-signal);
+  background: var(--color-signal);
+  box-shadow: inset 0 0 0 4px #15130f, 0 0 15px rgba(201, 123, 60, 0.5);
+}
+
+.sideb-session-inner > p strong {
+  color: var(--color-cream-strong);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.sideb-session-inner > span {
+  display: grid;
+  gap: 5px;
+  color: var(--color-cream);
+}
+
+.sideb-session-inner > span small {
+  color: var(--color-muted);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sideb-session-inner > a {
+  color: var(--color-signal-soft);
+}
+
+.sideb-link-grid {
+  gap: 14px;
+  padding-block: clamp(52px, 6vw, 72px);
+}
+
+.sideb-link-card {
+  --link-card-padding: clamp(24px, 2vw, 30px);
+  min-height: 204px;
+  align-content: start;
+  padding: 62px var(--link-card-padding) 24px;
+  border-radius: 3px;
+  border-color: rgba(242, 231, 209, 0.12);
+  border-top: 2px solid rgba(199, 121, 61, 0.55);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 56px, rgba(255, 243, 220, 0.015) 56px 57px),
+    linear-gradient(155deg, rgba(199, 121, 61, 0.055), transparent 52%),
+    var(--color-surface);
+}
+
+.sideb-link-card:nth-child(2),
+.sideb-link-card:nth-child(3),
+.sideb-link-card:nth-child(4) {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 56px, rgba(255, 243, 220, 0.015) 56px 57px),
+    linear-gradient(155deg, rgba(199, 121, 61, 0.055), transparent 52%),
+    var(--color-surface);
+}
+
+.sideb-link-card::after {
+  top: auto;
+  right: 24px;
+  bottom: 24px;
+  width: 46px;
+  border-color: rgba(201, 123, 60, 0.12);
+  box-shadow: inset 0 0 0 8px rgba(201, 123, 60, 0.025);
+}
+
+.sideb-link-card-channel {
+  position: absolute;
+  top: 24px;
+  right: var(--link-card-padding);
+  left: var(--link-card-padding);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sideb-link-card-channel > span,
+.sideb-link-card-channel > small {
+  color: var(--color-muted-strong);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.sideb-link-card-channel > small {
+  color: rgba(201, 123, 60, 0.62);
+}
+
+.sideb-link-card > strong {
+  min-height: 1em;
+  margin-top: 0;
+  font-size: clamp(1.75rem, 2vw, 2rem);
+  line-height: 1;
+}
+
+.sideb-link-card > p {
+  margin-top: 12px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.sideb-link-card:hover {
+  border-color: rgba(201, 123, 60, 0.38);
+  border-top-color: var(--color-signal);
+  background-color: var(--color-surface-raised);
+  box-shadow: var(--shadow-low), var(--shadow-signal);
+}
+
+.sideb-crates {
+  border-top-color: rgba(201, 123, 60, 0.14);
+}
+
+.sideb-crate-card {
+  padding: 14px 14px 22px;
+  border: 1px solid rgba(242, 231, 209, 0.12);
+  border-radius: 2px;
+  background:
+    linear-gradient(180deg, rgba(255, 243, 220, 0.025), transparent 36%),
+    #15110d;
+  box-shadow: 10px 12px 0 rgba(0, 0, 0, 0.19);
+}
+
+.sideb-crate-card > p {
+  color: var(--color-signal);
+  letter-spacing: 0.11em;
+}
+
+.sideb-crate-controls button {
+  border-radius: 3px;
+  background: var(--color-console);
+}

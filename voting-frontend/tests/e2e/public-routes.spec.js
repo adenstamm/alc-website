@@ -1,4 +1,5 @@
 import { expect, test } from "playwright/test";
+import { installAdminPollFixture, installMockSession, installPublicFixtures } from "./fixtures";
 
 const publicRoutes = [
   ["/", /Album Listening\s*Club/i],
@@ -11,130 +12,7 @@ const publicRoutes = [
   ["/vote", /What .*should the club listen to next/i],
 ];
 
-async function installMockSession(page, {
-  displayName,
-  email,
-  userId,
-}) {
-  const expiresAt = Math.floor(Date.now() / 1000) + 3_600;
-
-  await page.addInitScript(({
-    activeDisplayName,
-    activeEmail,
-    activeUserId,
-    sessionExpiresAt,
-  }) => {
-    const encodeJwtPart = (value) => btoa(JSON.stringify(value))
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/g, "");
-    const accessToken = [
-      encodeJwtPart({ alg: "HS256", typ: "JWT" }),
-      encodeJwtPart({
-        aud: "authenticated",
-        email: activeEmail,
-        exp: sessionExpiresAt,
-        role: "authenticated",
-        sub: activeUserId,
-      }),
-      "test-signature",
-    ].join(".");
-
-    localStorage.setItem("sb-playwright-auth-token", JSON.stringify({
-      access_token: accessToken,
-      expires_at: sessionExpiresAt,
-      expires_in: 3_600,
-      refresh_token: "test-refresh-token",
-      token_type: "bearer",
-      user: {
-        app_metadata: { provider: "email", providers: ["email"] },
-        aud: "authenticated",
-        created_at: "2026-08-27T12:00:00.000Z",
-        email: activeEmail,
-        email_confirmed_at: "2026-08-27T12:00:00.000Z",
-        id: activeUserId,
-        role: "authenticated",
-        updated_at: "2026-08-27T12:00:00.000Z",
-        user_metadata: { display_name: activeDisplayName },
-      },
-    }));
-  }, {
-    activeDisplayName: displayName,
-    activeEmail: email,
-    activeUserId: userId,
-    sessionExpiresAt: expiresAt,
-  });
-}
-
-async function installAdminPollFixture(page, { poll, results }) {
-  const userId = "33333333-3333-4333-8333-333333333333";
-
-  await installMockSession(page, {
-    displayName: "Event Admin",
-    email: "event-admin@albumasu.com",
-    userId,
-  });
-  await page.route("**/rest/v1/memberships**", (route) => route.fulfill({
-    body: JSON.stringify([{
-      created_at: "2026-08-30T12:00:00.000Z",
-      display_name: "Event Admin",
-      email: "event-admin@albumasu.com",
-      role: "admin",
-      status: "approved",
-      updated_at: "2026-08-30T12:00:00.000Z",
-      user_id: userId,
-    }]),
-    contentType: "application/json",
-    status: 200,
-  }));
-  await page.route("**/rest/v1/record_shelf_items**", (route) => route.fulfill({
-    body: "[]",
-    contentType: "application/json",
-    status: 200,
-  }));
-  await page.route("**/rest/v1/record_shelf_covers**", (route) => route.fulfill({
-    body: "[]",
-    contentType: "application/json",
-    status: 200,
-  }));
-  await page.route("**/rest/v1/rpc/get_admin_poll_results", (route) => route.fulfill({
-    body: JSON.stringify(typeof results === "function" ? results() : results),
-    contentType: "application/json",
-    status: 200,
-  }));
-  await page.route("**/api/current-poll", (route) => route.fulfill({
-    body: JSON.stringify(typeof poll === "function" ? poll() : poll),
-    contentType: "application/json",
-    status: 200,
-  }));
-}
-
-test.beforeEach(async ({ page }) => {
-  // Keep the suite deterministic when third-party album metadata is unavailable.
-  await page.route("https://musicbrainz.org/**", (route) => route.abort());
-  await page.route("https://coverartarchive.org/**", (route) => route.abort());
-  await page.route("https://playwright.supabase.co/rest/v1/album_archive_entries**", (route) => (
-    route.fulfill({ body: "[]", contentType: "application/json", status: 200 })
-  ));
-  await page.route("**/api/current-poll", (route) => route.fulfill({
-    body: JSON.stringify({
-      album_of_week: {
-        artist: "Cocteau Twins",
-        title: "Heaven or Las Vegas",
-      },
-      candidates: [],
-      cycle_label: "Test Week",
-      description: "Submit one album for the next club session.",
-      finalists: [],
-      id: "test-poll",
-      phase: "nominations",
-      question: "What should the club listen to next?",
-      status: "Nominations are open",
-    }),
-    contentType: "application/json",
-    status: 200,
-  }));
-});
+test.beforeEach(installPublicFixtures);
 
 for (const [path, heading] of publicRoutes) {
   test(`${path} renders its primary content`, async ({ page }) => {
@@ -177,7 +55,10 @@ test("the desktop record shelf stays contained and visibly framed", async ({ pag
 });
 
 test("the homepage shelf refreshes on focus when the queue changes", async ({ page }) => {
-  let shelfRows = [];
+  let shelfRows = [{
+    album_id: "fixture-original", album_title: "Fixture Original",
+    artist_name: "Fixture Artist", position: 1,
+  }];
 
   await page.route("**/rest/v1/record_shelf_items**", (route) => route.fulfill({
     body: JSON.stringify(shelfRows),
@@ -195,7 +76,7 @@ test("the homepage shelf refreshes on focus when the queue changes", async ({ pa
 
   const shelfCards = page.locator("#recent-albums-track > li");
   await expect(shelfCards).toHaveCount(5);
-  await expect(shelfCards.first()).toContainText("Flying Beagle");
+  await expect(shelfCards.first()).toContainText("Fixture Original");
 
   shelfRows = [{
     album_id: "poll-week-1",
@@ -203,12 +84,12 @@ test("the homepage shelf refreshes on focus when the queue changes", async ({ pa
     archived_at: "2026-08-30T12:00:00.000Z",
     artist_name: "Olivia Rodrigo",
     position: 1,
-  }];
+  }, { ...shelfRows[0], position: 2 }];
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
 
   await expect(shelfCards).toHaveCount(5);
   await expect(shelfCards.first()).toContainText("Olivia Rodrigo");
-  await expect(shelfCards.nth(1)).toContainText("Flying Beagle");
+  await expect(shelfCards.nth(1)).toContainText("Fixture Original");
 });
 
 test("keyboard navigation exposes and uses the skip link", async ({ page }) => {

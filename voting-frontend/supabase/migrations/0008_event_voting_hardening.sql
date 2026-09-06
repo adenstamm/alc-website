@@ -20,7 +20,6 @@
 --   Do not rerun an older setup file afterward, because it would restore an
 --   older function body without these event-safety invariants.
 
-begin;
 
 -- The final phase remains the poll phase after voting closes. Closing is
 -- derived from these timestamps, so no cron job or background worker is
@@ -1149,5 +1148,3 @@ grant execute on function public.create_poll(text, text, text, text, text, text)
 to authenticated;
 grant execute on function public.update_current_album(text, text, text, text)
 to authenticated;
-
-commit;

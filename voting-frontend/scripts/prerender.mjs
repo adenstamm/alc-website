@@ -1,11 +1,12 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { ROUTE_META, SITE_ORIGIN } from "../src/data/routeMeta.js";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const outputRoot = path.join(projectRoot, "dist");
+const outputRoot = process.argv[2] ? path.resolve(process.argv[2]) : path.join(projectRoot, "dist");
 const sourceHtml = await readFile(path.join(outputRoot, "index.html"), "utf8");
 
 function escapeHtml(value) {

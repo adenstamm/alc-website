@@ -1,0 +1,367 @@
+/* Admin control room */
+
+.sideb-admin-page .sideb-subpage-main {
+  width: min(100%, 1500px);
+}
+
+.sideb-admin-page .surface-card {
+  box-shadow: none;
+}
+
+.admin-snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-snapshot-card,
+.admin-next-event,
+.admin-result-row,
+.admin-irv-round,
+.admin-event-row,
+.admin-shelf-card,
+.member-row {
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  background: rgba(8, 5, 3, 0.27);
+}
+
+.admin-snapshot-card {
+  min-height: 155px;
+  padding: 20px;
+}
+
+.admin-snapshot-card > span,
+.admin-next-event > span,
+.admin-result-row > span,
+.admin-event-row span {
+  color: var(--color-copper-bright);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.admin-snapshot-card > strong,
+.admin-next-event > strong {
+  display: block;
+  margin-top: 15px;
+  overflow-wrap: anywhere;
+  color: var(--color-cream-strong);
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.admin-snapshot-card > p,
+.admin-next-event > p,
+.admin-result-row p,
+.admin-irv-round p,
+.admin-event-row p,
+.admin-shelf-card p,
+.member-row p {
+  margin: 10px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--color-muted);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.admin-next-event {
+  margin-top: 10px;
+  padding: 22px;
+}
+
+.admin-snapshot-actions {
+  margin-top: 18px;
+}
+
+.admin-create-grid,
+.admin-events-layout,
+.admin-shelf-upload,
+.member-toolbar {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-create-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-current-cover-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.65fr);
+  gap: 24px;
+  align-items: center;
+}
+
+.admin-current-cover-clear {
+  width: fit-content;
+  margin-top: 4px;
+}
+
+.admin-current-cover-preview {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+}
+
+.admin-current-cover-preview > img,
+.admin-current-cover-preview > .cozy-album-cover {
+  width: 96px;
+  aspect-ratio: 1;
+  border-radius: 2px;
+  object-fit: cover;
+}
+
+.admin-current-cover-preview .cozy-generated-cover > span {
+  font-size: 2rem;
+}
+
+.admin-current-cover-preview figcaption {
+  overflow-wrap: anywhere;
+  color: var(--color-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.admin-events-layout {
+  grid-template-columns: minmax(0, 0.9fr) minmax(320px, 1.1fr);
+  align-items: start;
+  gap: 24px;
+}
+
+.admin-event-form,
+.admin-shelf-upload {
+  padding: 22px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  background: rgba(8, 5, 3, 0.23);
+}
+
+.admin-event-row,
+.admin-result-row,
+.member-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 18px;
+}
+
+.member-row {
+  grid-template-columns: minmax(210px, 1fr) auto minmax(250px, auto);
+}
+
+.admin-result-row strong,
+.admin-event-row strong,
+.admin-shelf-card strong,
+.member-row strong {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--color-cream-strong);
+}
+
+.admin-result-row.candidate-option {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  cursor: pointer;
+}
+
+.admin-primary-candidate-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-candidate-remove {
+  min-height: 44px;
+  align-self: stretch;
+  padding: 0 13px;
+  border: 1px solid rgba(228, 127, 115, 0.38);
+  border-radius: 2px;
+  background: rgba(228, 127, 115, 0.06);
+  color: #f0aaa1;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.admin-candidate-remove:hover:not(:disabled) {
+  border-color: rgba(228, 127, 115, 0.72);
+  background: rgba(228, 127, 115, 0.14);
+  color: #ffd0c9;
+}
+
+.admin-candidate-remove:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.admin-irv-round {
+  padding: 20px;
+}
+
+.admin-irv-round > strong {
+  color: var(--color-cream-strong);
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 400;
+}
+
+.admin-irv-round > span {
+  display: block;
+  margin-top: 12px;
+  color: var(--color-copper-bright);
+  font-size: 0.82rem;
+}
+
+.member-toolbar {
+  grid-template-columns: minmax(260px, 0.7fr) minmax(300px, 1.3fr);
+  align-items: end;
+  margin-block: 20px;
+}
+
+.member-filter-group {
+  justify-content: flex-end;
+}
+
+.member-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 20px;
+  color: var(--color-muted);
+  font-size: 0.86rem;
+}
+
+.admin-shelf-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-shelf-card {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 18px;
+}
+
+.admin-shelf-card > img,
+.admin-shelf-card > .cozy-album-cover {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 5px;
+  object-fit: cover;
+}
+
+.cozy-generated-cover {
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 66% 28%, rgba(231, 161, 94, 0.35), transparent 22%),
+    #25170f;
+}
+
+.cozy-generated-cover > span {
+  color: var(--color-cream);
+  font-family: var(--font-display);
+  font-size: 3rem;
+  font-style: italic;
+}
+
+.admin-shelf-upload {
+  grid-template-columns: minmax(180px, 0.8fr) minmax(220px, 1.2fr) auto;
+  align-items: end;
+  margin-top: 20px;
+}
+
+.reset-card {
+  width: min(100%, 720px);
+  margin-inline: auto;
+}
+
+.confirm-signup-hero {
+  min-height: 390px;
+  background:
+    radial-gradient(circle at 82% 40%, rgba(214, 130, 61, 0.18), transparent 20rem),
+    linear-gradient(120deg, rgba(201, 123, 60, 0.075), transparent 48%),
+    var(--color-surface);
+}
+
+.confirm-signup-stamp {
+  display: grid;
+  width: min(100%, 330px);
+  min-height: 220px;
+  align-content: end;
+  justify-self: end;
+  padding: 28px;
+  border: 1px solid rgba(231, 161, 94, 0.38);
+  border-radius: 50% 50% 7px 7px;
+  background:
+    repeating-radial-gradient(circle at 50% 12%, transparent 0 10px, rgba(231, 161, 94, 0.05) 11px 12px),
+    #17100b;
+  color: var(--color-cream-strong);
+  text-align: center;
+  transform: rotate(1.5deg);
+}
+
+.confirm-signup-stamp span,
+.confirm-signup-stamp small {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.confirm-signup-stamp strong {
+  margin: 10px 0 8px;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-style: italic;
+  font-weight: 400;
+  line-height: 0.9;
+}
+
+.confirm-signup-stamp small {
+  color: var(--color-muted);
+}
+
+.confirm-signup-card {
+  width: min(100%, 760px);
+  margin-inline: auto;
+}
+
+.confirm-signup-card h2 {
+  max-width: 13ch;
+  margin: 12px 0 0;
+  color: var(--color-cream-strong);
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 5vw, 4rem);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  line-height: 0.96;
+}
+
+.confirm-signup-card .button {
+  width: fit-content;
+  margin-top: 8px;
+}
+
+.confirm-signup-security-note {
+  max-width: 58ch;
+  margin: 6px 0 0;
+  color: var(--color-muted);
+  font-size: 0.78rem;
+}

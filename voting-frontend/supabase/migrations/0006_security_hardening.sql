@@ -2,7 +2,6 @@
 -- Run this LAST, after every other SQL file in this directory. Re-run it after
 -- any older setup file that creates a function, policy, or table grant.
 
-begin;
 
 -- PostgreSQL grants EXECUTE on new functions to PUBLIC by default. Supabase
 -- may also install default table grants for API roles. Make future objects
@@ -405,5 +404,3 @@ grant execute on function public.advance_to_primary(text) to authenticated;
 grant execute on function public.save_finalists(text, text[]) to authenticated;
 grant execute on function public.advance_to_final(text, text[]) to authenticated;
 grant execute on function public.update_current_album(text, text, text, text) to authenticated;
-
-commit;

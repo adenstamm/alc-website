@@ -1,18 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
-function hasRecoveryParams() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-  return urlParams.get("type") === "recovery" || hashParams.get("type") === "recovery";
-}
+import { recoverySessionStore } from "../lib/recoverySession";
 
 function ResetPassword({ hasSupabaseConfig, navigate, supabase }) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [status, setStatus] = useState(null);
   const [error, setError] = useState(null);
-  const [isRecoverySession, setIsRecoverySession] = useState(false);
-  const [isCheckingRecovery, setIsCheckingRecovery] = useState(Boolean(hasSupabaseConfig));
+  const isRecoverySession = useSyncExternalStore(
+    recoverySessionStore.subscribe,
+    recoverySessionStore.getSnapshot,
+  );
+  const [isCheckingRecovery, setIsCheckingRecovery] = useState(
+    Boolean(hasSupabaseConfig),
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -23,31 +24,19 @@ function ResetPassword({ hasSupabaseConfig, navigate, supabase }) {
 
     let isMounted = true;
 
-    async function checkRecoverySession() {
-      const { data } = await supabase.auth.getSession();
-
-      if (!isMounted) {
-        return;
-      }
-
-      setIsRecoverySession(Boolean(data.session?.user) && hasRecoveryParams());
-      setIsCheckingRecovery(false);
-    }
-
-    checkRecoverySession();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, nextSession) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setIsRecoverySession(Boolean(nextSession?.user));
-        setError(null);
-      }
-    });
-
+    supabase.auth
+      .getSession()
+      .catch(() => {
+        if (isMounted)
+          setError(
+            "Could not check your recovery session. Reload to try again.",
+          );
+      })
+      .finally(() => {
+        if (isMounted) setIsCheckingRecovery(false);
+      });
     return () => {
       isMounted = false;
-      subscription.unsubscribe();
     };
   }, [hasSupabaseConfig, supabase]);
 
@@ -57,7 +46,9 @@ function ResetPassword({ hasSupabaseConfig, navigate, supabase }) {
     setError(null);
 
     if (!isRecoverySession) {
-      setError("Open the password reset link from your email before setting a new password.");
+      setError(
+        "Open the password reset link from your email before setting a new password.",
+      );
       return;
     }
 
@@ -84,6 +75,7 @@ function ResetPassword({ hasSupabaseConfig, navigate, supabase }) {
       return;
     }
 
+    recoverySessionStore.clear();
     setPassword("");
     setConfirmPassword("");
     setStatus("Password updated. You can now sign in with your new password.");
@@ -97,11 +89,15 @@ function ResetPassword({ hasSupabaseConfig, navigate, supabase }) {
             <p className="sideb-kicker">Account</p>
             <h1>Reset your password.</h1>
             <p>
-            Enter a new password after opening the reset link from your email.
+              Enter a new password after opening the reset link from your email.
             </p>
           </div>
 
-          <button className="sideb-button sideb-button-ghost" type="button" onClick={() => navigate("/account")}>
+          <button
+            className="sideb-button sideb-button-ghost"
+            type="button"
+            onClick={() => navigate("/account")}
+          >
             Back to account
           </button>
         </section>
@@ -117,14 +113,31 @@ function ResetPassword({ hasSupabaseConfig, navigate, supabase }) {
               <p className="eyebrow">Checking reset link</p>
               <h3>Verifying your password recovery session.</h3>
             </div>
+          ) : status ? (
+            <div className="confirmation-card" role="status">
+              <h3>Password updated.</h3>
+              <p>{status}</p>
+              <button
+                className="button button-secondary"
+                type="button"
+                onClick={() => navigate("/account")}
+              >
+                Back to account
+              </button>
+            </div>
           ) : !isRecoverySession ? (
             <div className="confirmation-card">
               <p className="eyebrow">Reset link needed</p>
               <h3>Open the password reset link from your email.</h3>
               <p>
-                Supabase only allows password changes after the recovery link creates a temporary session.
+                Supabase only allows password changes after the recovery link
+                creates a temporary session.
               </p>
-              <button className="button button-secondary" type="button" onClick={() => navigate("/account")}>
+              <button
+                className="button button-secondary"
+                type="button"
+                onClick={() => navigate("/account")}
+              >
                 Back to account
               </button>
             </div>
@@ -156,10 +169,22 @@ function ResetPassword({ hasSupabaseConfig, navigate, supabase }) {
                 />
               </div>
 
-              {error ? <p className="form-error" role="alert">{error}</p> : null}
-              {status ? <p className="form-success" role="status">{status}</p> : null}
+              {error ? (
+                <p className="form-error" role="alert">
+                  {error}
+                </p>
+              ) : null}
+              {status ? (
+                <p className="form-success" role="status">
+                  {status}
+                </p>
+              ) : null}
 
-              <button className="button button-primary" type="submit" disabled={isSubmitting}>
+              <button
+                className="button button-primary"
+                type="submit"
+                disabled={isSubmitting}
+              >
                 {isSubmitting ? "Updating..." : "Update password"}
               </button>
             </form>

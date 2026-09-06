@@ -16,14 +16,9 @@ export default defineConfig({
     { name: "mobile", use: { ...devices["Pixel 5"] } },
   ],
   webServer: {
-    command: "npm run dev -- --host 127.0.0.1 --port 4173",
-    env: {
-      ...process.env,
-      VITE_ENABLE_SITE_EVENTS: "false",
-      VITE_SUPABASE_ANON_KEY: "playwright-anon-key",
-      VITE_SUPABASE_URL: "https://playwright.supabase.co",
-    },
+    command: "node scripts/test-server.mjs",
+    timeout: 120_000,
     url: "http://127.0.0.1:4173",
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
   },
 });

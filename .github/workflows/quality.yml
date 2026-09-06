@@ -32,9 +32,38 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run check
 
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: local-test-password
+          POSTGRES_DB: alc_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: voting-frontend/package-lock.json
+      - run: npm ci
+      - run: npm run test:db
+        env:
+          DATABASE_TEST_URL: postgres://postgres:local-test-password@127.0.0.1:5432/alc_test
+
   deploy:
     if: github.event_name == 'push'
-    needs: verify
+    needs: [verify, database]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:

@@ -99,3 +99,49 @@ The account provisioning/sign-in setup is intentionally outside the measured
 event stages because attendees are expected to arrive verified, approved, and
 signed in. The measured output reports pass counts and p50/p95/p99 latency for
 membership reads, Azure/API poll reads, and both ballot bursts.
+
+## Separate availability from latency
+
+The monitor now reports static pages and `/api/current-poll` independently.
+Availability checks and latency targets have separate verdicts. The existing
+p95 < 1,000 ms and p99 < 2,000 ms targets remain unchanged for each component.
+A successful response above the latency target is not classified as an outage.
+
+The one-user, one-minute smoke profile retains low traffic. Reports include
+sample counts and warn that p95/p99 from a handful of requests are sensitive to
+individual observations. Each component must collect at least five requests;
+a slow or incomplete run cannot silently pass due to missing metrics.
+
+Workflow artifacts also contain `samples.json.gz`: raw k6 measurements tagged
+by component and route, including waiting, connection, and TLS timings. The
+first observed poll request and subsequent requests are summarized separately.
+API responses expose `Server-Timing: handler;dur=…`, worker first-request/reused
+state, and worker age. These contain no account or token information.
+
+For a latency failure, compare API and static durations first. A slow API TTFB
+with a fast reported handler on a worker's first request is consistent with
+platform startup or routing overhead, but does not prove a cold start. Slow
+handler time points toward the handler/upstream database path. Correlate these
+observations with Azure logs and multiple scheduled runs before changing
+thresholds or infrastructure. A client's first request can reach a warm worker.
+
+The [September 5 failing run](https://github.com/adenstamm/alc-website/actions/runs/33974441276)
+had 12 requests, 100% successful checks, p95 1,209.96 ms and p99 2,049.70 ms.
+Its aggregate-only artifacts cannot identify which component or request caused
+the tail latency, or establish a cold start. New diagnostics support that next
+investigation after deployment; the current target has not been relaxed.
+
+### Audit measurement — September 5, 2026
+
+A read-only, one-minute local k6 run against `https://albumasu.com` returned
+successful checks for all six static-page and six poll-API requests. Static
+p95/p99 were 308/368 ms; poll-API p95/p99 were 1,460/1,715 ms. Availability
+passed and API p95 failed the unchanged target. The first API response took
+1,779 ms; subsequent API responses had a median of 423 ms. These are observations
+from one small sample and one client location, not a production latency baseline.
+
+The live deployment did not yet include the new worker-state/handler headers.
+The first-request slowdown is consistent with startup or connection effects,
+but does not establish a cold start. After deploying the instrumentation, compare
+worker-first versus reused responses and handler time against raw waiting,
+connection, and TLS timings before selecting a hosting or caching change.

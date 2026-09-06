@@ -16,16 +16,20 @@ export function sanitizeNominationValue(value) {
 export function normalizeMusicName(value) {
   return sanitizeNominationValue(value)
     .normalize("NFKC")
-    .toLocaleLowerCase()
-    .replace(/[!"#$%&'()*+,./:;<=>?@[\\\]^_`{|}~¡¿‘’“”«»]/g, " ")
+    .toLowerCase()
+    .replace(/[-!"#$%&'()*+,./:;<=>?@[\\\]^_`{|}~¡¿‘’“”«»]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
 const bannedAlbumNames = new Set(
-  parseAlbumArchiveText(bannedAlbumsText).map((album) => normalizeMusicName(album.title)),
+  parseAlbumArchiveText(bannedAlbumsText).map((album) =>
+    normalizeMusicName(album.title),
+  ),
 );
-const bannedArtistNames = new Set(parseList(bannedArtistsText).map(normalizeMusicName));
+const bannedArtistNames = new Set(
+  parseList(bannedArtistsText).map(normalizeMusicName),
+);
 
 export function validateNominationInput({ albumTitle, artistName }) {
   const cleanAlbumTitle = sanitizeNominationValue(albumTitle);
@@ -62,8 +66,13 @@ export function validateNominationInput({ albumTitle, artistName }) {
 export function getNominationSubmissionError(error, getFallbackError = null) {
   const message = error?.message || "";
 
-  if (message.includes("ALREADY_VOTED") || message.includes("votes_one_per_user_per_poll_phase")) {
-    return getFallbackError ? getFallbackError(error) : "Your account already submitted this phase.";
+  if (
+    message.includes("ALREADY_VOTED") ||
+    message.includes("votes_one_per_user_per_poll_phase")
+  ) {
+    return getFallbackError
+      ? getFallbackError(error)
+      : "Your account already submitted this phase.";
   }
 
   if (message.includes("BANNED_ARTIST")) {

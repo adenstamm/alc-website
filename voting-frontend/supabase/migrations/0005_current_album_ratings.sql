@@ -1,7 +1,6 @@
 -- Current-album ratings and durable archive entries.
 -- Run after site-content.sql and before security-hardening.sql.
 
-begin;
 
 create table if not exists public.album_ratings (
   poll_id text not null references public.polls(id) on delete cascade,
@@ -349,5 +348,3 @@ revoke execute on function public.submit_current_album_rating(text, integer)
 from public, anon, authenticated;
 grant execute on function public.submit_current_album_rating(text, integer)
 to authenticated;
-
-commit;

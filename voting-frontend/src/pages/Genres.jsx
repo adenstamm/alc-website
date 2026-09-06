@@ -1,5 +1,7 @@
 import genresPoster from "../assets/genres-this-year.png";
 
+import { genreSchedule } from "../data/genreSchedule";
+
 function Genres({ navigate }) {
   function handleHomeLink(event) {
     event.preventDefault();
@@ -8,14 +10,18 @@ function Genres({ navigate }) {
 
   return (
     <div className="sideb-page sideb-subpage sideb-genres-page">
-      <main className="sideb-subpage-main genres-main" id="main-content" tabIndex="-1">
+      <main
+        className="sideb-subpage-main genres-main"
+        id="main-content"
+        tabIndex="-1"
+      >
         <section className="genres-showcase" aria-labelledby="genres-title">
           <div className="genres-showcase-copy">
             <p className="sideb-kicker">This year in genres</p>
             <h1 id="genres-title">This is what this year will sound like.</h1>
             <p>
-              Every meeting will add another corner to the club&apos;s listening map.
-              Open the poster at full size to explore the genres ahead.
+              Every meeting will add another corner to the club&apos;s listening
+              map. Open the poster at full size to explore the genres ahead.
             </p>
             <a
               className="sideb-button sideb-button-ghost"
@@ -50,6 +56,21 @@ function Genres({ navigate }) {
               </a>
             </figcaption>
           </figure>
+        </section>
+        <section
+          aria-labelledby="genre-schedule-title"
+          className="genres-schedule"
+        >
+          <h2 id="genre-schedule-title">Dates and genres</h2>
+          <p>The schedule shown in the poster.</p>
+          <dl>
+            {genreSchedule.map(([date, genre]) => (
+              <div key={date}>
+                <dt>{date}</dt>
+                <dd>{genre}</dd>
+              </div>
+            ))}
+          </dl>
         </section>
       </main>
     </div>

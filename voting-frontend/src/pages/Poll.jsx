@@ -1,17 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-
-import { phaseContent } from "../data/clubContent";
-import { getAccountStatus } from "../lib/accountStatus";
+import AccountGate from "../components/voting/AccountGate.jsx";
+import AlbumRating from "../components/voting/AlbumRating.jsx";
+import BallotChoices from "../components/voting/BallotChoices.jsx";
+import BallotConfirmation from "../components/voting/BallotConfirmation.jsx";
+import FinalClosed from "../components/voting/FinalClosed.jsx";
+import {
+  attachUserToVote,
+  createDefaultFormState,
+  fetchAuthoritativeStoredBallot,
+  formatPhaseLabel,
+  getVoteSubmissionError,
+  shouldReconcileVoteSubmission,
+} from "../lib/ballotState.js";
 import {
   clearStoredBallot,
   readStoredBallot,
   writeStoredBallot,
 } from "../lib/ballotStorage";
-import {
-  getCurrentAlbumRatingError,
-  normalizeCurrentAlbumRating,
-  validateCurrentAlbumRating,
-} from "../lib/currentAlbumRating";
+import { getAccountStatus } from "../lib/accountStatus";
 import {
   getNominationSubmissionError,
   validateNominationInput,
@@ -21,131 +26,9 @@ import {
   validateFinalRanking,
   validatePrimarySelection,
 } from "../lib/votingLogic";
-
-function createDefaultFormState(phase, finalistIds = []) {
-  if (phase === "nominations") {
-    return {
-      albumTitle: "",
-      artistName: "",
-      selectedCandidateIds: [],
-      rankedCandidateIds: [],
-    };
-  }
-
-  return {
-    albumTitle: "",
-    artistName: "",
-    selectedCandidateIds: [],
-    rankedCandidateIds: finalistIds,
-  };
-}
-
-function formatPhaseLabel(phase) {
-  return phase.charAt(0).toUpperCase() + phase.slice(1);
-}
-
-function formatTimestamp(timestamp) {
-  return new Date(timestamp).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function normalizeVoteRecord(vote) {
-  if (!vote) {
-    return null;
-  }
-
-  const choices = [...(vote.choices || [])].sort((a, b) => a.rank - b.rank);
-
-  return {
-    pollId: vote.poll_id,
-    phase: vote.phase,
-    submittedAt: vote.created_at,
-    candidateIds: choices.map((choice) => choice.candidate_id),
-    nomination:
-      vote.album_title && vote.artist_name
-        ? {
-            albumTitle: vote.album_title,
-            artistName: vote.artist_name,
-          }
-        : null,
-  };
-}
-
-function attachUserToVote(vote, userId) {
-  const normalizedVote = normalizeVoteRecord(vote);
-  return normalizedVote ? { ...normalizedVote, userId } : null;
-}
-
-async function fetchAuthoritativeStoredBallot(supabase, { pollId, phase, userId }) {
-  try {
-    const { data, error } = await supabase
-      .from("votes")
-      .select("poll_id, phase, album_title, artist_name, created_at, vote_choices(candidate_id, rank)")
-      .eq("poll_id", pollId)
-      .eq("phase", phase)
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (error || !data) {
-      return { ballot: null, error };
-    }
-
-    return {
-      ballot: attachUserToVote({
-        ...data,
-        choices: data.vote_choices || [],
-      }, userId),
-      error: null,
-    };
-  } catch (error) {
-    return { ballot: null, error };
-  }
-}
-
-function formatNominationCount(count) {
-  return `${count} nomination${count === 1 ? "" : "s"}`;
-}
-
-function getVoteSubmissionError(error) {
-  const message = error?.message || "";
-
-  if (
-    error?.code === "23505" ||
-    message.includes("ALREADY_VOTED") ||
-    message.includes("votes_one_per_user_per_poll_phase")
-  ) {
-    return "Your account already submitted this phase.";
-  }
-
-  return message || "Something went wrong while saving your vote.";
-}
-
-function shouldReconcileVoteSubmission(error) {
-  if (!error) {
-    return true;
-  }
-
-  const message = String(error.message || "").toLowerCase();
-  const status = Number(error.status || 0) || 0;
-
-  return (
-    error.code === "23505" ||
-    message.includes("already_voted") ||
-    message.includes("votes_one_per_user_per_poll_phase") ||
-    status === 0 ||
-    status === 429 ||
-    status >= 500 ||
-    message.includes("fetch") ||
-    message.includes("network") ||
-    message.includes("timeout") ||
-    message.includes("connection") ||
-    message.includes("gateway")
-  );
-}
+import { phaseContent } from "../data/clubContent";
+import useAlbumRating from "../hooks/useAlbumRating.js";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 function Poll({
   authReady,
@@ -161,16 +44,14 @@ function Poll({
   session,
   supabase,
 }) {
-  const [formState, setFormState] = useState(() => createDefaultFormState(
-    poll.phase,
-    (poll.finalists || []).map((candidate) => candidate.id),
-  ));
+  const [formState, setFormState] = useState(() =>
+    createDefaultFormState(
+      poll.phase,
+      (poll.finalists || []).map((candidate) => candidate.id),
+    ),
+  );
   const [storedBallot, setStoredBallot] = useState(null);
-  const [storedCurrentAlbumRating, setStoredCurrentAlbumRating] = useState(null);
-  const [currentAlbumRating, setCurrentAlbumRating] = useState("");
-  const [currentAlbumRatingError, setCurrentAlbumRatingError] = useState(null);
-  const [isLoadingCurrentAlbumRating, setIsLoadingCurrentAlbumRating] = useState(false);
-  const [isSubmittingCurrentAlbumRating, setIsSubmittingCurrentAlbumRating] = useState(false);
+
   const [isLoadingVote, setIsLoadingVote] = useState(false);
   const [isRefreshingBallot, setIsRefreshingBallot] = useState(false);
   const [isRefreshingMembership, setIsRefreshingMembership] = useState(false);
@@ -185,28 +66,53 @@ function Poll({
     storedBallot?.pollId === poll.id &&
     storedBallot?.phase === poll.phase &&
     storedBallot?.userId === userId;
-  const accountStatus = getAccountStatus(session, membership, membershipLookupStatus);
+  const accountStatus = getAccountStatus(
+    session,
+    membership,
+    membershipLookupStatus,
+  );
+  const {
+    storedCurrentAlbumRating,
+    currentAlbumRating,
+    setCurrentAlbumRating,
+    currentAlbumRatingError,
+    setCurrentAlbumRatingError,
+    isLoadingCurrentAlbumRating,
+    isSubmittingCurrentAlbumRating,
+    handleCurrentAlbumRatingSubmit,
+  } = useAlbumRating({ accountStatus, poll, supabase, userId });
+
   const canVote = hasSupabaseConfig && accountStatus === "approved";
   const finalClosesAt = poll.finalClosesAt || poll.final_closes_at;
   const finalClosedAt = poll.finalClosedAt || poll.final_closed_at;
-  const finalIsClosed = poll.phase === "final" && (
-    poll.finalIsClosed === true
-    || poll.finalIsClosed === "true"
-    || poll.final_is_closed === true
-    || poll.final_is_closed === "true"
-    || Boolean(finalClosedAt)
-  );
+  const finalIsClosed =
+    poll.phase === "final" &&
+    (poll.finalIsClosed === true ||
+      poll.finalIsClosed === "true" ||
+      poll.final_is_closed === true ||
+      poll.final_is_closed === "true" ||
+      Boolean(finalClosedAt));
   const candidateOptions = useMemo(
-    () => (poll.phase === "final" ? poll.finalists || [] : poll.candidates || []),
+    () =>
+      poll.phase === "final" ? poll.finalists || [] : poll.candidates || [],
     [poll.candidates, poll.finalists, poll.phase],
   );
   const rankedCandidates = useMemo(
     () =>
       formState.rankedCandidateIds
-        .map((candidateId) => candidateOptions.find((candidate) => candidate.id === candidateId))
+        .map((candidateId) =>
+          candidateOptions.find((candidate) => candidate.id === candidateId),
+        )
         .filter(Boolean),
     [candidateOptions, formState.rankedCandidateIds],
   );
+  const isAccountGated =
+    !hasSupabaseConfig ||
+    (pollError && !hasSubmitted) ||
+    !authReady ||
+    !session ||
+    ["unverified", "unavailable", "pending", "blocked"].includes(accountStatus);
+
   const ballotNeedsCandidates =
     poll.phase !== "nominations" && candidateOptions.length === 0;
   const ballotChoiceIdsKey = JSON.stringify(
@@ -217,10 +123,12 @@ function Poll({
 
   useEffect(() => {
     const ballotChoiceIds = JSON.parse(ballotChoiceIdsKey);
-    setFormState(createDefaultFormState(
-      poll.phase,
-      poll.phase === "final" ? ballotChoiceIds : [],
-    ));
+    setFormState(
+      createDefaultFormState(
+        poll.phase,
+        poll.phase === "final" ? ballotChoiceIds : [],
+      ),
+    );
     setFormError(null);
   }, [ballotChoiceIdsKey, poll.id, poll.phase]);
 
@@ -268,57 +176,14 @@ function Poll({
     return () => {
       isMounted = false;
     };
-  }, [accountStatus, poll.id, poll.phase, supabase, userId]);
-
-  useEffect(() => {
-    if (
-      !supabase ||
-      !userId ||
-      accountStatus !== "approved" ||
-      poll.phase !== "nominations"
-    ) {
-      setStoredCurrentAlbumRating(null);
-      setCurrentAlbumRating("");
-      setCurrentAlbumRatingError(null);
-      setIsLoadingCurrentAlbumRating(false);
-      return undefined;
-    }
-
-    let isMounted = true;
-
-    async function loadCurrentAlbumRating() {
-      setIsLoadingCurrentAlbumRating(true);
-      setCurrentAlbumRatingError(null);
-
-      const { data, error } = await supabase
-        .from("album_ratings")
-        .select("poll_id, rating, created_at")
-        .eq("poll_id", poll.id)
-        .eq("user_id", userId)
-        .maybeSingle();
-
-      if (!isMounted) {
-        return;
-      }
-
-      if (error) {
-        setStoredCurrentAlbumRating(null);
-        setCurrentAlbumRatingError(
-          "Your saved album rating could not be checked. You can retry by reloading this page.",
-        );
-      } else {
-        setStoredCurrentAlbumRating(normalizeCurrentAlbumRating(data, userId));
-      }
-
-      setIsLoadingCurrentAlbumRating(false);
-    }
-
-    loadCurrentAlbumRating();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [accountStatus, poll.id, poll.phase, supabase, userId]);
+  }, [
+    accountStatus,
+    ballotChoiceIdsKey,
+    poll.id,
+    poll.phase,
+    supabase,
+    userId,
+  ]);
 
   function handleFieldChange(event) {
     const { name, value } = event.target;
@@ -331,7 +196,8 @@ function Poll({
 
   function handlePrimaryToggle(candidateId) {
     setFormState((currentState) => {
-      const isSelected = currentState.selectedCandidateIds.includes(candidateId);
+      const isSelected =
+        currentState.selectedCandidateIds.includes(candidateId);
       const selectedCandidateIds = isSelected
         ? currentState.selectedCandidateIds.filter((id) => id !== candidateId)
         : [...currentState.selectedCandidateIds, candidateId];
@@ -375,10 +241,10 @@ function Poll({
     return true;
   }
 
-  async function runBallotSubmission(request, {
-    getErrorMessage = getVoteSubmissionError,
-    missingConfirmationMessage,
-  }) {
+  async function runBallotSubmission(
+    request,
+    { getErrorMessage = getVoteSubmissionError, missingConfirmationMessage },
+  ) {
     let data = null;
     let error;
 
@@ -440,7 +306,9 @@ function Poll({
     }
 
     if (!canVote) {
-      setFormError("Your account needs verified, approved member access before voting.");
+      setFormError(
+        "Your account needs verified, approved member access before voting.",
+      );
       return;
     }
 
@@ -455,23 +323,25 @@ function Poll({
         return;
       }
 
-      if (!window.confirm(
-        `Submit ${nominationValidation.albumTitle} by ${nominationValidation.artistName}? Your nomination cannot be changed during this phase.`,
-      )) {
+      if (
+        !window.confirm(
+          `Submit ${nominationValidation.albumTitle} by ${nominationValidation.artistName}? Your nomination cannot be changed during this phase.`,
+        )
+      ) {
         setIsSubmitting(false);
         return;
       }
 
       await runBallotSubmission(
-        () => supabase.rpc("submit_nomination", {
-          target_poll_id: poll.id,
-          album_title_input: nominationValidation.albumTitle,
-          artist_name_input: nominationValidation.artistName,
-        }),
+        () =>
+          supabase.rpc("submit_nomination", {
+            target_poll_id: poll.id,
+            album_title_input: nominationValidation.albumTitle,
+            artist_name_input: nominationValidation.artistName,
+          }),
         {
-          getErrorMessage: (error) => (
-            getNominationSubmissionError(error, getVoteSubmissionError)
-          ),
+          getErrorMessage: (error) =>
+            getNominationSubmissionError(error, getVoteSubmissionError),
           missingConfirmationMessage:
             "Your nomination may have been saved, but its confirmation could not be loaded. Check again before resubmitting.",
         },
@@ -480,7 +350,9 @@ function Poll({
     }
 
     if (poll.phase === "primary") {
-      const primaryValidation = validatePrimarySelection(formState.selectedCandidateIds);
+      const primaryValidation = validatePrimarySelection(
+        formState.selectedCandidateIds,
+      );
 
       if (!primaryValidation.isValid) {
         setFormError(primaryValidation.message);
@@ -488,18 +360,21 @@ function Poll({
         return;
       }
 
-      if (!window.confirm(
-        `Submit ${formState.selectedCandidateIds.length} album ${formState.selectedCandidateIds.length === 1 ? "choice" : "choices"}? Your ballot cannot be changed during this phase.`,
-      )) {
+      if (
+        !window.confirm(
+          `Submit ${formState.selectedCandidateIds.length} album ${formState.selectedCandidateIds.length === 1 ? "choice" : "choices"}? Your ballot cannot be changed during this phase.`,
+        )
+      ) {
         setIsSubmitting(false);
         return;
       }
 
       await runBallotSubmission(
-        () => supabase.rpc("submit_primary_ballot", {
-          target_poll_id: poll.id,
-          candidate_ids: formState.selectedCandidateIds,
-        }),
+        () =>
+          supabase.rpc("submit_primary_ballot", {
+            target_poll_id: poll.id,
+            candidate_ids: formState.selectedCandidateIds,
+          }),
         {
           missingConfirmationMessage:
             "Your ballot may have been saved, but its confirmation could not be loaded. Check again before resubmitting.",
@@ -519,62 +394,26 @@ function Poll({
       return;
     }
 
-    if (!window.confirm("Submit this final ranking? Your ballot cannot be changed during this phase.")) {
+    if (
+      !window.confirm(
+        "Submit this final ranking? Your ballot cannot be changed during this phase.",
+      )
+    ) {
       setIsSubmitting(false);
       return;
     }
 
     await runBallotSubmission(
-      () => supabase.rpc("submit_final_ballot", {
-        target_poll_id: poll.id,
-        ranked_candidate_ids: formState.rankedCandidateIds,
-      }),
+      () =>
+        supabase.rpc("submit_final_ballot", {
+          target_poll_id: poll.id,
+          ranked_candidate_ids: formState.rankedCandidateIds,
+        }),
       {
         missingConfirmationMessage:
           "Your ranking may have been saved, but its confirmation could not be loaded. Check again before resubmitting.",
       },
     );
-  }
-
-  async function handleCurrentAlbumRatingSubmit(event) {
-    event.preventDefault();
-    setCurrentAlbumRatingError(null);
-
-    const validation = validateCurrentAlbumRating(currentAlbumRating);
-
-    if (!validation.isValid) {
-      setCurrentAlbumRatingError(validation.message);
-      return;
-    }
-
-    if (!window.confirm(
-      `Submit ${validation.rating}/10 for ${poll.albumOfWeek?.title || "the current album"}? Your rating cannot be changed.`,
-    )) {
-      return;
-    }
-
-    setIsSubmittingCurrentAlbumRating(true);
-    const { data, error } = await supabase.rpc("submit_current_album_rating", {
-      target_poll_id: poll.id,
-      rating_input: validation.rating,
-    });
-    setIsSubmittingCurrentAlbumRating(false);
-
-    if (error) {
-      setCurrentAlbumRatingError(getCurrentAlbumRatingError(error));
-      return;
-    }
-
-    const savedRating = normalizeCurrentAlbumRating(data, userId);
-
-    if (!savedRating) {
-      setCurrentAlbumRatingError(
-        "Your rating was saved, but its confirmation could not be loaded. Reload this page to check it.",
-      );
-      return;
-    }
-
-    setStoredCurrentAlbumRating(savedRating);
   }
 
   async function handleBallotReload() {
@@ -592,10 +431,15 @@ function Poll({
     try {
       const refreshedPoll = await refreshPoll({ force: true });
 
-      if (refreshedPoll?.id === poll.id && refreshedPoll?.phase === poll.phase) {
+      if (
+        refreshedPoll?.id === poll.id &&
+        refreshedPoll?.phase === poll.phase
+      ) {
         setRoundCheckMessage("This ballot is up to date.");
       } else if (!refreshedPoll) {
-        setRoundCheckMessage("The new round could not be checked. Try again in a moment.");
+        setRoundCheckMessage(
+          "The new round could not be checked. Try again in a moment.",
+        );
       }
     } finally {
       setIsRefreshingBallot(false);
@@ -616,403 +460,6 @@ function Poll({
     }
   }
 
-  function renderAccountGate() {
-    if (!hasSupabaseConfig) {
-      return (
-        <div className="confirmation-card">
-          <p className="eyebrow">Setup needed</p>
-          <h3>Connect Supabase before real voting opens.</h3>
-          <p>
-            Add <strong>VITE_SUPABASE_URL</strong> and <strong>VITE_SUPABASE_ANON_KEY</strong>
-            to your environment, then run the Supabase schema in this repo.
-          </p>
-        </div>
-      );
-    }
-
-    if (pollError && !hasSubmitted) {
-      const errorTitle = pollErrorStatus === 401
-        ? "Your sign-in needs attention."
-        : pollErrorStatus === 429
-          ? "Too many ballot refreshes."
-          : "The ballot didn’t load.";
-
-      return (
-        <div className="confirmation-card ballot-recovery" role="alert">
-          <p className="eyebrow">Ballot temporarily unavailable</p>
-          <h3>{errorTitle}</h3>
-          <p>{pollError}</p>
-          <div className="ballot-recovery-actions">
-            {pollErrorStatus === 401 ? (
-              <a
-                className="button button-secondary"
-                href="/account"
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigate("/account");
-                }}
-              >
-                Open account
-              </a>
-            ) : (
-              <button
-                className="button button-secondary"
-                type="button"
-                disabled={isRefreshingBallot}
-                onClick={handleBallotReload}
-              >
-                {isRefreshingBallot ? "Reloading ballot…" : "Reload ballot"}
-              </button>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    if (!authReady) {
-      return (
-        <div className="confirmation-card">
-          <p className="eyebrow">Loading account</p>
-          <h3>Checking your voting access.</h3>
-        </div>
-      );
-    }
-
-    if (!session) {
-      return (
-        <div className="confirmation-card">
-          <p className="eyebrow">Account required</p>
-          <h3>Sign in or create an account to vote.</h3>
-          <p>
-            Voting opens after your email is verified and an admin approves your membership.
-          </p>
-          <a
-            className="sideb-button sideb-button-primary"
-            href="/account"
-            onClick={(event) => {
-              event.preventDefault();
-              navigate("/account");
-            }}
-          >
-            Open your account <span aria-hidden="true">→</span>
-          </a>
-        </div>
-      );
-    }
-
-    if (accountStatus === "unverified") {
-      return (
-        <div className="confirmation-card">
-          <p className="eyebrow">Verify email</p>
-          <h3>Check your inbox before voting.</h3>
-          <p>{session.user.email} needs to be verified before your account can vote.</p>
-          <a className="button button-secondary" href="/account" onClick={(event) => { event.preventDefault(); navigate("/account"); }}>
-            View account status
-          </a>
-        </div>
-      );
-    }
-
-    if (accountStatus === "unavailable") {
-      return (
-        <div className="confirmation-card ballot-recovery" role="alert">
-          <p className="eyebrow">Membership check unavailable</p>
-          <h3>Your approval could not be verified right now.</h3>
-          <p>
-            You are still signed in. We retried automatically, but the membership service
-            did not answer. Wait a moment and check again.
-          </p>
-          <button
-            className="button button-secondary"
-            type="button"
-            disabled={isRefreshingMembership}
-            onClick={handleMembershipReload}
-          >
-            {isRefreshingMembership ? "Checking membership…" : "Check membership again"}
-          </button>
-        </div>
-      );
-    }
-
-    if (accountStatus === "pending") {
-      return (
-        <div className="confirmation-card">
-          <p className="eyebrow">Approval pending</p>
-          <h3>Your account is waiting for member approval.</h3>
-          <p>
-            You are signed in as {session.user.email}. Ask an ALC admin to approve your
-            membership, then refresh your status from the Account page.
-          </p>
-          <a className="button button-secondary" href="/account" onClick={(event) => { event.preventDefault(); navigate("/account"); }}>
-            View account status
-          </a>
-        </div>
-      );
-    }
-
-    if (accountStatus === "blocked") {
-      return (
-        <div className="confirmation-card">
-          <p className="eyebrow">Access unavailable</p>
-          <h3>This account is not approved for voting.</h3>
-          <p>Ask an ALC admin if you think this is a mistake.</p>
-          <a className="button button-secondary" href="/account" onClick={(event) => { event.preventDefault(); navigate("/account"); }}>
-            View account details
-          </a>
-        </div>
-      );
-    }
-
-    return null;
-  }
-
-  function renderFormBody() {
-    if (poll.phase === "nominations") {
-      return (
-        <>
-          <div className="field-group">
-            <label htmlFor="albumTitle">Album title</label>
-            <input
-              id="albumTitle"
-              name="albumTitle"
-              type="text"
-              placeholder="Heaven or Las Vegas"
-              value={formState.albumTitle}
-              onChange={handleFieldChange}
-            />
-          </div>
-
-          <div className="field-group">
-            <label htmlFor="artistName">Artist</label>
-            <input
-              id="artistName"
-              name="artistName"
-              type="text"
-              placeholder="Cocteau Twins"
-              value={formState.artistName}
-              onChange={handleFieldChange}
-            />
-          </div>
-        </>
-      );
-    }
-
-    if (candidateOptions.length === 0) {
-      return (
-        <div className="confirmation-card ballot-recovery" role="status">
-          <p className="eyebrow">Ballot didn’t finish loading</p>
-          <h3>Your album choices are temporarily missing.</h3>
-          <p>Your account is still signed in. Reload the ballot to request the choices again.</p>
-          <div className="ballot-recovery-actions">
-            <button
-              className="button button-secondary"
-              type="button"
-              disabled={isRefreshingBallot}
-              onClick={handleBallotReload}
-            >
-              {isRefreshingBallot ? "Reloading ballot…" : "Reload ballot"}
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    if (poll.phase === "primary") {
-      return (
-        <div className="candidate-list" role="group" aria-label="Primary album choices">
-          {candidateOptions.map((candidate) => {
-            const isSelected = formState.selectedCandidateIds.includes(candidate.id);
-
-            return (
-              <label
-                key={candidate.id}
-                className={`candidate-option ${isSelected ? "is-selected" : ""}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  disabled={!isSelected && formState.selectedCandidateIds.length >= 5}
-                  onChange={() => handlePrimaryToggle(candidate.id)}
-                />
-
-                <div>
-                  <strong>{candidate.title}</strong>
-                  <p className="candidate-artist">{candidate.artist}</p>
-                  <p className="candidate-note">
-                    {formatNominationCount(candidate.nominationCount || 0)}
-                  </p>
-                </div>
-              </label>
-            );
-          })}
-        </div>
-      );
-    }
-
-    return (
-      <div className="ranked-ballot" aria-label="Final IRV ranking">
-        {rankedCandidates.map((candidate, index) => (
-          <article className="ranked-choice" key={candidate.id}>
-            <span>#{index + 1}</span>
-            <div>
-              <strong>{candidate.title}</strong>
-              <p>{candidate.artist}</p>
-            </div>
-            <div className="ranked-actions">
-              <button
-                aria-label={`Move ${candidate.title} up one rank`}
-                className="button button-secondary"
-                type="button"
-                disabled={index === 0}
-                onClick={() => handleRankMove(candidate.id, -1)}
-              >
-                Up
-              </button>
-              <button
-                aria-label={`Move ${candidate.title} down one rank`}
-                className="button button-secondary"
-                type="button"
-                disabled={index === rankedCandidates.length - 1}
-                onClick={() => handleRankMove(candidate.id, 1)}
-              >
-                Down
-              </button>
-            </div>
-          </article>
-        ))}
-      </div>
-    );
-  }
-
-  function renderCurrentAlbumRating() {
-    if (poll.phase !== "nominations" || !canVote || pollError) {
-      return null;
-    }
-
-    const albumTitle = poll.albumOfWeek?.title || "Current album";
-    const albumArtist = poll.albumOfWeek?.artist || "Artist not listed";
-
-    return (
-      <section className="current-album-rating" aria-labelledby="current-album-rating-title">
-        <div className="current-album-rating-heading">
-          <div>
-            <p className="eyebrow">The album we just heard</p>
-            <h3 id="current-album-rating-title">Rate {albumTitle}</h3>
-            <p>{albumArtist}</p>
-          </div>
-          <span>1–10</span>
-        </div>
-
-        {isLoadingCurrentAlbumRating ? (
-          <p className="helper-note" role="status">Checking for your saved rating…</p>
-        ) : storedCurrentAlbumRating ? (
-          <div className="current-album-rating-saved" role="status">
-            <span>Your rating</span>
-            <strong>{storedCurrentAlbumRating.rating}<small>/10</small></strong>
-            <p>Saved for this week. Ratings lock after submission.</p>
-          </div>
-        ) : (
-          <form className="current-album-rating-form" onSubmit={handleCurrentAlbumRatingSubmit}>
-            <fieldset disabled={isSubmittingCurrentAlbumRating}>
-              <legend>Choose one whole-number rating</legend>
-              <div className="rating-scale">
-                {Array.from({ length: 10 }, (_, index) => index + 1).map((rating) => (
-                  <label
-                    className={`rating-scale-option ${currentAlbumRating === rating ? "is-selected" : ""}`}
-                    key={rating}
-                  >
-                    <input
-                      name="currentAlbumRating"
-                      type="radio"
-                      value={rating}
-                      checked={currentAlbumRating === rating}
-                      onChange={() => {
-                        setCurrentAlbumRating(rating);
-                        setCurrentAlbumRatingError(null);
-                      }}
-                    />
-                    <span>{rating}</span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            <p className="helper-note">
-              This is separate from the album you nominate next.
-            </p>
-            {currentAlbumRatingError ? (
-              <p className="form-error" role="alert">{currentAlbumRatingError}</p>
-            ) : null}
-            <button
-              className="button button-secondary"
-              type="submit"
-              disabled={isSubmittingCurrentAlbumRating}
-            >
-              {isSubmittingCurrentAlbumRating ? "Saving rating…" : "Submit album rating"}
-            </button>
-          </form>
-        )}
-      </section>
-    );
-  }
-
-  function renderConfirmation() {
-    if (!storedBallot) {
-      return null;
-    }
-
-    return (
-      <div className="confirmation-card">
-        <p className="eyebrow">Submission saved</p>
-        <h3>Your ballot is locked for this phase.</h3>
-        <p>
-          The server has a saved submission for your account in this voting phase.
-        </p>
-
-        <div className="saved-ballot">
-          {storedBallot.nomination ? (
-            <>
-              <span>Nomination</span>
-              <strong>{storedBallot.nomination.albumTitle}</strong>
-              <p>{storedBallot.nomination.artistName}</p>
-            </>
-          ) : (
-            <>
-              <span>{poll.phase === "final" ? "Ranked ballot" : "Selected albums"}</span>
-              {storedBallot.candidateIds.map((candidateId, index) => {
-                const candidate = candidateOptions.find((option) => option.id === candidateId);
-
-                return candidate ? (
-                  <p key={candidateId}>
-                    {poll.phase === "final" ? `${index + 1}. ` : ""}
-                    {candidate.title} - {candidate.artist}
-                  </p>
-                ) : null;
-              })}
-            </>
-          )}
-        </div>
-
-        <p className="timestamp">Saved {formatTimestamp(storedBallot.submittedAt)}</p>
-      </div>
-    );
-  }
-
-  function renderFinalClosed() {
-    const cutoff = finalClosedAt || finalClosesAt;
-
-    return (
-      <div className="confirmation-card">
-        <p className="eyebrow">Final voting closed</p>
-        <h3>The final ballot is locked.</h3>
-        <p>
-          No new rankings can be submitted. The admin can now finalize any tied
-          elimination round and publish the official winner.
-        </p>
-        {cutoff ? <p className="timestamp">Closed {formatTimestamp(cutoff)}</p> : null}
-      </div>
-    );
-  }
-
   return (
     <div className="sideb-page sideb-subpage sideb-vote-page">
       <main className="sideb-subpage-main" id="main-content" tabIndex="-1">
@@ -1028,39 +475,96 @@ function Poll({
           <article className="vote-form-card surface-card">
             <div className="form-header">
               <div>
-                <span className={`phase-pill phase-${poll.phase}`}>{phaseDetails.label}</span>
+                <span className={`phase-pill phase-${poll.phase}`}>
+                  {phaseDetails.label}
+                </span>
                 <h2>{phaseDetails.title}</h2>
               </div>
               <p>{phaseDetails.description}</p>
             </div>
 
-            {renderCurrentAlbumRating()}
+            {
+              <AlbumRating
+                canVote={canVote}
+                currentAlbumRating={currentAlbumRating}
+                currentAlbumRatingError={currentAlbumRatingError}
+                handleCurrentAlbumRatingSubmit={handleCurrentAlbumRatingSubmit}
+                isLoadingCurrentAlbumRating={isLoadingCurrentAlbumRating}
+                isSubmittingCurrentAlbumRating={isSubmittingCurrentAlbumRating}
+                poll={poll}
+                pollError={pollError}
+                setCurrentAlbumRating={setCurrentAlbumRating}
+                setCurrentAlbumRatingError={setCurrentAlbumRatingError}
+                storedCurrentAlbumRating={storedCurrentAlbumRating}
+              />
+            }
 
-            {finalIsClosed && !hasSubmitted ? renderFinalClosed() : renderAccountGate() ||
-            (isLoadingVote && !hasSubmitted ? (
+            {finalIsClosed && !hasSubmitted ? (
+              <FinalClosed
+                finalClosedAt={finalClosedAt}
+                finalClosesAt={finalClosesAt}
+              />
+            ) : isAccountGated ? (
+              <AccountGate
+                accountStatus={accountStatus}
+                authReady={authReady}
+                handleBallotReload={handleBallotReload}
+                handleMembershipReload={handleMembershipReload}
+                hasSubmitted={hasSubmitted}
+                hasSupabaseConfig={hasSupabaseConfig}
+                isRefreshingBallot={isRefreshingBallot}
+                isRefreshingMembership={isRefreshingMembership}
+                navigate={navigate}
+                pollError={pollError}
+                pollErrorStatus={pollErrorStatus}
+                session={session}
+              />
+            ) : isLoadingVote && !hasSubmitted ? (
               <div className="confirmation-card">
                 <p className="eyebrow">Loading ballot</p>
                 <h3>Checking for an existing submission.</h3>
               </div>
             ) : hasSubmitted ? (
-              renderConfirmation()
+              <BallotConfirmation
+                candidateOptions={candidateOptions}
+                poll={poll}
+                storedBallot={storedBallot}
+              />
             ) : (
               <form className="vote-form" onSubmit={handleSubmit}>
-                {renderFormBody()}
+                {
+                  <BallotChoices
+                    candidateOptions={candidateOptions}
+                    formState={formState}
+                    handleBallotReload={handleBallotReload}
+                    handleFieldChange={handleFieldChange}
+                    handlePrimaryToggle={handlePrimaryToggle}
+                    handleRankMove={handleRankMove}
+                    isRefreshingBallot={isRefreshingBallot}
+                    poll={poll}
+                    rankedCandidates={rankedCandidates}
+                  />
+                }
 
                 {!ballotNeedsCandidates ? (
                   <>
                     <p className="helper-note">
-                      One verified, approved account gets one submission per phase.
+                      One verified, approved account gets one submission per
+                      phase.
                     </p>
 
                     {poll.phase === "primary" ? (
                       <p className="helper-note">
-                        Selected {formState.selectedCandidateIds.length}. You can submit any number from 1 to 5.
+                        Selected {formState.selectedCandidateIds.length}. You
+                        can submit any number from 1 to 5.
                       </p>
                     ) : null}
 
-                    {formError ? <p className="form-error" role="alert">{formError}</p> : null}
+                    {formError ? (
+                      <p className="form-error" role="alert">
+                        {formError}
+                      </p>
+                    ) : null}
 
                     <button
                       className="button button-primary"
@@ -1072,14 +576,16 @@ function Poll({
                   </>
                 ) : null}
               </form>
-            ))}
+            )}
           </article>
 
           <aside className="poll-sidebar">
             {session ? (
               <article className="surface-card sidebar-card">
                 <p className="eyebrow">Voting as</p>
-                <h2 className="sidebar-title">{membership?.display_name || "Signed in"}</h2>
+                <h2 className="sidebar-title">
+                  {membership?.display_name || "Signed in"}
+                </h2>
                 <p className="sidebar-copy">{session.user.email}</p>
                 <div className="member-badges compact-badges">
                   <span>{accountStatus}</span>
@@ -1116,10 +622,14 @@ function Poll({
                 disabled={isRefreshingBallot}
                 onClick={handleBallotReload}
               >
-                {isRefreshingBallot ? "Checking for a new round…" : "Check for new round"}
+                {isRefreshingBallot
+                  ? "Checking for a new round…"
+                  : "Check for new round"}
               </button>
               {roundCheckMessage ? (
-                <p className="helper-note" role="status">{roundCheckMessage}</p>
+                <p className="helper-note" role="status">
+                  {roundCheckMessage}
+                </p>
               ) : null}
             </article>
           </aside>

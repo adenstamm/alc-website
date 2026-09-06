@@ -58,17 +58,27 @@ test("poll requests forward abort signals", async () => {
   globalThis.fetch = async (_url, options) => {
     requestOptions = options;
     return new Promise((_resolve, reject) => {
-      options.signal.addEventListener("abort", () => reject(
-        options.signal.reason || new DOMException("Aborted", "AbortError"),
-      ), { once: true });
+      options.signal.addEventListener(
+        "abort",
+        () =>
+          reject(
+            options.signal.reason || new DOMException("Aborted", "AbortError"),
+          ),
+        { once: true },
+      );
     });
   };
 
   try {
-    const pendingRequest = fetchCurrentPoll(null, { signal: controller.signal });
+    const pendingRequest = fetchCurrentPoll(null, {
+      signal: controller.signal,
+    });
     await Promise.resolve();
     controller.abort();
-    await assert.rejects(pendingRequest, (error) => error.name === "AbortError");
+    await assert.rejects(
+      pendingRequest,
+      (error) => error.name === "AbortError",
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -83,19 +93,25 @@ test("hung poll requests time out and enter bounded retry recovery", async () =>
   globalThis.fetch = async (_url, options) => {
     requestCount += 1;
     return new Promise((_resolve, reject) => {
-      options.signal.addEventListener("abort", () => reject(
-        options.signal.reason || new DOMException("Aborted", "AbortError"),
-      ), { once: true });
+      options.signal.addEventListener(
+        "abort",
+        () =>
+          reject(
+            options.signal.reason || new DOMException("Aborted", "AbortError"),
+          ),
+        { once: true },
+      );
     });
   };
 
   try {
     await assert.rejects(
-      () => fetchReliableCurrentPoll(null, {
-        maxAttempts: 2,
-        requestTimeoutMs: 1,
-        sleep: async () => {},
-      }),
+      () =>
+        fetchReliableCurrentPoll(null, {
+          maxAttempts: 2,
+          requestTimeoutMs: 1,
+          sleep: async () => {},
+        }),
       (error) => error.status === 0 && /timed out/i.test(error.message),
     );
     assert.equal(requestCount, 2);
@@ -107,10 +123,11 @@ test("hung poll requests time out and enter bounded retry recovery", async () =>
 test("rate-limit responses include a useful retry window", async () => {
   const originalFetch = globalThis.fetch;
 
-  globalThis.fetch = async () => new Response(null, {
-    headers: { "Retry-After": "12" },
-    status: 429,
-  });
+  globalThis.fetch = async () =>
+    new Response(null, {
+      headers: { "Retry-After": "12" },
+      status: 429,
+    });
 
   try {
     await assert.rejects(
@@ -207,7 +224,10 @@ test("long Retry-After windows remain manual instead of retrying too early", asy
 
   globalThis.fetch = async () => {
     requestCount += 1;
-    return new Response(null, { headers: { "Retry-After": "12" }, status: 429 });
+    return new Response(null, {
+      headers: { "Retry-After": "12" },
+      status: 429,
+    });
   };
 
   try {
@@ -224,15 +244,28 @@ test("long Retry-After windows remain manual instead of retrying too early", asy
 test("only signed-in primary and final ballots require candidates", () => {
   const session = { access_token: "header.payload.signature" };
 
-  assert.equal(isIncompleteMemberBallot({ phase: "primary", candidates: [] }, session), true);
-  assert.equal(isIncompleteMemberBallot({ phase: "final", finalists: [] }, session), true);
-  assert.equal(isIncompleteMemberBallot({ phase: "nominations" }, session), false);
-  assert.equal(isIncompleteMemberBallot({ phase: "final", finalists: [] }, null), false);
-  assert.equal(isIncompleteMemberBallot(
-    { phase: "primary", candidates: [] },
-    session,
-    { requireCandidates: false },
-  ), false);
+  assert.equal(
+    isIncompleteMemberBallot({ phase: "primary", candidates: [] }, session),
+    true,
+  );
+  assert.equal(
+    isIncompleteMemberBallot({ phase: "final", finalists: [] }, session),
+    true,
+  );
+  assert.equal(
+    isIncompleteMemberBallot({ phase: "nominations" }, session),
+    false,
+  );
+  assert.equal(
+    isIncompleteMemberBallot({ phase: "final", finalists: [] }, null),
+    false,
+  );
+  assert.equal(
+    isIncompleteMemberBallot({ phase: "primary", candidates: [] }, session, {
+      requireCandidates: false,
+    }),
+    false,
+  );
 });
 
 test("pending members can receive the intentionally hidden ballot without retrying", async () => {
@@ -262,9 +295,11 @@ test("an incomplete member ballot is retried once before rendering", async () =>
 
   globalThis.fetch = async () => {
     requestCount += 1;
-    return Response.json(requestCount === 1
-      ? { phase: "primary", candidates: [] }
-      : { phase: "primary", candidates: [{ id: "candidate-1" }] });
+    return Response.json(
+      requestCount === 1
+        ? { phase: "primary", candidates: [] }
+        : { phase: "primary", candidates: [{ id: "candidate-1" }] },
+    );
   };
 
   try {
@@ -289,10 +324,74 @@ test("persistently incomplete member ballots become a recoverable error", async 
 
   try {
     await assert.rejects(
-      () => fetchReliableCurrentPoll({ access_token: "header.payload.signature" }),
+      () =>
+        fetchReliableCurrentPoll({ access_token: "header.payload.signature" }),
       /without its candidates/i,
     );
     assert.equal(requestCount, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("the timeout also aborts a stalled response body and permits retry", async () => {
+  const originalFetch = globalThis.fetch;
+  let attempts = 0;
+  globalThis.fetch = async (_url, { signal }) => {
+    attempts++;
+    return new Response(
+      new ReadableStream({
+        start(controller) {
+          signal.addEventListener(
+            "abort",
+            () => controller.error(signal.reason),
+            { once: true },
+          );
+        },
+      }),
+    );
+  };
+  try {
+    await assert.rejects(
+      fetchReliableCurrentPoll(null, {
+        requestTimeoutMs: 10,
+        maxAttempts: 2,
+        sleep: async () => {},
+      }),
+      /timed out/,
+    );
+    assert.equal(attempts, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("caller cancellation remains connected during response body consumption", async () => {
+  const originalFetch = globalThis.fetch;
+  let bodyStarted;
+  const started = new Promise((resolve) => {
+    bodyStarted = resolve;
+  });
+  globalThis.fetch = async (_url, { signal }) =>
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          signal.addEventListener(
+            "abort",
+            () => controller.error(signal.reason),
+            { once: true },
+          );
+          bodyStarted();
+        },
+      }),
+    );
+  const caller = new AbortController();
+  try {
+    const pending = fetchCurrentPoll(null, { signal: caller.signal });
+    await started;
+    await Promise.resolve();
+    caller.abort();
+    await assert.rejects(pending, (error) => error.name === "AbortError");
   } finally {
     globalThis.fetch = originalFetch;
   }

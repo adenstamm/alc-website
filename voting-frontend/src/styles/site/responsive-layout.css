@@ -1,0 +1,154 @@
+/* End-of-program footer */
+
+.site-footer {
+  border-top: 2px solid rgba(201, 123, 60, 0.38);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 90px, rgba(255, 255, 255, 0.014) 90px 91px),
+    linear-gradient(90deg, rgba(199, 121, 61, 0.05), transparent 40%),
+    #0d0b09;
+}
+
+.site-footer-statement p {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-signal-soft);
+  letter-spacing: 0.13em;
+}
+
+.site-footer-fineprint {
+  border-top-color: rgba(242, 231, 209, 0.09);
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 1180px) {
+  .sideb-nav-signal {
+    display: none;
+  }
+
+  .sideb-session-inner {
+    grid-template-columns: minmax(145px, 0.7fr) minmax(220px, 1.25fr) minmax(180px, 1fr) minmax(180px, 1fr);
+  }
+
+  .sideb-session-inner > span:nth-of-type(2) {
+    display: none;
+  }
+}
+
+@media (max-width: 920px) {
+  .sideb-subpage-main {
+    padding-top: 20px;
+  }
+
+  .poll-sidebar {
+    position: static;
+  }
+
+  .sideb-page-hero {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .sideb-nav,
+  .sideb-nav-floating {
+    border-radius: 0;
+  }
+
+  .sideb-nav-floating {
+    top: 0;
+    right: 0;
+    left: 0;
+  }
+
+  .sideb-links {
+    border-radius: 3px;
+    border-top: 2px solid rgba(201, 123, 60, 0.4);
+    background: var(--color-console);
+  }
+
+  .sideb-links a {
+    justify-content: flex-start;
+  }
+
+  .sideb-links a > span {
+    width: 24px;
+  }
+
+  .sideb-hero {
+    padding-top: 126px;
+  }
+
+  .sideb-floating-album-link {
+    max-width: 520px;
+  }
+
+  .sideb-page-hero::before {
+    right: 18px;
+  }
+}
+
+@media (max-width: 540px) {
+  .sideb-hero-signal {
+    grid-template-columns: auto auto;
+  }
+
+  .sideb-hero-signal small {
+    display: none;
+  }
+
+  .sideb-hero-signal > * {
+    padding-inline: 9px;
+    font-size: 0.53rem;
+  }
+
+  .sideb-hero h1 {
+    font-size: clamp(4rem, 19vw, 5.7rem);
+  }
+
+  .sideb-floating-album-link {
+    grid-template-columns: 84px minmax(0, 1fr);
+  }
+
+  .sideb-floating-album-art {
+    width: 84px;
+  }
+
+  .sideb-session-inner > span {
+    display: grid;
+  }
+
+  .sideb-link-card {
+    min-height: 190px;
+  }
+
+  .sideb-page-hero,
+  .current-record-room,
+  .vote-form-card,
+  .sidebar-card,
+  .account-auth-card,
+  .account-pass-card,
+  .account-settings-card,
+  .account-message-card,
+  .account-side-note {
+    border-radius: 3px;
+  }
+
+  .account-hero-pass {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sideb-nav-signal i,
+  .site-footer-statement p i,
+  .current-signal-line i,
+  .sideb-floating-album-label i,
+  .sideb-hero-signal i {
+    box-shadow: none;
+  }
+}
